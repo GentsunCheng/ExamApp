@@ -1,0 +1,109 @@
+# Makefile for Exam System
+
+# 项目配置
+APP_NAME = exam_system
+PYTHON_VERSION = 3.9+
+MAIN_SCRIPT = main.py
+DIST_DIR = dist
+BUILD_DIR = build
+
+# PyInstaller 配置
+PYINSTALLER = pyinstaller
+PYINSTALLER_ARGS = --onedir --noconsole --name $(APP_NAME) --distpath $(DIST_DIR) --workpath $(BUILD_DIR)
+
+# 依赖的Python包
+REQUIRED_PACKAGES = \
+    PySide6 \
+    pyyaml \
+    toml
+
+# 默认目标
+.PHONY: all
+all: install build
+
+# 安装依赖
+.PHONY: install
+install:
+	@echo "安装依赖包..."
+	pip3 install -r requirements.txt
+	@echo "安装完成!"
+
+# 创建requirements.txt
+.PHONY: requirements
+requirements:
+	@echo "生成 requirements.txt..."
+	@echo "# Python packages for Exam System" > requirements.txt
+	@echo "PySide6" >> requirements.txt
+	@echo "pyyaml" >> requirements.txt
+	@echo "toml" >> requirements.txt
+	@echo "pyinstaller" >> requirements.txt
+	@echo "requirements.txt 已生成!"
+
+# 清理构建文件
+.PHONY: clean
+clean:
+	@echo "清理构建文件..."
+	rm -rf $(BUILD_DIR) $(DIST_DIR) *.spec
+	@echo "清理完成!"
+
+# 清理所有文件（包括数据库）
+.PHONY: deep-clean
+deep-clean: clean
+	@echo "清理所有文件..."
+	rm -rf ~/.exam_system/
+	@echo "深度清理完成!"
+
+# 构建可执行文件
+.PHONY: build
+build: clean
+	@echo "开始构建可执行文件..."
+	$(PYINSTALLER) $(PYINSTALLER_ARGS) $(MAIN_SCRIPT)
+	@echo "构建完成! 可执行文件位于: $(DIST_DIR)/$(APP_NAME)/"
+
+# 构建并运行
+.PHONY: run
+run: build
+	@echo "运行可执行文件..."
+	./$(DIST_DIR)/$(APP_NAME)/$(APP_NAME)
+
+# 开发模式运行
+.PHONY: dev
+dev:
+	@echo "开发模式运行..."
+	python $(MAIN_SCRIPT)
+
+# 打包发布
+.PHONY: package
+package: build
+	@echo "创建发布包..."
+	cd $(DIST_DIR) && tar -czf $(APP_NAME)-$(shell date +%Y%m%d).tar.gz $(APP_NAME)
+	@echo "发布包已创建: $(DIST_DIR)/$(APP_NAME)-$(shell date +%Y%m%d).tar.gz"
+
+# 检查依赖
+.PHONY: check-deps
+check-deps:
+	@echo "检查依赖包..."
+	@for pkg in $(REQUIRED_PACKAGES); do \
+		python -c "import $$pkg" 2>/dev/null && echo "✓ $$pkg 已安装" || echo "✗ $$pkg 未安装"; \
+	done
+
+# 测试
+.PHONY: test
+test:
+	@echo "运行测试..."
+	python -m pytest test_*.py -v
+
+# 帮助
+.PHONY: help
+help:
+	@echo "Exam System Makefile"
+	@echo "可用命令:"
+	@echo "  make install     - 安装依赖包"
+	@echo "  make build         - 构建可执行文件"
+	@echo "  make run          - 构建并运行"
+	@echo "  make dev          - 开发模式运行"
+	@echo "  make clean        - 清理构建文件"
+	@echo "  make package      - 创建发布包"
+	@echo "  make check-deps  - 检查依赖包"
+	@echo "  make test         - 运行测试"
+	@echo "  make help          - 显示此帮助信息"
