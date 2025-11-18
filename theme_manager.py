@@ -40,7 +40,7 @@ class ThemeManager:
                 'text_primary': '#eaeaea',
                 'text_secondary': '#cfcfcf',
                 'text_tertiary': '#b3b3b3',
-                'text_inverse': '#000000',
+                'text_inverse': '#ffffff',
                 'primary': '#409eff',
                 'success': '#67c23a',
                 'warning': '#e6a23c',

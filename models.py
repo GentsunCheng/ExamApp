@@ -235,6 +235,30 @@ def update_user_active(user_id, active):
     conn.commit()
     conn.close()
 
+def update_user_basic(user_id, username=None, full_name=None):
+    conn = get_conn()
+    c = conn.cursor()
+    if username is not None and full_name is not None:
+        c.execute('UPDATE users SET username=?, full_name=? WHERE id=?', (username, full_name, user_id))
+    elif username is not None:
+        c.execute('UPDATE users SET username=? WHERE id=?', (username, user_id))
+    elif full_name is not None:
+        c.execute('UPDATE users SET full_name=? WHERE id=?', (full_name, user_id))
+    conn.commit()
+    conn.close()
+
+def update_exam_title_desc(exam_id, title=None, description=None):
+    conn = get_conn()
+    c = conn.cursor()
+    if title is not None and description is not None:
+        c.execute('UPDATE exams SET title=?, description=? WHERE id=?', (title, description, exam_id))
+    elif title is not None:
+        c.execute('UPDATE exams SET title=? WHERE id=?', (title, exam_id))
+    elif description is not None:
+        c.execute('UPDATE exams SET description=? WHERE id=?', (description, exam_id))
+    conn.commit()
+    conn.close()
+
 def delete_sync_target(target_id):
     conn = get_conn()
     c = conn.cursor()
