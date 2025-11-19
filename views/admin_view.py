@@ -492,8 +492,15 @@ class AdminView(QWidget):
                         return header.index(name)
                     except Exception:
                         return -1
-                itype = idx('类型'); icontent = idx('内容'); icorrect = idx('正确答案')
-                start_opts = 3
+            itype = idx('类型'); icontent = idx('内容'); icorrect = idx('正确答案'); iscore = idx('分数')
+            start_opts = None
+            for i, h in enumerate(header):
+                if h.startswith('选项'):
+                    start_opts = i
+                    break
+            if start_opts is None:
+                base_cols = [x for x in (itype, icontent, icorrect, iscore) if x >= 0]
+                start_opts = (max(base_cols) + 1) if base_cols else 3
                 if min(itype, icontent, icorrect) < 0:
                     QMessageBox.warning(self, '错误', '缺少必要列: 类型/内容/正确答案')
                     return
@@ -538,10 +545,18 @@ class AdminView(QWidget):
                             key_index += 1
                         if not options:
                             continue
+                    sc = 1.0
+                    if iscore >= 0 and iscore < len(row):
+                        try:
+                            v = row[iscore]
+                            if v is not None and str(v).strip() != '':
+                                sc = float(str(v).strip())
+                        except Exception:
+                            sc = 1.0
                     item = {
                         'type': qtype,
                         'text': text,
-                        'score': 1.0,
+                        'score': sc,
                         'options': options,
                         'correct': correct
                     }
@@ -623,10 +638,10 @@ class AdminView(QWidget):
                 wb = Workbook()
                 ws = wb.active
                 ws.title = 'Questions'
-                ws.append(['类型', '内容', '正确答案', '选项A', '选项B', '选项C', '选项D'])
-                ws.append(['单选', '2+2=?', 'A', '4', '3'])
-                ws.append(['多选', '哪些是偶数？', 'A,C', '2', '3', '4'])
-                ws.append(['判断', 'Python是解释型语言', 'true'])
+                ws.append(['类型', '内容', '正确答案', '分数', '选项A', '选项B', '选项C', '选项D'])
+                ws.append(['单选', '2+2=?', 'A', 2, '4', '3'])
+                ws.append(['多选', '哪些是偶数？', 'A,C', 3, '2', '3', '4'])
+                ws.append(['判断', 'Python是解释型语言', 'true', 1])
                 wb.save(out)
             elif (sel and sel.startswith('JSON')) or ext == '.json':
                 out = fn if ext == '.json' else fn + '.json'
@@ -1144,6 +1159,13 @@ class AdminView(QWidget):
         self.scores_table = QTableWidget(0, 8)
         self.scores_table.setHorizontalHeaderLabels(['UUID记录', '用户名', '姓名', '用户ID', '试题', '开始', '提交', '分数/通过'])
         self.scores_table.horizontalHeader().setStretchLastSection(True)
+        self.scores_table.setColumnWidth(0, 280)
+        self.scores_table.setColumnWidth(1, 75)
+        self.scores_table.setColumnWidth(2, 75)
+        self.scores_table.setColumnWidth(3, 50)
+        self.scores_table.setColumnWidth(4, 250)
+        self.scores_table.setColumnWidth(5, 200)
+        self.scores_table.setColumnWidth(6, 200)
         self.scores_table.setAlternatingRowColors(True)
         self.refresh_scores()
         vb.addWidget(self.scores_table)

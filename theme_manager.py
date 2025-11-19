@@ -1,9 +1,15 @@
 from PySide6.QtGui import QColor
+import sys
+import subprocess
 
 
 class ThemeManager:
     def __init__(self):
         self.mode = 'light'
+        try:
+            self.auto_detect_mode()
+        except Exception:
+            pass
 
     def get_theme_colors(self):
         if self.mode == 'light':
@@ -59,6 +65,19 @@ class ThemeManager:
 
     def set_mode(self, mode):
         self.mode = mode if mode in ('light', 'dark') else 'light'
+
+    def auto_detect_mode(self):
+        if sys.platform != 'darwin':
+            return
+        try:
+            r = subprocess.run(['defaults', 'read', '-g', 'AppleInterfaceStyle'], capture_output=True, text=True)
+            if r.returncode == 0:
+                v = (r.stdout or '').strip().lower()
+                self.mode = 'dark' if v == 'dark' else 'light'
+            else:
+                self.mode = 'light'
+        except Exception:
+            self.mode = 'light'
 
 
 theme_manager = ThemeManager()

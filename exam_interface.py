@@ -289,6 +289,25 @@ class ExamInfoPanel(QWidget):
                 font-size: 14px;
                 margin: 4px 0;
             }}
+            
+            QPushButton#optionButton {{
+                background: {colors['card_background']};
+                border: 1px solid {colors['input_border']};
+                border-radius: 12px;
+                color: {colors['text_primary']};
+                padding: 12px 16px;
+                font-size: 16px;
+                min-height: 44px;
+                text-align: left;
+            }}
+            QPushButton#optionButton:hover {{
+                background: {colors['border_light']};
+            }}
+            QPushButton#optionButton:checked {{
+                background: {colors['primary']};
+                color: {colors['text_inverse']};
+                border-color: {colors['primary']};
+            }}
         """)
         
     def set_exam_info(self, title, duration, total_questions, pass_score):
@@ -576,6 +595,7 @@ class QuestionDisplay(QWidget):
         """显示单选题"""
         for option in question_data['options']:
             button = QPushButton(option['text'])
+            button.setObjectName('optionButton')
             button.setCheckable(True)
             self.options_layout.addWidget(button)
             
@@ -583,6 +603,7 @@ class QuestionDisplay(QWidget):
         """显示多选题"""
         for option in question_data['options']:
             button = QPushButton(option['text'])
+            button.setObjectName('optionButton')
             button.setCheckable(True)
             self.options_layout.addWidget(button)
             
@@ -590,6 +611,8 @@ class QuestionDisplay(QWidget):
         """显示判断题"""
         true_button = QPushButton("正确")
         false_button = QPushButton("错误")
+        true_button.setObjectName('optionButton')
+        false_button.setObjectName('optionButton')
         
         true_button.setCheckable(True)
         false_button.setCheckable(True)

@@ -97,6 +97,16 @@ def list_questions(exam_id):
         result.append({'id': r[0], 'type': r[1], 'text': r[2], 'options': json.loads(r[3]) if r[3] else [], 'correct': json.loads(r[4]) if r[4] else [], 'score': r[5]})
     return result
 
+def get_exam_stats(exam_id):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute('SELECT COUNT(*), COALESCE(SUM(score), 0) FROM questions WHERE exam_id=?', (exam_id,))
+    row = c.fetchone()
+    conn.close()
+    cnt = int(row[0]) if row and row[0] is not None else 0
+    total = float(row[1]) if row and row[1] is not None else 0.0
+    return {'count': cnt, 'total_score': total}
+
 def import_questions_from_json(exam_id, payload):
     conn = get_conn()
     c = conn.cursor()

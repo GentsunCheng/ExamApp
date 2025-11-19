@@ -34,7 +34,10 @@ class LoginView(QWidget):
         lay = QVBoxLayout()
         title = QLabel('📝 登录')
         title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size:20px; font-weight:bold; margin-bottom:16px;")
+        title.setStyleSheet(
+            f"font-size:20px; font-weight:bold; margin-bottom:16px; padding:6px 12px; border-radius:12px; "
+            f"background-color:{colors['border_light']}; color:{colors['text_primary']}; border:1px solid {colors['border']};"
+        )
         self.user = QLineEdit()
         self.user.setPlaceholderText('用户名')
         self.user.setInputMethodHints(Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase | Qt.ImhPreferLowercase)

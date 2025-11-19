@@ -3,7 +3,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QTableWidget, QTableWidgetItem, QMessageBox, QTabWidget
 from icon_manager import get_icon
 from theme_manager import theme_manager
-from models import list_exams, list_attempts, get_exam_title
+from models import list_exams, list_attempts, get_exam_title, get_exam_stats
 from windows.exam_window import ExamWindow
 
 class UserView(QWidget):
@@ -59,8 +59,15 @@ class UserView(QWidget):
         exams_toolbar.addWidget(refresh_exams_btn)
         exams_toolbar.addStretch()
         exams_v.addLayout(exams_toolbar)
-        self.exams_table_user = QTableWidget(0, 3)
-        self.exams_table_user.setHorizontalHeaderLabels(['ID', '标题', '限时(分钟)'])
+        self.exams_table_user = QTableWidget(0, 7)
+        self.exams_table_user.setHorizontalHeaderLabels(['ID', '标题', '限时(分钟)', '总分', '及格比例%', '题目数量', '截止'])
+        self.exams_table_user.setColumnWidth(0, 50)
+        self.exams_table_user.setColumnWidth(1, 250)
+        self.exams_table_user.setColumnWidth(2, 80)
+        self.exams_table_user.setColumnWidth(3, 80)
+        self.exams_table_user.setColumnWidth(4, 80)
+        self.exams_table_user.setColumnWidth(5, 80)
+        self.exams_table_user.setColumnWidth(6, 180)
         self.exams_table_user.horizontalHeader().setStretchLastSection(True)
         self.exams_table_user.setAlternatingRowColors(True)
         self.refresh_exams()
@@ -79,6 +86,10 @@ class UserView(QWidget):
         history_v.addLayout(history_toolbar)
         self.attempts_table = QTableWidget(0, 5)
         self.attempts_table.setHorizontalHeaderLabels(['UUID记录', '试题', '开始', '提交', '分数/通过'])
+        self.attempts_table.setColumnWidth(0, 280)
+        self.attempts_table.setColumnWidth(1, 250)
+        self.attempts_table.setColumnWidth(2, 200)
+        self.attempts_table.setColumnWidth(3, 200)
         self.attempts_table.horizontalHeader().setStretchLastSection(True)
         self.attempts_table.setAlternatingRowColors(True)
         self.refresh_attempts()
@@ -99,6 +110,11 @@ class UserView(QWidget):
             tbl.setItem(r, 0, QTableWidgetItem(str(e[0])))
             tbl.setItem(r, 1, QTableWidgetItem(e[1] or ''))
             tbl.setItem(r, 2, QTableWidgetItem(str(e[4])))
+            stats = get_exam_stats(int(e[0]))
+            tbl.setItem(r, 3, QTableWidgetItem(str(int(stats['total_score'])) if stats else '0'))
+            tbl.setItem(r, 4, QTableWidgetItem(f"{int(float(e[3])*100)}%"))
+            tbl.setItem(r, 5, QTableWidgetItem(str(stats['count']) if stats else '0'))
+            tbl.setItem(r, 6, QTableWidgetItem(e[5] if e[5] else '永久'))
     def refresh_attempts(self):
         self.attempts_table.setRowCount(0)
         for a in list_attempts(self.user['id']):
@@ -111,9 +127,9 @@ class UserView(QWidget):
             self.attempts_table.setItem(r, 3, QTableWidgetItem(a[4] or ''))
             ucell = QTableWidgetItem(f'{a[5]} / {"通过" if a[6]==1 else "未通过"}')
             if a[6] == 1:
-                ucell.setBackground(QColor('#e1f3d8'))
+                ucell.setBackground(QColor("#6bc041"))
             else:
-                ucell.setBackground(QColor('#fde2e2'))
+                ucell.setBackground(QColor("#e75c5c"))
             self.attempts_table.setItem(r, 4, ucell)
     def start_exam(self, exam_id=None):
         if exam_id is None:
