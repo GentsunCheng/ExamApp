@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt, QThread, Signal, QSize, QRegularExpression
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QFormLayout, QSpinBox, QDateTimeEdit, QFileDialog, QTabWidget, QTableWidget, QTableWidgetItem, QGroupBox, QCheckBox, QComboBox, QMessageBox, QProgressDialog, QListView
 from PySide6.QtGui import QRegularExpressionValidator
 from database import DB_PATH
-from models import list_users, create_user, list_exams, add_exam, import_questions_from_json, list_sync_targets, upsert_sync_target, delete_user, update_user_role, update_user_active, delete_sync_target, update_sync_target
+from models import list_users, create_user, list_exams, add_exam, import_questions_from_json, list_sync_targets, upsert_sync_target, delete_user, update_user_role, update_user_active, delete_sync_target, update_sync_target, get_exam_title
 from theme_manager import theme_manager
 from icon_manager import get_icon
 from status_indicators import LoadingIndicator
@@ -1142,7 +1142,7 @@ class AdminView(QWidget):
         gb = QGroupBox('成绩列表')
         vb = QVBoxLayout()
         self.scores_table = QTableWidget(0, 8)
-        self.scores_table.setHorizontalHeaderLabels(['尝试UUID', '用户名', '姓名', '用户ID', '试题ID', '开始', '提交', '分数/通过'])
+        self.scores_table.setHorizontalHeaderLabels(['UUID记录', '用户名', '姓名', '用户ID', '试题', '开始', '提交', '分数/通过'])
         self.scores_table.horizontalHeader().setStretchLastSection(True)
         self.scores_table.setAlternatingRowColors(True)
         self.refresh_scores()
@@ -1168,7 +1168,8 @@ class AdminView(QWidget):
             self.scores_table.setItem(r, 1, QTableWidgetItem(a[1] or ''))
             self.scores_table.setItem(r, 2, QTableWidgetItem(a[2] or ''))
             self.scores_table.setItem(r, 3, QTableWidgetItem(str(a[3])))
-            self.scores_table.setItem(r, 4, QTableWidgetItem(str(a[4])))
+            exam_title = get_exam_title(int(a[4])) if a[4] is not None else ''
+            self.scores_table.setItem(r, 4, QTableWidgetItem(exam_title or ''))
             self.scores_table.setItem(r, 5, QTableWidgetItem(a[5] or ''))
             self.scores_table.setItem(r, 6, QTableWidgetItem(a[6] or ''))
             passed_text = '通过' if a[8] == 1 else '未通过'
@@ -1191,13 +1192,14 @@ class AdminView(QWidget):
             wb = Workbook()
             ws = wb.active
             ws.title = 'Scores'
-            headers = ['尝试UUID', '用户名', '姓名', '用户ID', '试题ID', '开始', '提交', '分数', '通过']
+            headers = ['尝试UUID', '用户名', '姓名', '用户ID', '试题标题', '开始', '提交', '分数', '通过']
             ws.append(headers)
             from models import list_attempts_with_user
             green_fill = PatternFill(start_color='FF67C23A', end_color='FF67C23A', fill_type='solid')
             red_fill = PatternFill(start_color='FFF56C6C', end_color='FFF56C6C', fill_type='solid')
             for a in list_attempts_with_user():
-                ws.append([a[0], a[1] or '', a[2] or '', int(a[3]), int(a[4]), a[5] or '', a[6] or '', a[7], '通过' if a[8] == 1 else '未通过'])
+                exam_title = get_exam_title(int(a[4])) if a[4] is not None else ''
+                ws.append([a[0], a[1] or '', a[2] or '', int(a[3]), exam_title or '', a[5] or '', a[6] or '', a[7], '通过' if a[8] == 1 else '未通过'])
                 cell = ws.cell(row=ws.max_row, column=9)
                 cell.fill = green_fill if a[8] == 1 else red_fill
             wb.save(out)

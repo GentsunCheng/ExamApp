@@ -71,6 +71,14 @@ def list_exams(include_expired=False):
     conn.close()
     return rows
 
+def get_exam_title(exam_id):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute('SELECT title FROM exams WHERE id=?', (exam_id,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else None
+
 def add_question(exam_id, qtype, text, options, correct_answers, score):
     conn = get_conn()
     c = conn.cursor()

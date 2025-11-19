@@ -3,7 +3,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QTableWidget, QTableWidgetItem, QMessageBox, QTabWidget
 from icon_manager import get_icon
 from theme_manager import theme_manager
-from models import list_exams, list_attempts
+from models import list_exams, list_attempts, get_exam_title
 from windows.exam_window import ExamWindow
 
 class UserView(QWidget):
@@ -66,7 +66,7 @@ class UserView(QWidget):
         self.refresh_exams()
         exams_v.addWidget(self.exams_table_user)
         exams_tab.setLayout(exams_v)
-        self.tabs.addTab(exams_tab, '考试')
+        self.tabs.addTab(exams_tab, '试题列表')
         self.tabs.setTabIcon(0, get_icon('exam'))
         # 历史成绩页面
         history_tab = QWidget()
@@ -78,7 +78,7 @@ class UserView(QWidget):
         history_toolbar.addStretch()
         history_v.addLayout(history_toolbar)
         self.attempts_table = QTableWidget(0, 5)
-        self.attempts_table.setHorizontalHeaderLabels(['尝试UUID', '试题ID', '开始', '提交', '分数/通过'])
+        self.attempts_table.setHorizontalHeaderLabels(['UUID记录', '试题', '开始', '提交', '分数/通过'])
         self.attempts_table.horizontalHeader().setStretchLastSection(True)
         self.attempts_table.setAlternatingRowColors(True)
         self.refresh_attempts()
@@ -105,7 +105,8 @@ class UserView(QWidget):
             r = self.attempts_table.rowCount()
             self.attempts_table.insertRow(r)
             self.attempts_table.setItem(r, 0, QTableWidgetItem(a[0]))
-            self.attempts_table.setItem(r, 1, QTableWidgetItem(str(a[2])))
+            title = get_exam_title(int(a[2])) if a[2] is not None else ''
+            self.attempts_table.setItem(r, 1, QTableWidgetItem(title or ''))
             self.attempts_table.setItem(r, 2, QTableWidgetItem(a[3] or ''))
             self.attempts_table.setItem(r, 3, QTableWidgetItem(a[4] or ''))
             ucell = QTableWidgetItem(f'{a[5]} / {"通过" if a[6]==1 else "未通过"}')
