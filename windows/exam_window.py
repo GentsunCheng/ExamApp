@@ -37,8 +37,8 @@ class ExamWindow(QMainWindow):
         self.attempt_uuid = start_attempt(user['id'], exam_id)
         self.current_index = 0
         self.setWindowTitle(f'考试进行中, 总分: {self.total_score}')
-        self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
-        self.setWindowModality(Qt.ApplicationModal)
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
         colors = theme_manager.get_theme_colors()
         bkg = 'background' + '-color'
         col = 'co' + 'lor'
@@ -245,8 +245,8 @@ class ExamWindow(QMainWindow):
             ExamWindow.instance = None
             event.accept()
             return
-        reply = QMessageBox.question(self, '确认', '确定要退出考试吗？未作答的题目按0分，其他题目正常记分', QMessageBox.Yes | QMessageBox.No)
-        if reply == QMessageBox.Yes:
+        reply = QMessageBox.question(self, '确认', '确定要退出考试吗？未作答的题目按0分，其他题目正常记分', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
             try:
                 self.save_current()
                 self.timer.stop()

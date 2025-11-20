@@ -38,10 +38,6 @@ def rsync_pull(ip, username, remote_path, local_dir, ssh_password=None):
     """Pull database file from remote device using rsync"""
     os.makedirs(local_dir, exist_ok=True)
     
-    # First, check if remote file exists
-    remote_dir = os.path.dirname(remote_path)
-    remote_filename = os.path.basename(remote_path)
-    
     if ssh_password:
         # Check if remote file exists using SSH with password
         check_cmd = ['sshpass', '-p', ssh_password, 'ssh', '-o', 'StrictHostKeyChecking=no', 

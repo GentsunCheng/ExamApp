@@ -3,15 +3,22 @@
 提供现代化的计时器、进度显示和考试管理功能
 """
 
-from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect, Signal
-from PySide6.QtGui import QPainter, QColor, QPen, QBrush, QFont, QFontMetrics
+from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, Signal
 from PySide6.QtWidgets import (
     QWidget, QLabel, QProgressBar, QFrame, QVBoxLayout, QHBoxLayout,
-    QPushButton, QButtonGroup, QApplication,
+    QPushButton, QButtonGroup,
     QTextEdit, QGroupBox, QLineEdit
 )
 from theme_manager import theme_manager
-from icon_manager import icon_manager
+
+
+def seconds_to_time(seconds):
+    """将秒数转换为时间格式"""
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
 
 class ModernTimer(QLabel):
     """现代化计时器组件"""
@@ -28,7 +35,7 @@ class ModernTimer(QLabel):
         # 动画效果
         self.pulse_animation = QPropertyAnimation(self, b"pulse_scale")
         self.pulse_animation.setDuration(1000)
-        self.pulse_animation.setEasingCurve(QEasingCurve.InOutSine)
+        self.pulse_animation.setEasingCurve(QEasingCurve.Type.InOutSine)
         self.pulse_scale = 1.0
         
         self.setup_ui()
@@ -36,7 +43,7 @@ class ModernTimer(QLabel):
         
     def setup_ui(self):
         """设置UI"""
-        self.setAlignment(Qt.AlignCenter)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setMinimumHeight(60)
         self.setMaximumHeight(60)
         
@@ -82,12 +89,12 @@ class ModernTimer(QLabel):
         self.update_display()
         
         # 发送时间变化信号
-        time_str = self.seconds_to_time(self.time_remaining)
+        time_str = seconds_to_time(self.time_remaining)
         self.time_changed.emit(time_str)
         
     def update_display(self):
         """更新显示"""
-        time_str = self.seconds_to_time(self.time_remaining)
+        time_str = seconds_to_time(self.time_remaining)
         self.setText(time_str)
         
         # 根据剩余时间设置颜色
@@ -143,17 +150,10 @@ class ModernTimer(QLabel):
         if not self.pulse_animation:
             self.pulse_animation = QPropertyAnimation(self, b"pulse_scale")
             self.pulse_animation.setDuration(1000)
-            self.pulse_animation.setEasingCurve(QEasingCurve.InOutSine)
+            self.pulse_animation.setEasingCurve(QEasingCurve.Type.InOutSine)
             
         self.pulse_animation.start()
-        
-    def seconds_to_time(self, seconds):
-        """将秒数转换为时间格式"""
-        hours = seconds // 3600
-        minutes = (seconds % 3600) // 60
-        secs = seconds % 60
-        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
-        
+
     def get_time_remaining(self):
         """获取剩余时间"""
         return self.time_remaining
@@ -220,6 +220,13 @@ class ExamInfoPanel(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.progress_bar = None
+        self.timer_label = None
+        self.timer_frame = None
+        self.pass_score_label = None
+        self.questions_label = None
+        self.duration_label = None
+        self.title_label = None
         self.setup_ui()
         self.update_style()
         
@@ -339,6 +346,8 @@ class QuestionNavigation(QWidget):
     
     def __init__(self, total_questions, parent=None):
         super().__init__(parent)
+        self.question_buttons = None
+        self.button_group = None
         self.total_questions = total_questions
         self.answered_questions = set()
         self.current_question = 1
@@ -468,6 +477,14 @@ class QuestionDisplay(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.submit_button = None
+        self.next_button = None
+        self.prev_button = None
+        self.options_layout = None
+        self.content_text = None
+        self.score_label = None
+        self.question_type_label = None
+        self.question_num_label = None
         self.setup_ui()
         self.update_style()
         
@@ -624,12 +641,14 @@ class QuestionDisplay(QWidget):
         
         self.options_layout.addWidget(true_button)
         self.options_layout.addWidget(false_button)
+        return question_data
         
     def _display_fill_blank(self, question_data):
         """显示填空题"""
         input_field = QLineEdit()
         input_field.setPlaceholderText("请输入答案")
         self.options_layout.addWidget(input_field)
+        return question_data
 
 class ModernExamInterface(QWidget):
     """现代化考试界面"""
@@ -641,6 +660,12 @@ class ModernExamInterface(QWidget):
     
     def __init__(self, exam_data, parent=None):
         super().__init__(parent)
+        self.auto_save_label = None
+        self.remaining_label = None
+        self.answered_label = None
+        self.question_display = None
+        self.info_panel = None
+        self.navigation = None
         self.exam_data = exam_data
         self.current_question_index = 0
         self.answers = {}  # 答案存储

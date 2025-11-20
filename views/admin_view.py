@@ -4,9 +4,9 @@ import pathlib
 import yaml
 import toml
 import re
-from datetime import datetime
+import re
 from openpyxl import load_workbook, Workbook
-from PySide6.QtCore import Qt, QThread, Signal, QSize, QRegularExpression
+from PySide6.QtCore import Qt, QThread, Signal, QSize, QRegularExpression, QDateTime
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QFormLayout, QSpinBox, QDateTimeEdit, QFileDialog, QTabWidget, QTableWidget, QTableWidgetItem, QGroupBox, QCheckBox, QComboBox, QMessageBox, QProgressDialog, QListView
 from PySide6.QtGui import QRegularExpressionValidator
 from database import DB_PATH
@@ -69,7 +69,6 @@ class AdminView(QWidget):
         col = 'co' + 'lor'
         bd = 'bor' + 'der'
         pd = 'pad' + 'ding'
-        fs = 'font' + '-size'
         ff = 'font' + '-family'
         br = 'border' + '-radius'
         ss_admin = (
@@ -137,7 +136,7 @@ class AdminView(QWidget):
         self.sync_progress_dialog = dlg
     def make_tag(self, text, bg, fg):
         lab = QLabel(text)
-        lab.setAlignment(Qt.AlignCenter)
+        lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lab.setStyleSheet(f"QLabel {{ background-color:{bg}; color:{fg}; border-radius:10px; padding:2px 8px; font-size:12px; }}")
         return lab
     def users_tab(self):
@@ -158,12 +157,12 @@ class AdminView(QWidget):
         form = QFormLayout()
         self.new_user = QLineEdit()
         self.new_user.setPlaceholderText('用户名')
-        self.new_user.setInputMethodHints(Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase | Qt.ImhPreferLowercase)
+        self.new_user.setInputMethodHints(Qt.InputMethodHint.ImhNoPredictiveText | Qt.InputMethodHint.ImhNoAutoUppercase | Qt.InputMethodHint.ImhPreferLowercase)
         self.new_user.setValidator(QRegularExpressionValidator(QRegularExpression(r"^[A-Za-z0-9_@.\-]+$")))
         self.new_pwd = QLineEdit()
-        self.new_pwd.setEchoMode(QLineEdit.Password)
+        self.new_pwd.setEchoMode(QLineEdit.EchoMode.Password)
         self.new_pwd.setPlaceholderText('密码')
-        self.new_pwd.setInputMethodHints(Qt.ImhHiddenText | Qt.ImhNoPredictiveText | Qt.ImhSensitiveData)
+        self.new_pwd.setInputMethodHints(Qt.InputMethodHint.ImhHiddenText | Qt.InputMethodHint.ImhNoPredictiveText | Qt.InputMethodHint.ImhSensitiveData)
         self.new_pwd.setValidator(QRegularExpressionValidator(QRegularExpression(r"^[\x20-\x7E]+$")))
         self.new_fullname = QLineEdit()
         self.new_fullname.setPlaceholderText('姓名(可选)')
@@ -237,9 +236,9 @@ class AdminView(QWidget):
             it_id = self.users_table.item(row, 0)
             it_ct = self.users_table.item(row, 5)
             if it_id:
-                it_id.setTextAlignment(Qt.AlignCenter)
+                it_id.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             if it_ct:
-                it_ct.setTextAlignment(Qt.AlignCenter)
+                it_ct.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             action_widget = QWidget()
             action_layout = QHBoxLayout()
             action_layout.setContentsMargins(4, 4, 4, 4)
@@ -285,8 +284,8 @@ class AdminView(QWidget):
         except Exception as e:
             QMessageBox.warning(self, '错误', str(e))
     def delete_user(self, user_id):
-        reply = QMessageBox.question(self, '确认', '确定要删除该用户吗？', QMessageBox.Yes | QMessageBox.No)
-        if reply == QMessageBox.Yes:
+        reply = QMessageBox.question(self, '确认', '确定要删除该用户吗？', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
             try:
                 delete_user(user_id)
                 self.refresh_users()
@@ -317,6 +316,12 @@ class AdminView(QWidget):
         vb1 = QVBoxLayout()
         self.exams_table = QTableWidget(0, 7)
         self.exams_table.setHorizontalHeaderLabels(['ID', '标题', '及格比例', '限时(分钟)', '截止', '描述', '操作'])
+        self.exams_table.setColumnWidth(0, 25)
+        self.exams_table.setColumnWidth(1, 100)
+        self.exams_table.setColumnWidth(2, 75)
+        self.exams_table.setColumnWidth(3, 75)
+        self.exams_table.setColumnWidth(4, 150)
+        self.exams_table.setColumnWidth(5, 100)
         self.exams_table.horizontalHeader().setStretchLastSection(True)
         self.exams_table.setAlternatingRowColors(True)
         self.refresh_exams()
@@ -347,7 +352,7 @@ class AdminView(QWidget):
         self.ex_time.setValue(60)
         self.ex_time.setStyleSheet(spin_style)
         self.ex_end = QDateTimeEdit()
-        self.ex_end.setDateTime(datetime.now())
+        self.ex_end.setDateTime(QDateTime.currentDateTime())
         self.ex_end.setDisplayFormat('yyyy-MM-dd HH:mm')
         self.ex_end.setCalendarPopup(True)
         dt_style = (
@@ -382,7 +387,7 @@ class AdminView(QWidget):
             f"QCheckBox::indicator:checked {{ background-color:{colors_perm['primary']}; border:1px solid {colors_perm['primary']}; }}"
         )
         def on_perm_changed(state):
-            checked = state == Qt.Checked
+            checked = state == Qt.CheckState.Checked
             self.ex_end.setEnabled(not checked)
             self.ex_end.setReadOnly(checked)
             if not checked:
@@ -424,15 +429,15 @@ class AdminView(QWidget):
             r = tbl.rowCount()
             tbl.insertRow(r)
             it_id = QTableWidgetItem(str(e[0]))
-            it_id.setFlags(it_id.flags() & ~Qt.ItemIsEditable)
+            it_id.setFlags(it_id.flags() & ~Qt.ItemFlag.ItemIsEditable)
             tbl.setItem(r, 0, it_id)
             tbl.setItem(r, 1, QTableWidgetItem(e[1] or ''))
             tbl.setItem(r, 2, QTableWidgetItem(f"{int(float(e[3])*100)}%"))
             it_time = QTableWidgetItem(str(e[4]))
-            it_time.setFlags(it_time.flags() & ~Qt.ItemIsEditable)
+            it_time.setFlags(it_time.flags() & ~Qt.ItemFlag.ItemIsEditable)
             tbl.setItem(r, 3, it_time)
             it_end = QTableWidgetItem(e[5] if e[5] else '永久')
-            it_end.setFlags(it_end.flags() & ~Qt.ItemIsEditable)
+            it_end.setFlags(it_end.flags() & ~Qt.ItemFlag.ItemIsEditable)
             tbl.setItem(r, 4, it_end)
             tbl.setItem(r, 5, QTableWidgetItem(e[2] or ''))
             opw = QWidget()
@@ -456,7 +461,7 @@ class AdminView(QWidget):
         desc = self.ex_desc.toPlainText().strip()
         pass_ratio = self.ex_pass.value() / 100.0
         tl = self.ex_time.value()
-        end = None if self.ex_permanent.isChecked() else self.ex_end.dateTime().toString(Qt.ISODate)
+        end = None if self.ex_permanent.isChecked() else self.ex_end.dateTime().toString(Qt.DateFormat.ISODate)
         if not title:
             QMessageBox.warning(self, '错误', '请输入标题')
             return
@@ -600,8 +605,8 @@ class AdminView(QWidget):
         except Exception as e:
             QMessageBox.warning(self, '错误', str(e))
     def clear_exam(self, exam_id):
-        reply = QMessageBox.question(self, '确认', '确定要清空该试题的所有题目吗？此操作不可恢复', QMessageBox.Yes | QMessageBox.No)
-        if reply != QMessageBox.Yes:
+        reply = QMessageBox.question(self, '确认', '确定要清空该试题的所有题目吗？此操作不可恢复', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply != QMessageBox.StandardButton.Yes:
             return
         try:
             from models import clear_exam_questions
@@ -610,8 +615,8 @@ class AdminView(QWidget):
         except Exception as e:
             QMessageBox.warning(self, '错误', str(e))
     def delete_exam(self, exam_id):
-        reply = QMessageBox.question(self, '确认', '确定要删除该试题吗？相关的考试尝试与答案也将被删除', QMessageBox.Yes | QMessageBox.No)
-        if reply != QMessageBox.Yes:
+        reply = QMessageBox.question(self, '确认', '确定要删除该试题吗？相关的考试尝试与答案也将被删除', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply != QMessageBox.StandardButton.Yes:
             return
         try:
             from models import delete_exam
@@ -634,6 +639,8 @@ class AdminView(QWidget):
             ext = os.path.splitext(fn)[1].lower()
             if (sel and sel.startswith('Excel')) or ext == '.xlsx' or ext == '':
                 from openpyxl import Workbook
+                from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
+                from openpyxl.utils import get_column_letter
                 out = fn if ext == '.xlsx' else fn + '.xlsx'
                 wb = Workbook()
                 ws = wb.active
@@ -642,6 +649,34 @@ class AdminView(QWidget):
                 ws.append(['单选', '2+2=?', 'A', 2, '4', '3'])
                 ws.append(['多选', '哪些是偶数？', 'A,C', 3, '2', '3', '4'])
                 ws.append(['判断', 'Python是解释型语言', 'true', 1])
+                headers = ['类型', '内容', '正确答案', '分数', '选项A', '选项B', '选项C', '选项D']
+                header_fill = PatternFill(start_color='FF409EFF', end_color='FF409EFF', fill_type='solid')
+                header_font = Font(bold=True, color='FFFFFFFF')
+                center = Alignment(horizontal='center', vertical='center')
+                left = Alignment(horizontal='left', vertical='center')
+                thin = Side(style='thin', color='FFDDDDDD')
+                border = Border(left=thin, right=thin, top=thin, bottom=thin)
+                for c in range(1, len(headers)+1):
+                    cell = ws.cell(row=1, column=c)
+                    cell.fill = header_fill
+                    cell.font = header_font
+                    cell.alignment = center
+                for r in range(2, ws.max_row+1):
+                    for c in range(1, len(headers)+1):
+                        ws.cell(row=r, column=c).border = border
+                    ws.cell(row=r, column=4).alignment = center
+                    for c in (1,2,3,5,6,7,8):
+                        ws.cell(row=r, column=c).alignment = left
+                widths = [0] * len(headers)
+                for r in ws.iter_rows(values_only=True):
+                    for idx, val in enumerate(r):
+                        l = len(str(val)) if val is not None else 0
+                        widths[idx] = max(widths[idx], l)
+                for i, w in enumerate(widths, start=1):
+                    letter = get_column_letter(i)
+                    ws.column_dimensions[letter].width = max(12, min(36, w + 2))
+                ws.freeze_panes = 'A2'
+                ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{ws.max_row}"
                 wb.save(out)
             elif (sel and sel.startswith('JSON')) or ext == '.json':
                 out = fn if ext == '.json' else fn + '.json'
@@ -706,6 +741,11 @@ class AdminView(QWidget):
         vb1 = QVBoxLayout()
         self.targets_table = QTableWidget(0, 6)
         self.targets_table.setHorizontalHeaderLabels(['名称', 'IP', '用户名', '远程路径', 'SSH密码', '操作'])
+        self.targets_table.setColumnWidth(0, 150)
+        self.targets_table.setColumnWidth(1, 150)
+        self.targets_table.setColumnWidth(2, 150)
+        self.targets_table.setColumnWidth(3, 300)
+        self.targets_table.setColumnWidth(4, 150)
         self.targets_table.horizontalHeader().setStretchLastSection(True)
         self.refresh_targets()
         vb1.addWidget(self.targets_table)
@@ -727,7 +767,7 @@ class AdminView(QWidget):
         self.t_path.setText('~/.exam_system/exam.db')
         self.t_password = QLineEdit()
         self.t_password.setPlaceholderText('SSH密码（可选）')
-        self.t_password.setEchoMode(QLineEdit.Password)
+        self.t_password.setEchoMode(QLineEdit.EchoMode.Password)
         add_btn = QPushButton('添加设备')
         add_btn.clicked.connect(self.add_target)
         form.addRow('名称', self.t_name)
@@ -914,7 +954,7 @@ class AdminView(QWidget):
             r = self.targets_table.rowCount()
             self.targets_table.insertRow(r)
             it_name = QTableWidgetItem(t[1])
-            it_name.setData(Qt.UserRole, t[0])
+            it_name.setData(Qt.ItemDataRole.UserRole, t[0])
             self.targets_table.setItem(r, 0, it_name)
             self.targets_table.setItem(r, 1, QTableWidgetItem(t[2]))
             self.targets_table.setItem(r, 2, QTableWidgetItem(t[3]))
@@ -986,7 +1026,7 @@ class AdminView(QWidget):
         if col not in (0,1,2,3):
             return
         id_item = self.targets_table.item(row, 0)
-        target_id = id_item.data(Qt.UserRole) if id_item else None
+        target_id = id_item.data(Qt.ItemDataRole.UserRole) if id_item else None
         if target_id is None:
             return
         name = self.targets_table.item(row, 0).text() if self.targets_table.item(row, 0) else ''
@@ -1040,13 +1080,13 @@ class AdminView(QWidget):
         path_edit = QLineEdit(target[4])
         password_edit = QLineEdit()
         password_edit.setPlaceholderText('留空保持原密码')
-        password_edit.setEchoMode(QLineEdit.Password)
+        password_edit.setEchoMode(QLineEdit.EchoMode.Password)
         layout.addRow('名称', name_edit)
         layout.addRow('IP', ip_edit)
         layout.addRow('用户名', user_edit)
         layout.addRow('远程路径', path_edit)
         layout.addRow('SSH密码', password_edit)
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(buttons)
         dialog.setLayout(layout)
         def save_changes():
@@ -1069,8 +1109,8 @@ class AdminView(QWidget):
         buttons.rejected.connect(dialog.reject)
         dialog.exec()
     def delete_target(self, target_id):
-        reply = QMessageBox.question(self, '确认', '确定要删除该设备吗？', QMessageBox.Yes | QMessageBox.No)
-        if reply == QMessageBox.Yes:
+        reply = QMessageBox.question(self, '确认', '确定要删除该设备吗？', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
             try:
                 delete_sync_target(target_id)
                 self.refresh_targets()
@@ -1201,14 +1241,15 @@ class AdminView(QWidget):
             for c in (3,4):
                 it = self.scores_table.item(r, c)
                 if it:
-                    it.setTextAlignment(Qt.AlignCenter)
+                    it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
     def export_scores_to_excel(self):
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents/scores')
         fn, sel = QFileDialog.getSaveFileName(self, '导出成绩Excel', suggested, 'Excel (*.xlsx)')
         if not fn:
             return
         try:
-            from openpyxl.styles import PatternFill
+            from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
+            from openpyxl.utils import get_column_letter
             ext = os.path.splitext(fn)[1].lower()
             out = fn if ext == '.xlsx' else fn + '.xlsx'
             wb = Workbook()
@@ -1219,11 +1260,44 @@ class AdminView(QWidget):
             from models import list_attempts_with_user
             green_fill = PatternFill(start_color='FF67C23A', end_color='FF67C23A', fill_type='solid')
             red_fill = PatternFill(start_color='FFF56C6C', end_color='FFF56C6C', fill_type='solid')
+            header_fill = PatternFill(start_color='FF409EFF', end_color='FF409EFF', fill_type='solid')
+            header_font = Font(bold=True, color='FFFFFFFF')
+            center = Alignment(horizontal='center', vertical='center')
+            left = Alignment(horizontal='left', vertical='center')
+            thin = Side(style='thin', color='FFDDDDDD')
+            border = Border(left=thin, right=thin, top=thin, bottom=thin)
             for a in list_attempts_with_user():
                 exam_title = get_exam_title(int(a[4])) if a[4] is not None else ''
                 ws.append([a[0], a[1] or '', a[2] or '', int(a[3]), exam_title or '', a[5] or '', a[6] or '', a[7], '通过' if a[8] == 1 else '未通过'])
                 cell = ws.cell(row=ws.max_row, column=9)
                 cell.fill = green_fill if a[8] == 1 else red_fill
+            for c in range(1, len(headers)+1):
+                cell = ws.cell(row=1, column=c)
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = center
+            for r in range(2, ws.max_row+1):
+                for c in range(1, len(headers)+1):
+                    ws.cell(row=r, column=c).border = border
+                ws.cell(row=r, column=4).alignment = center
+                ws.cell(row=r, column=6).alignment = center
+                ws.cell(row=r, column=7).alignment = center
+                ws.cell(row=r, column=8).alignment = center
+                ws.cell(row=r, column=9).alignment = center
+                ws.cell(row=r, column=1).alignment = left
+                ws.cell(row=r, column=2).alignment = left
+                ws.cell(row=r, column=3).alignment = left
+                ws.cell(row=r, column=5).alignment = left
+            widths = [0] * len(headers)
+            for r in ws.iter_rows(values_only=True):
+                for idx, val in enumerate(r):
+                    l = len(str(val)) if val is not None else 0
+                    widths[idx] = max(widths[idx], l)
+            for i, w in enumerate(widths, start=1):
+                letter = get_column_letter(i)
+                ws.column_dimensions[letter].width = max(12, min(36, w + 2))
+            ws.freeze_panes = 'A2'
+            ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{ws.max_row}"
             wb.save(out)
             QMessageBox.information(self, '成功', '成绩已导出')
         except Exception as e:

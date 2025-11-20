@@ -225,13 +225,6 @@ def merge_remote_db(remote_db_path):
     rconn.close()
     lconn.close()
 
-def upsert_sync_target(name, ip, username, remote_path):
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute('INSERT INTO sync_targets (name, ip, username, remote_path) VALUES (?,?,?,?)', (name, ip, username, remote_path))
-    conn.commit()
-    conn.close()
-
 def delete_user(user_id):
     conn = get_conn()
     c = conn.cursor()

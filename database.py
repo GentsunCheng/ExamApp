@@ -42,4 +42,4 @@ def get_conn():
     return sqlite3.connect(DB_PATH)
 
 def now_iso():
-    return datetime.utcnow().isoformat()
+    return datetime.now().isoformat()

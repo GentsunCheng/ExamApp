@@ -1,4 +1,6 @@
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QStackedWidget
+import sys
+
+from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
 from database import ensure_db
 from models import create_admin_if_absent
 from theme_manager import theme_manager
@@ -6,9 +8,12 @@ from views.login_view import LoginView
 from views.admin_view import AdminView
 from views.user_view import UserView
 
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.user_view = None
+        self.admin = None
         ensure_db()
         create_admin_if_absent()
         self.setWindowTitle('本地考试系统')
@@ -37,12 +42,10 @@ class MainWindow(QMainWindow):
             w.deleteLater()
         self.stack.setCurrentWidget(self.login)
 
-def run():
+
+if __name__ == '__main__':
     app = QApplication([])
     app.setStyle('Fusion')
     win = MainWindow()
     win.show()
-    app.exec()
-
-if __name__ == '__main__':
-    run()
+    sys.exit(app.exec())

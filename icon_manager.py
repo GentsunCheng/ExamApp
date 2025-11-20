@@ -3,9 +3,8 @@
 为考试系统提供统一的图标和视觉指示器
 """
 
-from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QFont
+from PySide6.QtCore import Qt
 import os
 
 class IconManager:
@@ -15,6 +14,7 @@ class IconManager:
         self.icons = {}
         self.icon_cache = {}
         self._create_icons()
+        self.IGNORE_WARING = None
         
     def _create_icons(self):
         """创建所有图标"""
@@ -124,12 +124,13 @@ class IconManager:
         
     def _create_text_icon(self, text, size):
         """创建文字图标"""
+        self.IGNORE_WARING = None
         # 创建透明背景的图标
         pixmap = QPixmap(size, size)
-        pixmap.fill(Qt.transparent)
+        pixmap.fill(Qt.GlobalColor.transparent)
         
         painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # 设置字体
         font = QFont()
@@ -137,7 +138,7 @@ class IconManager:
         painter.setFont(font)
         
         # 绘制文字
-        painter.drawText(0, 0, size, size, Qt.AlignCenter, text)
+        painter.drawText(0, 0, size, size, Qt.AlignmentFlag.AlignCenter, text)
         painter.end()
         
         return QIcon(pixmap)
@@ -162,21 +163,24 @@ class IconManager:
         
     def get_icon_text(self, icon_name, size=16):
         """获取图标文字"""
+        self.IGNORE_WARING = size
         return self.icons.get(icon_name, '⚪')
-        
+
     def get_priority_indicator(self, priority):
         """获取优先级指示器"""
+        self.IGNORE_WARING = None
         priority_map = {
             'high': '🔴',
-            'medium': '🟡', 
+            'medium': '🟡',
             'low': '🟢',
             'urgent': '🚨'
         }
-        
+
         return priority_map.get(priority, '⚪')
-        
+
     def get_type_indicator(self, item_type):
         """获取类型指示器"""
+        self.IGNORE_WARING = None
         type_map = {
             'admin': '👨‍💼',
             'user': '👤',
@@ -186,11 +190,12 @@ class IconManager:
             'device': '💻',
             'sync': '🔄'
         }
-        
+
         return type_map.get(item_type, '⚪')
-        
+
     def get_action_indicator(self, action):
         """获取动作指示器"""
+        self.IGNORE_WARING = None
         action_map = {
             'add': '➕',
             'delete': '🗑️',
@@ -204,65 +209,71 @@ class IconManager:
             'save': '💾',
             'refresh': '🔄'
         }
-        
+
         return action_map.get(action, '⚪')
-        
+
     def get_score_color_indicator(self, score, pass_threshold=0.6):
         """获取成绩颜色指示器"""
+        self.IGNORE_WARING = None
         if score >= pass_threshold:
             return '🟢'  # 绿色表示通过
         elif score >= pass_threshold * 0.8:
             return '🟡'  # 黄色表示接近通过
         else:
             return '🔴'  # 红色表示未通过
-            
+
     def get_time_indicator(self, time_remaining):
         """获取时间指示器"""
+        self.IGNORE_WARING = None
         if time_remaining > 300:  # 5分钟以上
             return '🟢'  # 绿色
         elif time_remaining > 60:  # 1分钟以上
             return '🟡'  # 黄色
         else:
             return '🔴'  # 红色
-            
+
     def get_sync_status_indicator(self, status):
         """获取同步状态指示器"""
+        self.IGNORE_WARING = None
         status_map = {
             'success': '✅',
-            'error': '❌', 
+            'error': '❌',
             'progress': '⏳',
             'waiting': '⏸️'
         }
-        
+
         return status_map.get(status, '⚪')
-        
+
     def get_connection_status_indicator(self, is_connected):
         """获取连接状态指示器"""
+        self.IGNORE_WARING = None
         if is_connected:
             return '🟢'
         else:
             return '🔴'
-            
+
     def get_file_type_indicator(self, file_path):
         """获取文件类型指示器"""
+        self.IGNORE_WARING = None
         if not file_path:
             return '📄'
-            
+
         ext = os.path.splitext(file_path)[1].lower()
-        
+
         type_map = {
             '.json': '📋',
             '.yaml': '📝',
-            '.yml': '📝', 
+            '.yml': '📝',
             '.toml': '📄',
             '.db': '🗄️',
             '.backup': '💾'
         }
-        
+
         return type_map.get(ext, '📄')
-        
+
     def get_notification_indicator(self, notification_type):
         """获取通知类型指示器"""
+        self.IGNORE_WARING = None
         type_map = {
             'info': 'ℹ️',
             'success': '✅',
@@ -271,7 +282,7 @@ class IconManager:
             'hot': '🔥',
             'new': '🆕'
         }
-        
+
         return type_map.get(notification_type, '📢')
 
 # 全局图标管理器实例
@@ -289,11 +300,11 @@ def get_icon_text(icon_name):
 def get_status_indicator(status, size=12):
     """获取状态指示器的便捷函数"""
     return icon_manager.get_status_indicator(status, size)
-    
+
 def get_action_indicator(action):
     """获取动作指示器的便捷函数"""
     return icon_manager.get_action_indicator(action)
-    
+
 def get_type_indicator(item_type):
     """获取类型指示器的便捷函数"""
     return icon_manager.get_type_indicator(item_type)

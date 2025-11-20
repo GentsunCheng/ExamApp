@@ -3,14 +3,13 @@
 提供加载动画、状态指示器和进度显示功能
 """
 
-from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect, Signal
-from PySide6.QtGui import QPainter, QColor, QPen, QBrush, QFont, QFontMetrics
+from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, Signal
+from PySide6.QtGui import QPainter, QColor, QPen, QBrush
 from PySide6.QtWidgets import (
-    QWidget, QLabel, QProgressBar, QFrame, QVBoxLayout, QHBoxLayout,
-    QPushButton, QApplication, QSizePolicy
+    QWidget, QLabel, QProgressBar, QVBoxLayout, QHBoxLayout,
+    QPushButton
 )
 from theme_manager import theme_manager
-from icon_manager import icon_manager
 
 class LoadingIndicator(QWidget):
     """加载动画指示器"""
@@ -32,15 +31,15 @@ class LoadingIndicator(QWidget):
         colors = theme_manager.get_theme_colors()
         
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # 移动到中心点
         painter.translate(self.width() / 2, self.height() / 2)
         painter.rotate(self.angle)
         
         # 绘制圆环
-        pen = QPen(QColor(colors['primary']), 3, Qt.SolidLine)
-        pen.setCapStyle(Qt.RoundCap)
+        pen = QPen(QColor(colors['primary']), 3, Qt.PenStyle.SolidLine)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
         
         # 绘制圆环
@@ -77,15 +76,15 @@ class SpinnerIndicator(QWidget):
     def paintEvent(self, event):
         """绘制旋转指示器"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # 移动到中心点
         painter.translate(self.width() / 2, self.height() / 2)
         painter.rotate(self.angle)
         
         # 绘制弧形
-        pen = QPen(QColor(self.color), 3, Qt.SolidLine)
-        pen.setCapStyle(Qt.RoundCap)
+        pen = QPen(QColor(self.color), 3, Qt.PenStyle.SolidLine)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
         
         # 绘制弧形
@@ -122,7 +121,7 @@ class PulseIndicator(QWidget):
         # 动画
         self.animation = QPropertyAnimation(self, b"scale")
         self.animation.setDuration(1000)
-        self.animation.setEasingCurve(QEasingCurve.InOutSine)
+        self.animation.setEasingCurve(QEasingCurve.Type.InOutSine)
         self.animation.setLoopCount(-1)  # 无限循环
         self.animation.setKeyValueAt(0, 1.0)
         self.animation.setKeyValueAt(0.5, 1.5)
@@ -131,7 +130,7 @@ class PulseIndicator(QWidget):
     def paintEvent(self, event):
         """绘制脉冲效果"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # 移动到中心点
         painter.translate(self.width() / 2, self.height() / 2)
@@ -140,7 +139,7 @@ class PulseIndicator(QWidget):
         # 绘制圆点
         radius = self.size // 4
         painter.setBrush(QBrush(QColor(self.color)))
-        painter.setPen(Qt.NoPen)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(-radius, -radius, radius * 2, radius * 2)
         
     def start(self):
@@ -176,7 +175,7 @@ class WaveIndicator(QWidget):
         colors = theme_manager.get_theme_colors()
         
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # 绘制波浪线
         points = []
@@ -185,7 +184,7 @@ class WaveIndicator(QWidget):
             points.append((x, y))
             
         # 绘制波浪线
-        pen = QPen(QColor(colors['primary']), 2, Qt.SolidLine)
+        pen = QPen(QColor(colors['primary']), 2, Qt.PenStyle.SolidLine)
         painter.setPen(pen)
         
         for i in range(len(points) - 1):
@@ -224,7 +223,7 @@ class DotsIndicator(QWidget):
         colors = theme_manager.get_theme_colors()
         
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         dot_radius = 4
         spacing = 20
@@ -240,7 +239,7 @@ class DotsIndicator(QWidget):
             y = self.height() // 2
             
             painter.setBrush(QBrush(color))
-            painter.setPen(Qt.NoPen)
+            painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(x - dot_radius, y - dot_radius, 
                             dot_radius * 2, dot_radius * 2)
             
@@ -279,12 +278,12 @@ class StatusIndicator(QWidget):
         
         # 状态图标
         self.icon_label = QLabel()
-        self.icon_label.setAlignment(Qt.AlignCenter)
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.icon_label.setFixedSize(16, 16)
         
         # 状态文本
         self.text_label = QLabel(self.text)
-        self.text_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.text_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         
         layout.addWidget(self.icon_label)
         layout.addWidget(self.text_label)
@@ -293,7 +292,7 @@ class StatusIndicator(QWidget):
         self.setLayout(layout)
         
         # 设置点击事件
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         
     def update_style(self):
         """更新样式"""
@@ -394,7 +393,7 @@ class StatusIndicator(QWidget):
         
     def mousePressEvent(self, event):
         """鼠标点击事件"""
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit(self.status)
         super().mousePressEvent(event)
 
@@ -415,7 +414,7 @@ class StatusBar(QWidget):
         
         # 状态文本
         self.status_label = QLabel("就绪")
-        self.status_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         
         layout.addWidget(self.status_label)
         layout.addStretch()
@@ -533,7 +532,7 @@ class ProgressIndicator(QWidget):
         # 进度文本
         if self.show_percentage:
             self.progress_label = QLabel("0%")
-            self.progress_label.setAlignment(Qt.AlignCenter)
+            self.progress_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(self.progress_label)
             
         self.setLayout(layout)
@@ -606,7 +605,7 @@ class ToastNotification(QWidget):
         self.update_style()
         self.fade_animation = QPropertyAnimation(self, b"opacity")
         self.fade_animation.setDuration(3000)  # 3秒显示时间
-        self.fade_animation.setEasingCurve(QEasingCurve.InOutSine)
+        self.fade_animation.setEasingCurve(QEasingCurve.Type.InOutSine)
         self.opacity = 1.0
         
     def setup_ui(self):
@@ -617,12 +616,12 @@ class ToastNotification(QWidget):
         
         # 图标
         self.icon_label = QLabel()
-        self.icon_label.setAlignment(Qt.AlignCenter)
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.icon_label.setFixedSize(20, 20)
         
         # 文本
         self.text_label = QLabel()
-        self.text_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.text_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         
         # 关闭按钮
         self.close_button = QPushButton("×")
