@@ -9,7 +9,8 @@ BUILD_DIR = build
 
 # PyInstaller 配置
 PYINSTALLER = pyinstaller
-PYINSTALLER_ARGS = --onedir --noconsole --name $(APP_NAME) --distpath $(DIST_DIR) --workpath $(BUILD_DIR)
+PYINSTALLER_ARGS = --onedir --noconsole --name $(APP_NAME) --distpath $(DIST_DIR) \
+ --workpath $(BUILD_DIR) --add-data "resources:resources"
 
 # 依赖的Python包
 REQUIRED_PACKAGES = \
