@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QL
 from theme_manager import theme_manager
 from icon_manager import get_icon
 from exam_interface import ModernTimer, ModernProgressBar
-from models import list_questions, start_attempt, save_answer, submit_attempt, list_exams
+from models import list_questions, start_attempt, save_answer, submit_attempt, list_exams, grade_question
 from PySide6.QtWidgets import QMessageBox
 
 class ExamWindow(QMainWindow):
@@ -25,15 +25,11 @@ class ExamWindow(QMainWindow):
         self.resize(900, 600)
         self.user = user
         self.exam_id = exam_id
-        questions = list_questions(exam_id)
-        questions_len = len(questions)
-        self.questions = []
+        self.questions = list_questions(exam_id)
+        random.shuffle(self.questions)
         self.total_score = 0
-        for _ in range(questions_len):
-            rand_q = random.choice(questions)
-            self.questions.append(rand_q)
-            self.total_score += rand_q["score"]
-            questions.remove(rand_q)
+        for q in self.questions:
+            self.total_score += q["score"]
         self.attempt_uuid = start_attempt(user['id'], exam_id)
         self.current_index = 0
         self.setWindowTitle(f'考试进行中, 总分: {self.total_score}')
@@ -99,6 +95,7 @@ class ExamWindow(QMainWindow):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
         self.answers = {}
+        self.evaluation = {}
         tl = 0
         for e in list_exams(include_expired=True):
             if e[0] == exam_id:
@@ -124,7 +121,7 @@ class ExamWindow(QMainWindow):
     def update_buttons_state(self):
         self.prev_btn.setEnabled(self.current_index > 0)
         self.next_btn.setEnabled(self.current_index < len(self.questions) - 1)
-        self.submit_btn.setEnabled(self.all_answered())
+        self.submit_btn.setEnabled(self.all_answered() and not getattr(self, '_submitted', False))
     def tick(self):
         self.remaining -= 1
         if self.remaining <= 0:
@@ -185,6 +182,11 @@ class ExamWindow(QMainWindow):
                     b.setChecked(key in sset if key is not None else False)
         self.update_buttons_state()
         self.progress_bar.setValue(self.current_index + 1)
+        if getattr(self, '_submitted', False):
+            try:
+                self.apply_evaluation_styles(q)
+            except Exception:
+                pass
     def collect_selected(self):
         q = self.questions[self.current_index]
         selected = []
@@ -209,6 +211,8 @@ class ExamWindow(QMainWindow):
         self.answers[q['id']] = sel
         self.update_buttons_state()
     def on_option_clicked(self, button):
+        if getattr(self, '_submitted', False):
+            return
         q = self.questions[self.current_index]
         if button.isChecked() and q['type'] in ('single', 'truefalse'):
             for b in getattr(self, 'opt_buttons', []):
@@ -232,13 +236,57 @@ class ExamWindow(QMainWindow):
     def submit(self):
         self.save_current()
         self.timer.stop()
+        try:
+            self.timer_widget.stop_timer()
+        except Exception:
+            pass
         score, passed = submit_attempt(self.attempt_uuid)
         QMessageBox.information(self, '结果', f'得分:{score} {"通过" if passed==1 else "未通过"}')
         p = self.parent()
         if p is not None and hasattr(p, 'refresh_attempts'):
             p.refresh_attempts()
+        # 计算评估仅用于着色，不显示正确答案
+        self.evaluation = {}
+        for q in self.questions:
+            sel = self.answers.get(q['id']) or []
+            ok = bool(grade_question(q, sel))
+            self.evaluation[q['id']] = {'selected': sel, 'correct': ok}
         self._submitted = True
-        self.close()
+        self.update_buttons_state()
+        self.render_q()
+
+    def apply_evaluation_styles(self, q):
+        colors = theme_manager.get_theme_colors()
+        ok_bg = colors['success_light']
+        ok_fg = colors['success']
+        ok_border = colors['success']
+        bad_bg = colors['error_light']
+        bad_fg = colors['error']
+        bad_border = colors['error']
+        info = self.evaluation.get(q['id']) or {'selected': [], 'correct': False}
+        sel = set(str(s) for s in (info['selected'] or []))
+        # 禁止修改
+        for b in getattr(self, 'opt_buttons', []):
+            b.setEnabled(False)
+        # 着色仅针对用户选择的选项
+        for b in getattr(self, 'opt_buttons', []):
+            key = b.property('key')
+            is_sel = False
+            if key is None and q['type'] == 'truefalse':
+                chosen = (info['selected'] or [None])[0]
+                is_sel = (b.property('tf_value') == chosen)
+            else:
+                is_sel = (str(key) in sel)
+            if not is_sel:
+                continue
+            if info['correct']:
+                b.setStyleSheet(
+                    f"QPushButton {{ background-color:{ok_bg}; color:{ok_fg}; border:1px solid {ok_border}; border-radius:12px; padding:12px 16px; font-size:16px; text-align:left; min-height:44px; }}"
+                )
+            else:
+                b.setStyleSheet(
+                    f"QPushButton {{ background-color:{bad_bg}; color:{bad_fg}; border:1px solid {bad_border}; border-radius:12px; padding:12px 16px; font-size:16px; text-align:left; min-height:44px; }}"
+                )
 
     def closeEvent(self, event):
         if getattr(self, '_submitted', False):
@@ -250,6 +298,7 @@ class ExamWindow(QMainWindow):
             try:
                 self.save_current()
                 self.timer.stop()
+                self.timer_widget.stop_timer()
             except Exception:
                 pass
             score, passed = submit_attempt(self.attempt_uuid)

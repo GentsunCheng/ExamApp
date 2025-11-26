@@ -2,7 +2,6 @@ import json
 import os
 import pathlib
 import yaml
-import toml
 import re
 import re
 from openpyxl import load_workbook, Workbook
@@ -10,7 +9,7 @@ from PySide6.QtCore import Qt, QThread, Signal, QSize, QRegularExpression, QDate
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QFormLayout, QSpinBox, QDateTimeEdit, QFileDialog, QTabWidget, QTableWidget, QTableWidgetItem, QGroupBox, QCheckBox, QComboBox, QMessageBox, QProgressDialog, QListView
 from PySide6.QtGui import QRegularExpressionValidator
 from database import DB_PATH
-from models import list_users, create_user, list_exams, add_exam, import_questions_from_json, list_sync_targets, upsert_sync_target, delete_user, update_user_role, update_user_active, delete_sync_target, update_sync_target, get_exam_title
+from models import list_users, create_user, list_exams, add_exam, import_questions_from_json, list_sync_targets, upsert_sync_target, delete_user, update_user_role, update_user_active, delete_sync_target, update_sync_target, get_exam_title, get_exam_stats
 from theme_manager import theme_manager
 from icon_manager import get_icon
 from status_indicators import LoadingIndicator
@@ -482,12 +481,19 @@ class AdminView(QWidget):
         if not exam_id:
             QMessageBox.warning(self, '错误', '请选择试题')
             return
-        fn, sel = QFileDialog.getOpenFileName(self, '选择题目文件', os.getcwd(), 'Excel (*.xlsx);;JSON (*.json);;YAML (*.yaml *.yml);;TOML (*.toml)')
+        fn, sel = QFileDialog.getOpenFileName(self, '选择题目文件', os.getcwd(), 'Excel (*.xlsx);;JSON (*.json);;YAML (*.yaml *.yml)')
         if not fn:
             return
         try:
-            ext = os.path.splitext(fn)[1].lower()
-            if (sel and sel.startswith('Excel')) or ext == '.xlsx':
+            ext = os.path.splitext(fn)[1].lower().strip()
+            is_zip = False
+            try:
+                with open(fn, 'rb') as f:
+                    head = f.read(4)
+                    is_zip = head.startswith(b'PK')
+            except Exception:
+                is_zip = False
+            if (sel and sel.startswith('Excel')) or ext in ('.xlsx', '.xlsm', '.xltx', '.xltm') or is_zip:
                 wb = load_workbook(fn)
                 ws = wb['Questions'] if 'Questions' in wb.sheetnames else wb.active
                 header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
@@ -497,18 +503,18 @@ class AdminView(QWidget):
                         return header.index(name)
                     except Exception:
                         return -1
-            itype = idx('类型'); icontent = idx('内容'); icorrect = idx('正确答案'); iscore = idx('分数')
-            start_opts = None
-            for i, h in enumerate(header):
-                if h.startswith('选项'):
-                    start_opts = i
-                    break
-            if start_opts is None:
+                itype = idx('类型'); icontent = idx('内容'); icorrect = idx('正确答案'); iscore = idx('分数')
+                start_opts = None
+                for i, h in enumerate(header):
+                    if h.startswith('选项'):
+                        start_opts = i
+                        break
                 base_cols = [x for x in (itype, icontent, icorrect, iscore) if x >= 0]
-                start_opts = (max(base_cols) + 1) if base_cols else 3
                 if min(itype, icontent, icorrect) < 0:
                     QMessageBox.warning(self, '错误', '缺少必要列: 类型/内容/正确答案')
                     return
+                if start_opts is None:
+                    start_opts = (max(base_cols) + 1) if base_cols else 3
                 data = []
                 for row in ws.iter_rows(min_row=2, values_only=True):
                     tval = (str(row[itype]).strip().lower() if row[itype] is not None else '')
@@ -570,10 +576,22 @@ class AdminView(QWidget):
                     QMessageBox.warning(self, '错误', '没有有效题目')
                     return
             else:
-                with open(fn, 'r', encoding='utf-8') as f:
-                    text = f.read()
+                def read_text_with_fallback(path):
+                    with open(path, 'rb') as f:
+                        raw = f.read()
+                    try:
+                        return raw.decode('utf-8')
+                    except UnicodeDecodeError:
+                        try:
+                            return raw.decode('gb18030')
+                        except UnicodeDecodeError:
+                            return None
+                text = read_text_with_fallback(fn)
+                if text is None:
+                    QMessageBox.warning(self, '错误', '无法解析文件编码，请使用UTF-8或GB18030')
+                    return
                 data = None
-                if (sel and sel.startswith('JSON')) or ext == '.json' or ext == '':
+                if (sel and sel.startswith('JSON')) or ext == '.json':
                     data = json.loads(text)
                 elif (sel and sel.startswith('YAML')) or ext in ('.yaml', '.yml'):
                     data = yaml.safe_load(text)
@@ -582,26 +600,63 @@ class AdminView(QWidget):
                     if not isinstance(data, list):
                         QMessageBox.warning(self, '错误', 'YAML 格式不正确: 需要为题目列表')
                         return
-                elif (sel and sel.startswith('TOML')) or ext == '.toml':
-                    obj = toml.loads(text)
-                    qs = obj.get('questions') or []
-                    if not isinstance(qs, list):
-                        QMessageBox.warning(self, '错误', 'TOML 格式不正确: 需要 questions 为列表')
-                        return
-                    data = []
-                    for q in qs:
-                        item = {
-                            'type': q.get('type'),
-                            'text': q.get('text'),
-                            'score': float(q.get('score') or 1),
-                            'options': q.get('options') or [],
-                            'correct': q.get('correct') or []
-                        }
-                        data.append(item)
                 else:
-                    data = json.loads(text)
-            import_questions_from_json(exam_id, data)
-            QMessageBox.information(self, '成功', '题目已导入')
+                    try:
+                        data = json.loads(text)
+                    except Exception:
+                        try:
+                            data_yaml = yaml.safe_load(text)
+                            if isinstance(data_yaml, dict) and 'questions' in data_yaml:
+                                data_yaml = data_yaml['questions']
+                            if isinstance(data_yaml, list):
+                                data = data_yaml
+                            else:
+                                raise Exception('yaml_not_list')
+                        except Exception:
+                            QMessageBox.warning(self, '错误', '不支持的文件类型或格式解析失败')
+                            return
+            if data is None:
+                QMessageBox.warning(self, '错误', '未能解析到题目数据')
+                return
+            valid = []
+            errs = []
+            for idx, q in enumerate(data, start=1):
+                t = (q.get('type') or '').strip().lower()
+                if t not in ('single','multiple','truefalse'):
+                    errs.append(f'第{idx}题: 类型无效')
+                    continue
+                corr = q.get('correct') or []
+                if t in ('single','multiple'):
+                    opts = q.get('options') or []
+                    keys = {str(o.get('key')).strip().upper() for o in opts if o.get('key')}
+                    if not keys:
+                        errs.append(f'第{idx}题: 缺少选项')
+                        continue
+                    corr = [str(x).strip().upper() for x in corr if str(x).strip() != '']
+                    if not corr or not set(corr).issubset(keys):
+                        errs.append(f'第{idx}题: 正确答案不在选项中')
+                        continue
+                    if t == 'single' and len(corr) != 1:
+                        errs.append(f'第{idx}题: 单选需1个答案')
+                        continue
+                    q['correct'] = corr
+                else:
+                    if not corr or len(corr) != 1 or not isinstance(corr[0], bool):
+                        errs.append(f'第{idx}题: 判断题答案需为true/false')
+                        continue
+                valid.append(q)
+            if not valid:
+                detail = '\n'.join(errs[:20]) if errs else '没有有效题目'
+                QMessageBox.warning(self, '错误', detail)
+                return
+            import_questions_from_json(exam_id, valid)
+            cnt_single = sum(1 for d in valid if d.get('type') == 'single')
+            cnt_multiple = sum(1 for d in valid if d.get('type') == 'multiple')
+            cnt_tf = sum(1 for d in valid if d.get('type') == 'truefalse')
+            extra = ''
+            if errs:
+                extra = '\n部分题目未导入:\n' + '\n'.join(errs[:10])
+            QMessageBox.information(self, '成功', f'题目已导入：单选{cnt_single}、多选{cnt_multiple}、判断{cnt_tf}{extra}')
         except Exception as e:
             QMessageBox.warning(self, '错误', str(e))
     def clear_exam(self, exam_id):
@@ -632,7 +687,7 @@ class AdminView(QWidget):
             {"type":"truefalse","text":"Python是解释型语言","correct":[True],"score":1}
         ]
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents/exam')
-        fn, sel = QFileDialog.getSaveFileName(self, '导出题目示例', suggested, 'Excel (*.xlsx);;JSON (*.json);;YAML (*.yaml);;TOML (*.toml)')
+        fn, sel = QFileDialog.getSaveFileName(self, '导出题目示例', suggested, 'Excel (*.xlsx);;JSON (*.json);;YAML (*.yaml)')
         if not fn:
             return
         try:
@@ -704,31 +759,7 @@ class AdminView(QWidget):
                                 lines.append('    - ' + str(v))
                 with open(out, 'w', encoding='utf-8') as f:
                     f.write('\n'.join(lines) + '\n')
-            elif (sel and sel.startswith('TOML')) or ext == '.toml':
-                out = fn if ext == '.toml' else fn + '.toml'
-                lines = []
-                for item in data:
-                    lines.append('[[questions]]')
-                    lines.append(f'type = "{item["type"]}"')
-                    lines.append(f'text = "{item["text"]}"')
-                    lines.append(f'score = {item["score"]}')
-                    if item.get('options'):
-                        for opt in item['options']:
-                            lines.append('[[questions.options]]')
-                            lines.append(f'key = "{opt["key"]}"')
-                            lines.append(f'text = "{opt["text"]}"')
-                    if item.get('correct') is not None:
-                        arr = []
-                        for v in item['correct']:
-                            if isinstance(v, bool):
-                                arr.append('true' if v else 'false')
-                            elif isinstance(v, (int, float)):
-                                arr.append(str(v))
-                            else:
-                                arr.append('"' + str(v) + '"')
-                        lines.append(f'correct = [{", ".join(arr)}]')
-                with open(out, 'w', encoding='utf-8') as f:
-                    f.write('\n'.join(lines) + '\n')
+            
             QMessageBox.information(self, '成功', '示例已导出')
         except ImportError:
             QMessageBox.warning(self, '错误', '需要安装openpyxl: pip install openpyxl')
@@ -1197,7 +1228,7 @@ class AdminView(QWidget):
         gb = QGroupBox('成绩列表')
         vb = QVBoxLayout()
         self.scores_table = QTableWidget(0, 8)
-        self.scores_table.setHorizontalHeaderLabels(['UUID记录', '用户名', '姓名', '用户ID', '试题', '开始', '提交', '分数/通过'])
+        self.scores_table.setHorizontalHeaderLabels(['UUID记录', '用户名', '姓名', '用户ID', '试题', '开始', '提交', '分数/满分/通过'])
         self.scores_table.horizontalHeader().setStretchLastSection(True)
         self.scores_table.setColumnWidth(0, 280)
         self.scores_table.setColumnWidth(1, 75)
@@ -1233,11 +1264,13 @@ class AdminView(QWidget):
             exam_title = get_exam_title(int(a[4])) if a[4] is not None else ''
             self.scores_table.setItem(r, 4, QTableWidgetItem(exam_title or ''))
             self.scores_table.setItem(r, 5, QTableWidgetItem(a[5] or ''))
-            self.scores_table.setItem(r, 6, QTableWidgetItem(a[6] or ''))
+            self.scores_table.setItem(r, 6, QTableWidgetItem(a[6] or '未提交'))
             passed_text = '通过' if a[8] == 1 else '未通过'
             badge_bg = '#e1f3d8' if a[8] == 1 else '#fde2e2'
             badge_fg = '#67c23a' if a[8] == 1 else '#f56c6c'
-            self.scores_table.setCellWidget(r, 7, self.make_tag(f'{a[7]} / {passed_text}', badge_bg, badge_fg))
+            stats = get_exam_stats(int(a[4])) if a[4] is not None else {'total_score': 0}
+            total = int(stats['total_score']) if stats and stats.get('total_score') is not None else 0
+            self.scores_table.setCellWidget(r, 7, self.make_tag(f'{a[7]} / {total} / {passed_text}', badge_bg, badge_fg))
             for c in (3,4):
                 it = self.scores_table.item(r, c)
                 if it:

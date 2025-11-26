@@ -16,7 +16,7 @@ class MainWindow(QMainWindow):
         self.admin = None
         ensure_db()
         create_admin_if_absent()
-        self.setWindowTitle('本地考试系统')
+        self.setWindowTitle('ExamApp By Gentsun')
         self.setMinimumSize(900, 600)
         self.resize(1440, 960)
         colors = theme_manager.get_theme_colors()
