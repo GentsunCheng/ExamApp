@@ -1,5 +1,5 @@
 # Python packages for Exam System
 PySide6
 pyyaml
-toml
 pyinstaller
+pycryptodome

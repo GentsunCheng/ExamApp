@@ -16,7 +16,8 @@ PYINSTALLER_ARGS = --onedir --noconsole --windowed --name $(APP_NAME) --distpath
 # 依赖的Python包
 REQUIRED_PACKAGES = \
     PySide6 \
-    pyyaml
+    pyyaml \
+    pycryptodome
 
 # 默认目标
 .PHONY: all
@@ -37,6 +38,7 @@ requirements:
 	@echo "PySide6" >> requirements.txt
 	@echo "pyyaml" >> requirements.txt
 	@echo "pyinstaller" >> requirements.txt
+	@echo "pycryptodome" >> requirements.txt
 	@echo "requirements.txt 已生成!"
 
 # 清理构建文件
@@ -119,3 +121,12 @@ help:
 	@echo "  make check-deps  - 检查依赖包"
 	@echo "  make test         - 运行测试"
 	@echo "  make help          - 显示此帮助信息"
+# 生成密钥文件
+.PHONY: genkey
+genkey:
+	@echo "生成密钥文件..."
+	@if [ -f serect_key.py ]; then \
+		echo "密钥已存在，跳过"; \
+	else \
+		python3 -c "import os, base64; key=os.urandom(32); open('serect_key.py','w').write('AES_KEY = ' + repr(base64.b64encode(key).decode('ascii')) + '\n'); print('serect_key.py 已生成')"; \
+	fi
