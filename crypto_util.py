@@ -1,4 +1,5 @@
 import base64
+import os
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
@@ -7,8 +8,14 @@ def _load_key():
         from serect_key import AES_KEY as _k
         return base64.b64decode(_k)
     except Exception:
-        k = get_random_bytes(32)
-        return k
+        try:
+            key = os.urandom(32)
+            with open('serect_key.py','w') as f:
+                f.write('AES_KEY = ' + repr(base64.b64encode(key).decode('ascii')) + '\n')
+            return key
+        except Exception:
+            k = get_random_bytes(32)
+            return k
 
 _KEY = _load_key()
 

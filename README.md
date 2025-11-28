@@ -122,3 +122,33 @@ correct = ["A"]
 ## 注意事项
 - 请勿在仓库中提交真实设备的 SSH 密码或数据库文件
 - 内网设备路径与权限需提前配置好，确保 `rsync/ssh` 可访问
+
+## 编译与打包教程
+- 前置准备
+  - 安装依赖：`make install` 或 `pip3 install -r requirements.txt`
+  - 生成密钥：`make genkey`（生成 `serect_key.py`，用于 AES-GCM 加密解密；文件已被 `.gitignore` 忽略）
+  - 准备资源：在项目根的 `resources/` 目录放置 `sshpass_darwin` 等平台二进制，并确保有执行权限；打包时会通过 `--add-data "resources:resources"` 进行携带
+  - Python 版本：`3.9+`
+- 开发模式
+  - 直接运行：`python main.py`
+  - 使用 Make：`make dev`
+- 构建应用（PyInstaller）
+  - 构建：`make build`
+  - 结果：`dist/ExamSystem.app`（macOS 应用包），使用 `--onedir --windowed` 等参数生成
+- 生成 DMG 安装镜像
+  - 命令：`make dmg`
+  - 结果：`dist/ExamSystem.dmg`
+- 发布压缩包
+  - 命令：`make package`
+  - 结果：`dist/ExamSystem-YYYYMMDD.tar.gz`
+- 依赖检查
+  - 命令：`make check-deps`
+- 清理与重置
+  - 清理构建：`make clean`
+  - 深度清理（含数据库目录）：`make deep-clean`
+
+### 加密密钥与数据说明
+- 系统使用 `PyCryptodome` 的 AES-GCM 对部分字段加密存储（如试题标题/描述、题目文本/选项/答案、用户姓名、作答选项、SSH 密码等）。
+- 加密密钥保存在 `serect_key.py` 中的 `AES_KEY`（Base64 字符串）。
+- 重要：请在首次运行或打包前执行 `make genkey` 生成密钥，并妥善备份；密钥一旦丢失，将无法解密已加密的数据。
+- 出于安全考虑，`serect_key.py` 已在 `.gitignore` 中忽略，不会进入版本库或发布包。
