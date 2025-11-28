@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt, QRegularExpression
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QLineEdit, QPushButton, QLabel, QMessageBox
 from PySide6.QtGui import QRegularExpressionValidator
-from models import authenticate
+from models import authenticate, verify_encryption_ok
 from theme_manager import theme_manager
 
 
@@ -56,6 +56,7 @@ class LoginView(QWidget):
         btn = QPushButton('登录')
         btn.setDefault(True)
         btn.clicked.connect(self.handle_login)
+        self.login_btn = btn
         lay.addWidget(title)
         lay.addWidget(self.user)
         lay.addWidget(self.pwd)
@@ -64,7 +65,23 @@ class LoginView(QWidget):
         card.setLayout(lay)
         main.addWidget(card)
         self.setLayout(main)
+        try:
+            ok = verify_encryption_ok()
+            self._encryption_ok = ok
+            if not ok:
+                self.user.setEnabled(False)
+                self.pwd.setEnabled(False)
+                self.login_btn.setEnabled(False)
+                msg = QLabel('数据库解密失败，请联系管理员')
+                msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                colors2 = theme_manager.get_theme_colors()
+                msg.setStyleSheet(f"font-size:13px; color:{colors2['error']}; padding:6px; border:1px solid {colors2['error']}; border-radius:8px; background-color:{colors2['error_light']};")
+                lay.addWidget(msg)
+        except Exception:
+            self._encryption_ok = True
     def handle_login(self):
+        if hasattr(self, '_encryption_ok') and not self._encryption_ok:
+            return
         u = authenticate(self.user.text().strip(), self.pwd.text())
         if not u:
             QMessageBox.warning(self, '错误', '用户名或密码错误')

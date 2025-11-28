@@ -1,5 +1,6 @@
 import base64
 import os
+import hashlib
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
@@ -66,3 +67,15 @@ def decrypt_json(text):
         return json.loads(text)
     except Exception:
         return None
+
+def key_fingerprint():
+    return hashlib.sha256(_KEY).hexdigest()
+
+def encrypt_probe():
+    return encrypt_text('EXAMAPP_KEY_PROBE')
+
+def verify_probe(enc):
+    try:
+        return decrypt_text(enc) == 'EXAMAPP_KEY_PROBE'
+    except Exception:
+        return False

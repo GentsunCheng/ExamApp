@@ -1,7 +1,7 @@
 import json
 import uuid
 from datetime import datetime
-from database import get_conn, now_iso
+from database import get_conn, now_iso, ensure_key_probe, verify_db_encryption_key
 from utils import hash_password, verify_password
 import sqlite3
 from crypto_util import encrypt_text, decrypt_text, encrypt_json, decrypt_json
@@ -18,6 +18,13 @@ def create_admin_if_absent():
             c.execute('INSERT INTO users (username, password_hash, role, active, created_at) VALUES (?,?,?,?,?)', ('admin', hash_password('admin'), 'admin', 1, now_iso()))
         conn.commit()
     conn.close()
+
+def verify_encryption_ok():
+    try:
+        ensure_key_probe()
+        return bool(verify_db_encryption_key())
+    except Exception:
+        return False
 
 def create_user(username, password, role='user', active=1, full_name=None):
     conn = get_conn()

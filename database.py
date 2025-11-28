@@ -2,6 +2,7 @@ import os
 import pathlib
 import sqlite3
 from datetime import datetime
+from crypto_util import encrypt_probe, verify_probe
 
 DB_DIR = os.path.join(str(pathlib.Path.home()), '.exam_system')
 DB_PATH = os.path.join(DB_DIR, 'exam.db')
@@ -43,3 +44,36 @@ def get_conn():
 
 def now_iso():
     return datetime.now().isoformat()
+
+def get_setting(key):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT value FROM settings WHERE key=?', (key,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+def set_setting(key, value):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('DELETE FROM settings WHERE key=?', (key,))
+    c.execute('INSERT INTO settings (key, value) VALUES (?,?)', (key, value))
+    conn.commit()
+    conn.close()
+
+def ensure_key_probe():
+    try:
+        v = get_setting('key_probe')
+        if v is None:
+            set_setting('key_probe', encrypt_probe())
+    except Exception:
+        pass
+
+def verify_db_encryption_key():
+    try:
+        v = get_setting('key_probe')
+        if v is None:
+            return True
+        return bool(verify_probe(v))
+    except Exception:
+        return False
