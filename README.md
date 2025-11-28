@@ -147,8 +147,37 @@ correct = ["A"]
   - 清理构建：`make clean`
   - 深度清理（含数据库目录）：`make deep-clean`
 
+### 无 Make 环境的构建脚本
+- 提供 `build.sh`，用于在没有 `make` 的设备上进行构建与发布。
+- 使用方法：
+  - 赋予执行权限：`chmod +x build.sh`
+  - 安装依赖：`./build.sh install`
+  - 生成密钥：`./build.sh genkey`
+  - 构建应用：`./build.sh build`（产物：`dist/ExamSystem.app`）
+  - 运行应用：`./build.sh run`
+  - 生成 DMG：`./build.sh dmg`（产物：`dist/ExamSystem.dmg`）
+  - 开发运行：`./build.sh dev`
+  - 清理：`./build.sh clean` / `./build.sh deep-clean`
+  - 依赖检查：`./build.sh check-deps`
+
 ### 加密密钥与数据说明
 - 系统使用 `PyCryptodome` 的 AES-GCM 对部分字段加密存储（如试题标题/描述、题目文本/选项/答案、用户姓名、作答选项、SSH 密码等）。
 - 加密密钥保存在 `serect_key.py` 中的 `AES_KEY`（Base64 字符串）。
 - 重要：请在首次运行或打包前执行 `make genkey` 生成密钥，并妥善备份；密钥一旦丢失，将无法解密已加密的数据。
 - 出于安全考虑，`serect_key.py` 已在 `.gitignore` 中忽略，不会进入版本库或发布包。
+
+### 使用 .env 指定密钥
+- 支持在项目根的 `.env` 中预置密钥，`genkey` 将优先使用 `.env` 中的值：
+  - `AES_KEY_B64`：32 字节密钥的 Base64 字符串（推荐）
+  - 或 `AES_KEY`：同样为 Base64 字符串
+- 示例 `.env`：
+```
+AES_KEY_B64=3GkYxvQfJ9qS8C4QGqGm8uQp3v9Qk7CqA1l7c0Qx1nY=
+```
+- 生成示例密钥命令：
+```
+python3 -c 'import os,base64; print(base64.b64encode(os.urandom(32)).decode())'
+```
+- 运行 `make genkey` 或 `./build.sh genkey` 时：
+  - 若 `.env` 存在且定义了 `AES_KEY_B64` 或 `AES_KEY`，将使用该值生成 `serect_key.py`
+  - 若未定义，则自动生成新的随机密钥并写入 `serect_key.py`
