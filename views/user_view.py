@@ -1,8 +1,8 @@
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QTabWidget
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QTabWidget, QAbstractItemView
 from icon_manager import get_icon
 from theme_manager import theme_manager
-from models import list_exams, list_attempts, get_exam_title, get_exam_stats
+from models import list_exams, list_attempts, get_exam_title, get_exam_stats, list_questions
 from windows.exam_window import ExamWindow
 
 class UserView(QWidget):
@@ -69,6 +69,8 @@ class UserView(QWidget):
         self.exams_table_user.setColumnWidth(6, 180)
         self.exams_table_user.horizontalHeader().setStretchLastSection(True)
         self.exams_table_user.setAlternatingRowColors(True)
+        self.exams_table_user.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.exams_table_user.setSelectionMode(QAbstractItemView.SingleSelection)
         self.refresh_exams()
         exams_v.addWidget(self.exams_table_user)
         exams_tab.setLayout(exams_v)
@@ -103,7 +105,10 @@ class UserView(QWidget):
         if tbl is None:
             return
         tbl.setRowCount(0)
-        for e in list_exams(include_expired=False):
+        colors = theme_manager.get_theme_colors()
+        exams = list_exams(include_expired=False)
+        exams_sorted = sorted(exams, key=lambda e: (0 if e[5] is None else 1, -int(e[0]) if e[0] is not None else 0))
+        for e in exams_sorted:
             r = tbl.rowCount()
             tbl.insertRow(r)
             tbl.setItem(r, 0, QTableWidgetItem(str(e[0])))
@@ -114,6 +119,11 @@ class UserView(QWidget):
             tbl.setItem(r, 4, QTableWidgetItem(f"{int(float(e[3])*100)}%"))
             tbl.setItem(r, 5, QTableWidgetItem(str(stats['count']) if stats else '0'))
             tbl.setItem(r, 6, QTableWidgetItem(e[5] if e[5] else '永久'))
+            if e[5] is None:
+                for c in range(0, 7):
+                    it = tbl.item(r, c)
+                    if it:
+                        it.setBackground(QColor(colors['info_light']))
     def refresh_attempts(self):
         self.attempts_table.setRowCount(0)
         for a in list_attempts(self.user['id']):
@@ -136,14 +146,26 @@ class UserView(QWidget):
             if tbl is None:
                 QMessageBox.warning(self, '错误', '请选择试题')
                 return
-            r = tbl.currentRow()
-            if r < 0:
+            sm = tbl.selectionModel()
+            if sm is None:
                 QMessageBox.warning(self, '错误', '请选择试题')
                 return
+            rows = sm.selectedRows()
+            if len(rows) == 0:
+                QMessageBox.warning(self, '错误', '请选择试题')
+                return
+            if len(rows) > 1:
+                QMessageBox.warning(self, '错误', '一次仅能选择一个试题')
+                return
+            r = rows[0].row()
             it = tbl.item(r, 0)
             exam_id = int(it.text()) if it and it.text() else None
         if not exam_id:
             QMessageBox.warning(self, '错误', '请选择试题')
+            return
+        qs = list_questions(int(exam_id))
+        if not qs:
+            QMessageBox.warning(self, '错误', '该试题暂无题目，无法开始')
             return
         ExamWindow(self.user, exam_id, self).show()
     def handle_logout(self):

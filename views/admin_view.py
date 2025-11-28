@@ -6,7 +6,7 @@ import re
 import re
 from openpyxl import load_workbook, Workbook
 from PySide6.QtCore import Qt, QThread, Signal, QSize, QRegularExpression, QDateTime
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QFormLayout, QSpinBox, QDateTimeEdit, QFileDialog, QTabWidget, QTableWidget, QTableWidgetItem, QGroupBox, QCheckBox, QComboBox, QMessageBox, QProgressDialog, QListView
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QFormLayout, QSpinBox, QDateTimeEdit, QFileDialog, QTabWidget, QTableWidget, QTableWidgetItem, QGroupBox, QCheckBox, QComboBox, QMessageBox, QProgressDialog, QListView, QAbstractItemView
 from PySide6.QtGui import QRegularExpressionValidator
 from database import DB_PATH
 from models import list_users, create_user, list_exams, add_exam, import_questions_from_json, list_sync_targets, upsert_sync_target, delete_user, update_user_role, update_user_active, delete_sync_target, update_sync_target, get_exam_title, get_exam_stats
@@ -323,6 +323,8 @@ class AdminView(QWidget):
         self.exams_table.setColumnWidth(5, 100)
         self.exams_table.horizontalHeader().setStretchLastSection(True)
         self.exams_table.setAlternatingRowColors(True)
+        self.exams_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.exams_table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.refresh_exams()
         vb1.addWidget(self.exams_table)
         self.exams_table.itemChanged.connect(self.on_exam_item_changed)

@@ -260,11 +260,16 @@ class ExamWindow(QMainWindow):
         ok_bg = colors['success_light']
         ok_fg = colors['success']
         ok_border = colors['success']
+        warn_bg = colors['warning_light']
+        warn_fg = colors['warning']
+        warn_border = colors['warning']
         bad_bg = colors['error_light']
         bad_fg = colors['error']
         bad_border = colors['error']
         info = self.evaluation.get(q['id']) or {'selected': [], 'correct': False}
-        sel = set(str(s) for s in (info['selected'] or []))
+        sel_list = info['selected'] or []
+        sel = set(str(s) for s in sel_list)
+        correct_set = set(str(s) for s in (q.get('correct') or []))
         # 禁止修改
         for b in getattr(self, 'opt_buttons', []):
             b.setEnabled(False)
@@ -284,9 +289,20 @@ class ExamWindow(QMainWindow):
                     f"QPushButton {{ background-color:{ok_bg}; color:{ok_fg}; border:1px solid {ok_border}; border-radius:12px; padding:12px 16px; font-size:16px; text-align:left; min-height:44px; }}"
                 )
             else:
-                b.setStyleSheet(
-                    f"QPushButton {{ background-color:{bad_bg}; color:{bad_fg}; border:1px solid {bad_border}; border-radius:12px; padding:12px 16px; font-size:16px; text-align:left; min-height:44px; }}"
-                )
+                if q['type'] == 'multiple':
+                    intersection = sel & correct_set
+                    if len(intersection) == 0:
+                        b.setStyleSheet(
+                            f"QPushButton {{ background-color:{bad_bg}; color:{bad_fg}; border:1px solid {bad_border}; border-radius:12px; padding:12px 16px; font-size:16px; text-align:left; min-height:44px; }}"
+                        )
+                    else:
+                        b.setStyleSheet(
+                            f"QPushButton {{ background-color:{warn_bg}; color:{warn_fg}; border:1px solid {warn_border}; border-radius:12px; padding:12px 16px; font-size:16px; text-align:left; min-height:44px; }}"
+                        )
+                else:
+                    b.setStyleSheet(
+                        f"QPushButton {{ background-color:{bad_bg}; color:{bad_fg}; border:1px solid {bad_border}; border-radius:12px; padding:12px 16px; font-size:16px; text-align:left; min-height:44px; }}"
+                    )
 
     def closeEvent(self, event):
         if getattr(self, '_submitted', False):
