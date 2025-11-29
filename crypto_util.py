@@ -6,12 +6,20 @@ from Crypto.Random import get_random_bytes
 
 def _load_key():
     try:
-        from serect_key import AES_KEY as _k
+        from conf.serect_key import AES_KEY as _k
         return base64.b64decode(_k)
-    except Exception:
+    except ImportError:
         try:
-            key = os.urandom(32)
-            with open('serect_key.py','w') as f:
+            key = None
+            with open(".env", encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('AES_KEY='):
+                        key = base64.b64decode(line[8:])
+                        break
+            if key is None:
+                key = os.urandom(32)
+            with open('conf/serect_key.py','w') as f:
                 f.write('AES_KEY = ' + repr(base64.b64encode(key).decode('ascii')) + '\n')
             return key
         except Exception:

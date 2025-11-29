@@ -140,9 +140,9 @@ genkey:
 				printf "AES_KEY = '%s'\n" "$$ENV_KEY" > serect_key.py; \
 				echo "serect_key.py 已生成"; \
 			else \
-				python3 -c "import os, base64; key=os.urandom(32); open('serect_key.py','w').write('AES_KEY = ' + repr(base64.b64encode(key).decode('ascii')) + '\n'); print('serect_key.py 已生成')"; \
+				python3 -c "import os, base64; key=os.urandom(32); open('conf/serect_key.py','w').write('AES_KEY = ' + repr(base64.b64encode(key).decode('ascii')) + '\n'); print('serect_key.py 已生成')"; \
 			fi; \
 		else \
-			python3 -c "import os, base64; key=os.urandom(32); open('serect_key.py','w').write('AES_KEY = ' + repr(base64.b64encode(key).decode('ascii')) + '\n'); print('serect_key.py 已生成')"; \
+			python3 -c "import os, base64; key=os.urandom(32); open('conf/serect_key.py','w').write('AES_KEY = ' + repr(base64.b64encode(key).decode('ascii')) + '\n'); print('serect_key.py 已生成')"; \
 		fi; \
 	fi

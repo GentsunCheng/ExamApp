@@ -6,7 +6,7 @@ import re
 import re
 from openpyxl import load_workbook, Workbook
 from PySide6.QtCore import Qt, QThread, Signal, QSize, QRegularExpression, QDateTime
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QFormLayout, QSpinBox, QDateTimeEdit, QFileDialog, QTabWidget, QTableWidget, QTableWidgetItem, QGroupBox, QCheckBox, QComboBox, QMessageBox, QProgressDialog, QListView, QAbstractItemView
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QFormLayout, QSpinBox, QDateTimeEdit, QFileDialog, QTabWidget, QTableWidget, QTableWidgetItem, QGroupBox, QCheckBox, QComboBox, QMessageBox, QProgressDialog, QListView, QAbstractItemView, QTextBrowser
 from PySide6.QtGui import QRegularExpressionValidator
 from database import DB_PATH
 from models import list_users, create_user, list_exams, add_exam, import_questions_from_json, list_sync_targets, upsert_sync_target, delete_user, update_user_role, update_user_active, delete_sync_target, update_sync_target, get_exam_title, get_exam_stats
@@ -124,6 +124,7 @@ class AdminView(QWidget):
                 self.sync_progress_dialog.close()
             except Exception:
                 pass
+        colors = theme_manager.get_theme_colors()
         dlg = QProgressDialog(message, '', 0, 0, self)
         dlg.setWindowTitle('同步中')
         dlg.setCancelButton(None)
@@ -131,6 +132,19 @@ class AdminView(QWidget):
         dlg.setAutoClose(False)
         dlg.setAutoReset(False)
         dlg.setModal(True)
+        dlg.setRange(0, 0)
+        dlg.setLabelText(message)
+        dlg.setFixedSize(420, 140)
+        try:
+            dlg.setWindowFlags(dlg.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
+        except Exception:
+            pass
+        dlg.setStyleSheet(
+            f"QProgressDialog {{ background-color:{colors['card_background']}; border:1px solid {colors['border']}; border-radius:12px; }}\n"
+            f"QLabel {{ color:{colors['text_primary']}; font-size:14px; padding:12px; }}\n"
+            f"QProgressBar {{ background-color:{colors['border_light']}; border:1px solid {colors['border']}; border-radius:10px; height:16px; margin:8px 12px; }}\n"
+            f"QProgressBar::chunk {{ background-color:{colors['primary']}; border-radius:10px; }}"
+        )
         dlg.show()
         self.sync_progress_dialog = dlg
     def make_tag(self, text, bg, fg):
@@ -670,6 +684,7 @@ class AdminView(QWidget):
                 QMessageBox.warning(self, '错误', detail)
                 return
             import_questions_from_json(exam_id, valid)
+            self.refresh_exams()
             cnt_single = sum(1 for d in valid if d.get('type') == 'single')
             cnt_multiple = sum(1 for d in valid if d.get('type') == 'multiple')
             cnt_tf = sum(1 for d in valid if d.get('type') == 'truefalse')
@@ -686,6 +701,7 @@ class AdminView(QWidget):
         try:
             from models import clear_exam_questions
             clear_exam_questions(exam_id)
+            self.refresh_exams()
             QMessageBox.information(self, '成功', '题目已清空')
         except Exception as e:
             QMessageBox.warning(self, '错误', str(e))
@@ -852,9 +868,13 @@ class AdminView(QWidget):
         self.sync_spinner = LoadingIndicator(self)
         self.sync_spinner.hide()
         lay.addWidget(self.sync_spinner)
-        from PySide6.QtWidgets import QListWidget
-        self.sync_log = QListWidget()
-        self.sync_log.setMinimumHeight(120)
+        colors_log = theme_manager.get_theme_colors()
+        self.sync_log = QTextBrowser()
+        self.sync_log.setReadOnly(True)
+        self.sync_log.setMinimumHeight(140)
+        self.sync_log.setStyleSheet(
+            f"QTextBrowser {{ background-color:{colors_log['card_background']}; border:1px solid {colors_log['border']}; border-radius:8px; padding:8px; color:{colors_log['text_primary']}; }}"
+        )
         lay.addWidget(self.sync_log)
         lay.addStretch()
         w.setLayout(lay)
@@ -1180,10 +1200,13 @@ class AdminView(QWidget):
             self.pull_btn.setEnabled(False)
         if hasattr(self, 'sync_spinner'):
             self.sync_spinner.show()
+        if hasattr(self, 'sync_log'):
+            self.sync_log.clear()
         self.sync_worker = SyncWorker(targets, 'push')
         self.sync_worker.finished.connect(self.on_sync_finished)
         self.sync_worker.error.connect(self.on_sync_error)
-        self.sync_worker.progress.connect(lambda msg: self.sync_log.addItem(msg))
+        self.sync_worker.progress.connect(self.append_sync_log)
+        self.sync_worker.progress.connect(self.update_progress_message)
         self.sync_worker.start()
         self.show_sync_progress('正在同步题库到设备，请稍候...')
     def pull_all(self):
@@ -1198,12 +1221,43 @@ class AdminView(QWidget):
             self.pull_btn.setEnabled(False)
         if hasattr(self, 'sync_spinner'):
             self.sync_spinner.show()
+        if hasattr(self, 'sync_log'):
+            self.sync_log.clear()
         self.sync_worker = SyncWorker(targets, 'pull')
         self.sync_worker.finished.connect(self.on_sync_finished)
         self.sync_worker.error.connect(self.on_sync_error)
-        self.sync_worker.progress.connect(lambda msg: self.sync_log.addItem(msg))
+        self.sync_worker.progress.connect(self.append_sync_log)
+        self.sync_worker.progress.connect(self.update_progress_message)
         self.sync_worker.start()
         self.show_sync_progress('正在拉取成绩，请稍候...')
+
+    def update_progress_message(self, msg):
+        try:
+            if hasattr(self, 'sync_progress_dialog') and getattr(self, 'sync_progress_dialog'):
+                self.sync_progress_dialog.setLabelText(msg)
+        except Exception:
+            pass
+
+    def append_sync_log(self, message):
+        colors = theme_manager.get_theme_colors()
+        fg_ok = '#67c23a'
+        bg_ok = '#e1f3d8'
+        fg_err = '#f56c6c'
+        bg_err = '#fde2e2'
+        fg_info = colors['text_secondary']
+        bg_info = colors['border_light']
+        status = '成功' if ('成功' in message and '失败' not in message) else ('失败' if '失败' in message else '信息')
+        if status == '成功':
+            badge_fg, badge_bg = fg_ok, bg_ok
+        elif status == '失败':
+            badge_fg, badge_bg = fg_err, bg_err
+        else:
+            badge_fg, badge_bg = fg_info, bg_info
+        html = f"<div style=\"margin:4px 0;\">"
+        html += f"<span style=\"background:{badge_bg}; color:{badge_fg}; border-radius:10px; padding:2px 8px; font-size:12px;\">{status}</span>"
+        html += f"<span style=\"margin-left:8px;\">{message}</span>"
+        html += "</div>"
+        self.sync_log.append(html)
     def set_sync_buttons_enabled(self, enabled):
         for i in range(self.targets_table.rowCount()):
             widget = self.targets_table.cellWidget(i, 5)
