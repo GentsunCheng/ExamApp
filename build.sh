@@ -63,12 +63,24 @@ case "$CMD" in
     rm -rf ~/.exam_system/
     ;;
   check-deps)
-    for pkg in PySide6 pyyaml pycryptodome; do
+    for pkg in PySide6 pyyaml pycryptodome pyarmor; do
       python -c "import ${pkg}" 2>/dev/null && echo "✓ ${pkg} 已安装" || echo "✗ ${pkg} 未安装"
     done
     ;;
+  obfuscate)
+    echo "使用 PyArmor 导出混淆代码..."
+    mkdir -p obf
+    pyarmor gen -O obf -r . || pyarmor obfuscate -r -O obf .
+    echo "混淆代码已导出到: obf/"
+    ;;
+  build-secure)
+    rm -rf "${BUILD_DIR}" "${DIST_DIR}" *.spec
+    echo "使用 PyArmor 打包（包含代码混淆）..."
+    pyarmor pack -e "${PYINSTALLER_ARGS}" "${MAIN_SCRIPT}"
+    echo "安全构建完成: ${DIST_DIR}/${APP_NAME}.app"
+    ;;
   *)
-    echo "用法: ./build.sh [install|genkey|build|run|dmg|dev|clean|deep-clean|check-deps]"
+    echo "用法: ./build.sh [install|genkey|build|build-secure|run|dmg|dev|clean|deep-clean|check-deps|obfuscate]"
     exit 1
     ;;
 esac

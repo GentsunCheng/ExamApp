@@ -33,13 +33,13 @@ install:
 # 创建requirements.txt
 .PHONY: requirements
 requirements:
-	@echo "生成 requirements.txt..."
-	@echo "# Python packages for Exam System" > requirements.txt
-	@echo "PySide6" >> requirements.txt
-	@echo "pyyaml" >> requirements.txt
-	@echo "pyinstaller" >> requirements.txt
-	@echo "pycryptodome" >> requirements.txt
-	@echo "requirements.txt 已生成!"
+    @echo "生成 requirements.txt..."
+    @echo "# Python packages for Exam System" > requirements.txt
+    @echo "PySide6" >> requirements.txt
+    @echo "pyyaml" >> requirements.txt
+    @echo "pyinstaller" >> requirements.txt
+    @echo "pycryptodome" >> requirements.txt
+    @echo "requirements.txt 已生成!"
 
 # 清理构建文件
 .PHONY: clean
@@ -79,6 +79,21 @@ dmg: build
 	hdiutil create -volname "$(APP_NAME)" -srcfolder "$(BUILD_DIR)/dmg" -ov -format UDZO "$(DIST_DIR)/$(APP_NAME).dmg"
 	@echo "DMG已创建: $(DIST_DIR)/$(APP_NAME).dmg"
 
+# 使用 PyArmor 导出混淆代码
+.PHONY: obfuscate
+obfuscate:
+	@echo "使用 PyArmor 导出混淆代码..."
+	@mkdir -p obf
+	@pyarmor gen -O obf -r . || pyarmor obfuscate -r -O obf .
+	@echo "混淆代码已导出到: obf/"
+
+# 使用 PyArmor 打包（包含代码混淆）
+.PHONY: build-secure
+build-secure: clean
+	@echo "使用 PyArmor 打包（包含代码混淆）..."
+	@pyarmor pack -e "$(PYINSTALLER_ARGS)" "$(MAIN_SCRIPT)"
+	@echo "安全构建完成"
+
 # 开发模式运行
 .PHONY: dev
 dev:
@@ -109,18 +124,20 @@ test:
 # 帮助
 .PHONY: help
 help:
-	@echo "Exam System Makefile"
-	@echo "可用命令:"
-	@echo "  make install     - 安装依赖包"
-	@echo "  make build         - 构建可执行文件"
-	@echo "  make run          - 构建并运行"
-	@echo "  make dmg          - 生成DMG安装镜像"
-	@echo "  make dev          - 开发模式运行"
-	@echo "  make clean        - 清理构建文件"
-	@echo "  make package      - 创建发布包"
-	@echo "  make check-deps  - 检查依赖包"
-	@echo "  make test         - 运行测试"
-	@echo "  make help          - 显示此帮助信息"
+    @echo "Exam System Makefile"
+    @echo "可用命令:"
+    @echo "  make install     - 安装依赖包"
+    @echo "  make build         - 构建可执行文件"
+    @echo "  make run          - 构建并运行"
+    @echo "  make dmg          - 生成DMG安装镜像"
+    @echo "  make dev          - 开发模式运行"
+    @echo "  make clean        - 清理构建文件"
+    @echo "  make package      - 创建发布包"
+    @echo "  make check-deps  - 检查依赖包"
+    @echo "  make test         - 运行测试"
+    @echo "  make help          - 显示此帮助信息"
+    @echo "  make obfuscate    - 使用 PyArmor 导出混淆代码到 obf/"
+    @echo "  make build-secure - 使用 PyArmor 打包（包含代码混淆）"
 # 生成密钥文件
 .PHONY: genkey
 genkey:

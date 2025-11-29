@@ -23,6 +23,7 @@ MANIFEST
 .venv/
 venv/
 env/
+obf/
 .env
 .env.*
 .python-version
