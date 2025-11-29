@@ -14,8 +14,8 @@ def _load_key():
             with open(".env", encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
-                    if line.startswith('AES_KEY='):
-                        key = base64.b64decode(line[8:])
+                    if line.startswith('AES_KEY'):
+                        key = line.split('=')[-1].strip()
                         break
             if key is None:
                 key = os.urandom(32)
