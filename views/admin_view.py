@@ -278,6 +278,14 @@ class AdminView(QWidget):
             action_layout.addWidget(active_btn)
             action_widget.setLayout(action_layout)
             self.users_table.setCellWidget(row, 6, action_widget)
+        try:
+            for r in range(self.users_table.rowCount()):
+                for c in range(self.users_table.columnCount()):
+                    it = self.users_table.item(r, c)
+                    if it:
+                        it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        except Exception:
+            pass
         self.users_table.blockSignals(False)
     def add_user(self):
         name = self.new_user.text().strip()
@@ -340,9 +348,10 @@ class AdminView(QWidget):
         self.exams_table.setColumnWidth(2, 120)
         self.exams_table.setColumnWidth(3, 120)
         self.exams_table.setColumnWidth(4, 120)
-        self.exams_table.setColumnWidth(5, 400)
+        self.exams_table.setColumnWidth(5, 480)
         self.exams_table.setColumnWidth(6, 80)
         self.exams_table.setColumnWidth(7, 80)
+        self.exams_table.setColumnWidth(8, 150)
         self.exams_table.horizontalHeader().setStretchLastSection(True)
         self.exams_table.setAlternatingRowColors(True)
         self.exams_table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -488,6 +497,14 @@ class AdminView(QWidget):
             hb.addStretch()
             opw.setLayout(hb)
             tbl.setCellWidget(r, 8, opw)
+        try:
+            for r in range(tbl.rowCount()):
+                for c in range(tbl.columnCount()):
+                    it = tbl.item(r, c)
+                    if it:
+                        it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        except Exception:
+            pass
         tbl.blockSignals(False)
     def add_exam(self):
         title = self.ex_title.text().strip()
@@ -1045,6 +1062,14 @@ class AdminView(QWidget):
             action_layout.addWidget(delete_btn)
             action_widget.setLayout(action_layout)
             self.targets_table.setCellWidget(r, 5, action_widget)
+        try:
+            for r in range(self.targets_table.rowCount()):
+                for c in range(self.targets_table.columnCount()):
+                    it = self.targets_table.item(r, c)
+                    if it:
+                        it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        except Exception:
+            pass
         self.targets_table.blockSignals(False)
         try:
             self.targets_table.itemChanged.disconnect()
@@ -1349,6 +1374,14 @@ class AdminView(QWidget):
                 it = self.scores_table.item(r, c)
                 if it:
                     it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        try:
+            for r in range(self.scores_table.rowCount()):
+                for c in range(self.scores_table.columnCount()):
+                    it = self.scores_table.item(r, c)
+                    if it:
+                        it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        except Exception:
+            pass
     def export_scores_to_excel(self):
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents/scores')
         fn, sel = QFileDialog.getSaveFileName(self, '导出成绩Excel', suggested, 'Excel (*.xlsx)')

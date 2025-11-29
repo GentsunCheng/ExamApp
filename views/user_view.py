@@ -1,4 +1,5 @@
 from PySide6.QtGui import QColor
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QTabWidget, QAbstractItemView
 from icon_manager import get_icon
 from theme_manager import theme_manager
@@ -58,15 +59,17 @@ class UserView(QWidget):
         exams_toolbar.addWidget(refresh_exams_btn)
         exams_toolbar.addStretch()
         exams_v.addLayout(exams_toolbar)
-        self.exams_table_user = QTableWidget(0, 7)
-        self.exams_table_user.setHorizontalHeaderLabels(['ID', '标题', '限时(分钟)', '总分', '及格比例%', '题目数量', '截止'])
+        self.exams_table_user = QTableWidget(0, 9)
+        self.exams_table_user.setHorizontalHeaderLabels(['ID', '标题', '描述', '限时(分钟)', '截止', '及格比例%', '题目数量', '总分', '历史最高分'])
         self.exams_table_user.setColumnWidth(0, 50)
         self.exams_table_user.setColumnWidth(1, 250)
-        self.exams_table_user.setColumnWidth(2, 80)
+        self.exams_table_user.setColumnWidth(2, 480)
         self.exams_table_user.setColumnWidth(3, 80)
-        self.exams_table_user.setColumnWidth(4, 80)
-        self.exams_table_user.setColumnWidth(5, 80)
-        self.exams_table_user.setColumnWidth(6, 180)
+        self.exams_table_user.setColumnWidth(4, 200)
+        self.exams_table_user.setColumnWidth(5, 75)
+        self.exams_table_user.setColumnWidth(6, 75)
+        self.exams_table_user.setColumnWidth(7, 75)
+        self.exams_table_user.setColumnWidth(8, 50)
         self.exams_table_user.horizontalHeader().setStretchLastSection(True)
         self.exams_table_user.setAlternatingRowColors(True)
         self.exams_table_user.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -106,6 +109,22 @@ class UserView(QWidget):
             return
         tbl.setRowCount(0)
         colors = theme_manager.get_theme_colors()
+        passed_ids = set()
+        best_scores = {}
+        for a in list_attempts(self.user['id']):
+            if a[6] == 1 and a[4]:
+                try:
+                    passed_ids.add(int(a[2]))
+                except Exception:
+                    pass
+            try:
+                eid = int(a[2]) if a[2] is not None else None
+            except Exception:
+                eid = None
+            if eid is not None and a[4]:
+                bs = best_scores.get(eid)
+                if bs is None or float(a[5] or 0.0) > bs:
+                    best_scores[eid] = float(a[5] or 0.0)
         exams = list_exams(include_expired=False)
         exams_sorted = sorted(exams, key=lambda e: (0 if e[5] is None else 1, -int(e[0]) if e[0] is not None else 0))
         for e in exams_sorted:
@@ -113,17 +132,33 @@ class UserView(QWidget):
             tbl.insertRow(r)
             tbl.setItem(r, 0, QTableWidgetItem(str(e[0])))
             tbl.setItem(r, 1, QTableWidgetItem(e[1] or ''))
-            tbl.setItem(r, 2, QTableWidgetItem(str(e[4])))
+            tbl.setItem(r, 2, QTableWidgetItem(e[2] or ''))
+            tbl.setItem(r, 3, QTableWidgetItem(str(e[4])))
             stats = get_exam_stats(int(e[0]))
-            tbl.setItem(r, 3, QTableWidgetItem(str(int(stats['total_score'])) if stats else '0'))
-            tbl.setItem(r, 4, QTableWidgetItem(f"{int(float(e[3])*100)}%"))
-            tbl.setItem(r, 5, QTableWidgetItem(str(stats['count']) if stats else '0'))
-            tbl.setItem(r, 6, QTableWidgetItem(e[5] if e[5] else '永久'))
+            tbl.setItem(r, 4, QTableWidgetItem(e[5] if e[5] else '永久'))
+            tbl.setItem(r, 5, QTableWidgetItem(f"{int(float(e[3])*100)}%"))
+            tbl.setItem(r, 6, QTableWidgetItem(str(stats['count']) if stats else '0'))
+            tbl.setItem(r, 7, QTableWidgetItem(str(int(stats['total_score'])) if stats else '0'))
+            best = int(best_scores.get(int(e[0]), 0))
+            tbl.setItem(r, 8, QTableWidgetItem(str(best)))
+            if int(e[0]) in passed_ids:
+                for c in range(0, 9):
+                    it = tbl.item(r, c)
+                    if it:
+                        it.setForeground(QColor('#2E7D32'))
             if e[5] is None:
-                for c in range(0, 7):
+                for c in range(0, 9):
                     it = tbl.item(r, c)
                     if it:
                         it.setBackground(QColor(colors['info_light']))
+        try:
+            for r in range(tbl.rowCount()):
+                for c in range(tbl.columnCount()):
+                    it = tbl.item(r, c)
+                    if it:
+                        it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        except Exception:
+            pass
     def refresh_attempts(self):
         self.attempts_table.setRowCount(0)
         for a in list_attempts(self.user['id']):
@@ -140,6 +175,14 @@ class UserView(QWidget):
             else:
                 ucell.setBackground(QColor("#e75c5c"))
             self.attempts_table.setItem(r, 4, ucell)
+        try:
+            for r in range(self.attempts_table.rowCount()):
+                for c in range(self.attempts_table.columnCount()):
+                    it = self.attempts_table.item(r, c)
+                    if it:
+                        it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        except Exception:
+            pass
     def start_exam(self, exam_id=None):
         if exam_id is None:
             tbl = getattr(self, 'exams_table_user', None)
