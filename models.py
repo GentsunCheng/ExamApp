@@ -5,6 +5,12 @@ from database import get_conn, now_iso, ensure_key_probe, verify_db_encryption_k
 from utils import hash_password, verify_password
 import sqlite3
 from crypto_util import encrypt_text, decrypt_text, encrypt_json, decrypt_json
+import hashlib
+import hmac
+try:
+    from conf.serect_key import SERECT_KEY
+except Exception:
+    SERECT_KEY = 'example'
 
 def create_admin_if_absent():
     conn = get_conn()
@@ -154,7 +160,13 @@ def start_attempt(user_id, exam_id):
     a_uuid = str(uuid.uuid4())
     conn = get_conn()
     c = conn.cursor()
-    c.execute('INSERT INTO attempts (uuid, user_id, exam_id, started_at, submitted_at, score, passed) VALUES (?,?,?,?,?,?,?)', (a_uuid, user_id, exam_id, now_iso(), None, 0.0, 0))
+    ts = now_iso()
+    checksum = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(a_uuid), str(user_id), str(exam_id), str(ts), '-', str(0.0), str(0)])).encode('utf-8'), hashlib.sha256).hexdigest()
+    try:
+        c.execute('INSERT INTO attempts (uuid, user_id, exam_id, started_at, submitted_at, score, passed, checksum) VALUES (?,?,?,?,?,?,?,?)', (a_uuid, user_id, exam_id, ts, None, 0.0, 0, checksum))
+    except Exception:
+        c.execute('INSERT INTO attempts (uuid, user_id, exam_id, started_at, submitted_at, score, passed) VALUES (?,?,?,?,?,?,?)', (a_uuid, user_id, exam_id, ts, None, 0.0, 0))
+        c.execute('UPDATE attempts SET checksum=? WHERE uuid=?', (checksum, a_uuid))
     conn.commit()
     conn.close()
     return a_uuid
@@ -170,12 +182,13 @@ def save_answer(attempt_uuid, question_id, selected):
 def submit_attempt(attempt_uuid):
     conn = get_conn()
     c = conn.cursor()
-    c.execute('SELECT exam_id, user_id FROM attempts WHERE uuid=?', (attempt_uuid,))
+    c.execute('SELECT exam_id, user_id, started_at FROM attempts WHERE uuid=?', (attempt_uuid,))
     row = c.fetchone()
     if not row:
         conn.close()
         return 0.0, 0
     exam_id = row[0]
+    started_at = row[2]
     qs = list_questions(exam_id)
     total = 0.0
     c.execute('SELECT question_id, selected FROM attempt_answers WHERE attempt_uuid=?', (attempt_uuid,))
@@ -189,7 +202,13 @@ def submit_attempt(attempt_uuid):
     pass_ratio = c.fetchone()[0]
     max_total = sum(float(q['score']) for q in qs)
     passed = 1 if (max_total > 0 and total / max_total >= pass_ratio) else 0
-    c.execute('UPDATE attempts SET submitted_at=?, score=?, passed=? WHERE uuid=?', (now_iso(), total, passed, attempt_uuid))
+    sub_ts = now_iso()
+    c.execute('UPDATE attempts SET submitted_at=?, score=?, passed=? WHERE uuid=?', (sub_ts, total, passed, attempt_uuid))
+    try:
+        checksum = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(attempt_uuid), str(row[1]), str(exam_id), str(started_at), str(sub_ts), str(total), str(passed)])).encode('utf-8'), hashlib.sha256).hexdigest()
+        c.execute('UPDATE attempts SET checksum=? WHERE uuid=?', (checksum, attempt_uuid))
+    except Exception:
+        pass
     conn.commit()
     conn.close()
     return total, passed
@@ -207,26 +226,33 @@ def list_attempts(user_id=None):
     conn = get_conn()
     c = conn.cursor()
     if user_id:
-        c.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed FROM attempts WHERE user_id=? ORDER BY id DESC', (user_id,))
+        c.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, checksum FROM attempts WHERE user_id=? ORDER BY id DESC', (user_id,))
     else:
-        c.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed FROM attempts ORDER BY id DESC')
+        c.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, checksum FROM attempts ORDER BY id DESC')
     rows = c.fetchall()
     conn.close()
-    return rows
+    out = []
+    for r in rows:
+        expect = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(r[0]), str(r[1]), str(r[2]), str(r[3]), str(r[4]) if r[4] else '-', str(r[5]), str(r[6])])).encode('utf-8'), hashlib.sha256).hexdigest()
+        valid = str(r[7] or '') == expect
+        out.append((r[0], r[1], r[2], r[3], r[4], r[5], r[6], 1 if valid else 0))
+    return out
 
 def list_attempts_with_user():
     conn = get_conn()
     c = conn.cursor()
     try:
-        c.execute('SELECT a.uuid, u.username, u.full_name, a.user_id, a.exam_id, a.started_at, a.submitted_at, a.score, a.passed FROM attempts a JOIN users u ON a.user_id=u.id ORDER BY a.id DESC')
+        c.execute('SELECT a.uuid, u.username, u.full_name, a.user_id, a.exam_id, a.started_at, a.submitted_at, a.score, a.passed, a.checksum FROM attempts a JOIN users u ON a.user_id=u.id ORDER BY a.id DESC')
     except Exception:
-        c.execute('SELECT a.uuid, u.username, NULL as full_name, a.user_id, a.exam_id, a.started_at, a.submitted_at, a.score, a.passed FROM attempts a JOIN users u ON a.user_id=u.id ORDER BY a.id DESC')
+        c.execute('SELECT a.uuid, u.username, NULL as full_name, a.user_id, a.exam_id, a.started_at, a.submitted_at, a.score, a.passed, a.checksum FROM attempts a JOIN users u ON a.user_id=u.id ORDER BY a.id DESC')
     rows = c.fetchall()
     conn.close()
     out = []
     for r in rows:
         fn = r[2]
-        out.append((r[0], r[1], decrypt_text(fn) if fn else None, r[3], r[4], r[5], r[6], r[7], r[8]))
+        expect = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(r[0]), str(r[3]), str(r[4]), str(r[5]), str(r[6]) if r[6] else '-', str(r[7]), str(r[8])])).encode('utf-8'), hashlib.sha256).hexdigest()
+        valid = str(r[9] or '') == expect
+        out.append((r[0], r[1], decrypt_text(fn) if fn else None, r[3], r[4], r[5], r[6], r[7], r[8], 1 if valid else 0))
     return out
 
 def merge_remote_db(remote_db_path):
@@ -234,11 +260,21 @@ def merge_remote_db(remote_db_path):
     lcur = lconn.cursor()
     rconn = sqlite3.connect(remote_db_path)
     rcur = rconn.cursor()
-    rcur.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed FROM attempts')
-    for a in rcur.fetchall():
+    try:
+        rcur.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, checksum FROM attempts')
+        remote_rows = rcur.fetchall()
+    except Exception:
+        rcur.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed FROM attempts')
+        remote_rows = [tuple(list(x) + [None]) for x in rcur.fetchall()]
+    for a in remote_rows:
         lcur.execute('SELECT COUNT(*) FROM attempts WHERE uuid=?', (a[0],))
         if lcur.fetchone()[0] == 0:
-            lcur.execute('INSERT INTO attempts (uuid, user_id, exam_id, started_at, submitted_at, score, passed) VALUES (?,?,?,?,?,?,?)', a)
+            try:
+                lcur.execute('INSERT INTO attempts (uuid, user_id, exam_id, started_at, submitted_at, score, passed, checksum) VALUES (?,?,?,?,?,?,?,?)', a)
+            except Exception:
+                lcur.execute('INSERT INTO attempts (uuid, user_id, exam_id, started_at, submitted_at, score, passed) VALUES (?,?,?,?,?,?,?)', a[:7])
+                ch = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(a[0]), str(a[1]), str(a[2]), str(a[3]), str(a[4]) if a[4] else '-', str(a[5]), str(a[6])])).encode('utf-8'), hashlib.sha256).hexdigest()
+                lcur.execute('UPDATE attempts SET checksum=? WHERE uuid=?', (ch, a[0]))
             rcur2 = rconn.cursor()
             rcur2.execute('SELECT question_id, selected FROM attempt_answers WHERE attempt_uuid=?', (a[0],))
             for aa in rcur2.fetchall():

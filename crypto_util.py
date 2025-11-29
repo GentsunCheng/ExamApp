@@ -14,9 +14,10 @@ def _load_key():
             with open(".env", encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
-                    if line.startswith('AES_KEY'):
-                        key = line.split('=')[-1].strip()
-                        break
+                    if line.startswith('AES_KEY='):
+                        key = line[len('AES_KEY='):]
+                    elif line.startswith('AES_KEY_B64='):
+                        key = line[len('AES_KEY_B64='):]
             if key is None:
                 key = os.urandom(32)
             with open('conf/serect_key.py','w') as f:

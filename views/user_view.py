@@ -169,11 +169,16 @@ class UserView(QWidget):
             self.attempts_table.setItem(r, 1, QTableWidgetItem(title or ''))
             self.attempts_table.setItem(r, 2, QTableWidgetItem(a[3] or ''))
             self.attempts_table.setItem(r, 3, QTableWidgetItem(a[4] or ''))
-            ucell = QTableWidgetItem(f'{a[5]} / {"通过" if a[6]==1 else "未通过"}')
-            if a[6] == 1:
-                ucell.setBackground(QColor("#6bc041"))
+            passed_text = '数据异常' if (len(a) > 7 and a[7] == 0) else ('通过' if a[6]==1 else '未通过')
+            ucell = QTableWidgetItem(f'{a[5]} / {passed_text}')
+            if len(a) > 7 and a[7] == 0:
+                ucell.setBackground(QColor('#fff3cd'))
+                ucell.setForeground(QColor('#8a6d3b'))
             else:
-                ucell.setBackground(QColor("#e75c5c"))
+                if a[6] == 1:
+                    ucell.setBackground(QColor("#6bc041"))
+                else:
+                    ucell.setBackground(QColor("#e75c5c"))
             self.attempts_table.setItem(r, 4, ucell)
         try:
             for r in range(self.attempts_table.rowCount()):

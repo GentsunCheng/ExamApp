@@ -30,17 +30,6 @@ install:
 	pip3 install -r requirements.txt
 	@echo "安装完成!"
 
-# 创建requirements.txt
-.PHONY: requirements
-requirements:
-    @echo "生成 requirements.txt..."
-    @echo "# Python packages for Exam System" > requirements.txt
-    @echo "PySide6" >> requirements.txt
-    @echo "pyyaml" >> requirements.txt
-    @echo "pyinstaller" >> requirements.txt
-    @echo "pycryptodome" >> requirements.txt
-    @echo "requirements.txt 已生成!"
-
 # 清理构建文件
 .PHONY: clean
 clean:
@@ -124,20 +113,20 @@ test:
 # 帮助
 .PHONY: help
 help:
-    @echo "Exam System Makefile"
-    @echo "可用命令:"
-    @echo "  make install     - 安装依赖包"
-    @echo "  make build         - 构建可执行文件"
-    @echo "  make run          - 构建并运行"
-    @echo "  make dmg          - 生成DMG安装镜像"
-    @echo "  make dev          - 开发模式运行"
-    @echo "  make clean        - 清理构建文件"
-    @echo "  make package      - 创建发布包"
-    @echo "  make check-deps  - 检查依赖包"
-    @echo "  make test         - 运行测试"
-    @echo "  make help          - 显示此帮助信息"
-    @echo "  make obfuscate    - 使用 PyArmor 导出混淆代码到 obf/"
-    @echo "  make build-secure - 使用 PyArmor 打包（包含代码混淆）"
+	@echo "Exam System Makefile"
+	@echo "可用命令:"
+	@echo "  make install     - 安装依赖包"
+	@echo "  make build         - 构建可执行文件"
+	@echo "  make run          - 构建并运行"
+	@echo "  make dmg          - 生成DMG安装镜像"
+	@echo "  make dev          - 开发模式运行"
+	@echo "  make clean        - 清理构建文件"
+	@echo "  make package      - 创建发布包"
+	@echo "  make check-deps  - 检查依赖包"
+	@echo "  make test         - 运行测试"
+	@echo "  make help          - 显示此帮助信息"
+	@echo "  make obfuscate    - 使用 PyArmor 导出混淆代码到 obf/"
+	@echo "  make build-secure - 使用 PyArmor 打包（包含代码混淆）"
 # 生成密钥文件
 .PHONY: genkey
 genkey:
@@ -146,20 +135,20 @@ genkey:
 		echo "密钥已存在，跳过"; \
 	else \
 		if [ -f .env ]; then \
-			ENV_KEY_B64=$$(grep -E '^AES_KEY_B64=' .env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' '); \
-			ENV_KEY=$$(grep -E '^AES_KEY=' .env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' '); \
-			if [ -n "$$ENV_KEY_B64" ]; then \
-				echo "使用 .env 中的 AES_KEY_B64"; \
-				printf "AES_KEY = '%s'\n" "$$ENV_KEY_B64" > conf/serect_key.py; \
-				echo "conf/serect_key.py 已生成"; \
-			elif [ -n "$$ENV_KEY" ]; then \
-				echo "使用 .env 中的 AES_KEY"; \
-				printf "AES_KEY = '%s'\n" "$$ENV_KEY" > conf/serect_key.py; \
+			ENV_AES_B64=$$(grep -E '^AES_KEY_B64=' .env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' '); \
+			ENV_AES=$$(grep -E '^AES_KEY=' .env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' '); \
+			ENV_HMAC_B64=$$(grep -E '^SERECT_KEY_B64=' .env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' '); \
+			ENV_HMAC=$$(grep -E '^SERECT_KEY=' .env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' '); \
+			AK=$${ENV_AES_B64:-$$ENV_AES}; \
+			SK=$${ENV_HMAC_B64:-$$ENV_HMAC}; \
+			if [ -n "$$AK" ] || [ -n "$$SK" ]; then \
+				printf "AES_KEY = '%s'\n" "$$AK" > conf/serect_key.py; \
+				printf "SERECT_KEY = '%s'\n" "$$SK" >> conf/serect_key.py; \
 				echo "conf/serect_key.py 已生成"; \
 			else \
-				python3 -c "import os, base64; key=os.urandom(32); open('conf/serect_key.py','w').write('AES_KEY = ' + repr(base64.b64encode(key).decode('ascii')) + '\n'); print('serect_key.py 已生成')"; \
+				python3 -c "import os, base64; ak=os.urandom(32); sk=os.urandom(32); open('conf/serect_key.py','w').write('AES_KEY = ' + repr(base64.b64encode(ak).decode('ascii')) + '\n' + 'SERECT_KEY = ' + repr(base64.b64encode(sk).decode('ascii')) + '\n'); print('serect_key.py 已生成')"; \
 			fi; \
 		else \
-			python3 -c "import os, base64; key=os.urandom(32); open('conf/serect_key.py','w').write('AES_KEY = ' + repr(base64.b64encode(key).decode('ascii')) + '\n'); print('serect_key.py 已生成')"; \
+			python3 -c "import os, base64; ak=os.urandom(32); sk=os.urandom(32); open('conf/serect_key.py','w').write('AES_KEY = ' + repr(base64.b64encode(ak).decode('ascii')) + '\n' + 'SERECT_KEY = ' + repr(base64.b64encode(sk).decode('ascii')) + '\n'); print('serect_key.py 已生成')"; \
 		fi; \
 	fi

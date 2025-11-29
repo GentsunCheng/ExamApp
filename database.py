@@ -38,6 +38,21 @@ def ensure_db():
         conn.close()
     conn.close()
 
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT checksum FROM attempts LIMIT 1')
+    except sqlite3.OperationalError:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute('ALTER TABLE attempts ADD COLUMN checksum TEXT')
+        conn.commit()
+        conn.close()
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
 def get_conn():
     ensure_db()
     return sqlite3.connect(DB_PATH)
