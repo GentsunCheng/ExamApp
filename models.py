@@ -1,4 +1,4 @@
-import json
+import random
 import uuid
 from datetime import datetime
 from database import get_conn, now_iso, ensure_key_probe, verify_db_encryption_key
@@ -71,10 +71,18 @@ def list_users():
         out.append((r[0], r[1], decrypt_text(fn) if fn else None, r[3], r[4], r[5]))
     return out
 
-def add_exam(title, description, pass_ratio, time_limit_minutes, end_date):
+def add_exam(title, description, pass_ratio, time_limit_minutes, end_date, random_pick_count=0):
     conn = get_conn()
     c = conn.cursor()
-    c.execute('INSERT INTO exams (title, description, pass_ratio, time_limit_minutes, end_date, created_at) VALUES (?,?,?,?,?,?)', (encrypt_text(title), encrypt_text(description) if description is not None else None, float(pass_ratio), int(time_limit_minutes), end_date, now_iso()))
+    try:
+        c.execute('INSERT INTO exams (title, description, pass_ratio, time_limit_minutes, end_date, created_at, random_pick_count) VALUES (?,?,?,?,?,?,?)', (encrypt_text(title), encrypt_text(description) if description is not None else None, float(pass_ratio), int(time_limit_minutes), end_date, now_iso(), int(random_pick_count)))
+    except Exception:
+        c.execute('INSERT INTO exams (title, description, pass_ratio, time_limit_minutes, end_date, created_at) VALUES (?,?,?,?,?,?)', (encrypt_text(title), encrypt_text(description) if description is not None else None, float(pass_ratio), int(time_limit_minutes), end_date, now_iso()))
+        try:
+            exam_id = c.lastrowid
+            c.execute('UPDATE exams SET random_pick_count=? WHERE id=?', (int(random_pick_count), exam_id))
+        except Exception:
+            pass
     conn.commit()
     conn.close()
 
@@ -132,7 +140,11 @@ def import_questions_from_json(exam_id, payload):
     conn = get_conn()
     c = conn.cursor()
     for q in payload:
-        c.execute('INSERT INTO questions (exam_id, type, text, options, correct_answers, score) VALUES (?,?,?,?,?,?)', (exam_id, q.get('type'), encrypt_text(q.get('text')), encrypt_json(q.get('options') or []), encrypt_json(q.get('correct') or []), float(q.get('score', 1))))
+        pool = (q.get('pool') or q.get('category') or 'mandatory')
+        try:
+            c.execute('INSERT INTO questions (exam_id, type, text, options, correct_answers, score, pool) VALUES (?,?,?,?,?,?,?)', (exam_id, q.get('type'), encrypt_text(q.get('text')), encrypt_json(q.get('options') or []), encrypt_json(q.get('correct') or []), float(q.get('score', 1)), pool))
+        except Exception:
+            c.execute('INSERT INTO questions (exam_id, type, text, options, correct_answers, score) VALUES (?,?,?,?,?,?)', (exam_id, q.get('type'), encrypt_text(q.get('text')), encrypt_json(q.get('options') or []), encrypt_json(q.get('correct') or []), float(q.get('score', 1))))
     conn.commit()
     conn.close()
 
@@ -362,3 +374,58 @@ def list_sync_targets():
     for r in rows:
         out.append((r[0], r[1], r[2], r[3], r[4], decrypt_text(r[5]) if r[5] else None))
     return out
+
+def list_questions_by_pool(exam_id, pool):
+    conn = get_conn()
+    c = conn.cursor()
+    try:
+        c.execute('SELECT id, type, text, options, correct_answers, score FROM questions WHERE exam_id=? AND (pool=? OR (pool IS NULL AND ?="mandatory")) ORDER BY id', (exam_id, pool, pool))
+    except Exception:
+        c.execute('SELECT id, type, text, options, correct_answers, score FROM questions WHERE exam_id=? ORDER BY id', (exam_id,))
+    rows = c.fetchall()
+    conn.close()
+    out = []
+    for r in rows:
+        out.append({'id': r[0], 'type': r[1], 'text': decrypt_text(r[2]) if r[2] else '', 'options': decrypt_json(r[3]) or [], 'correct': decrypt_json(r[4]) or [], 'score': r[5]})
+    return out
+
+def get_exam_random_pick_count(exam_id):
+    conn = get_conn()
+    c = conn.cursor()
+    try:
+        c.execute('SELECT random_pick_count FROM exams WHERE id=?', (exam_id,))
+        row = c.fetchone()
+        conn.close()
+        return int(row[0]) if row and row[0] is not None else 0
+    except Exception:
+        conn.close()
+        return 0
+
+def update_exam_random_pick_count(exam_id, count):
+    conn = get_conn()
+    c = conn.cursor()
+    try:
+        c.execute('UPDATE exams SET random_pick_count=? WHERE id=?', (int(count), exam_id))
+        conn.commit()
+    except Exception:
+        pass
+    conn.close()
+
+def build_exam_questions_for_attempt(exam_id):
+    mandatory = list_questions_by_pool(exam_id, 'mandatory')
+    random_pool = list_questions_by_pool(exam_id, 'random')
+    pick = get_exam_random_pick_count(exam_id)
+    if pick <= 0:
+        sampled = random_pool
+    else:
+        n = min(int(pick), len(random_pool))
+        try:
+            sampled = random.sample(random_pool, n)
+        except Exception:
+            sampled = random_pool[:n]
+    combined = list(mandatory) + list(sampled)
+    try:
+        random.shuffle(combined)
+    except Exception:
+        pass
+    return combined

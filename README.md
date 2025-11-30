@@ -60,12 +60,25 @@ python3 main.py
 - 限时默认 60 分钟，可在创建时调整
 - 及格比例以百分比输入（0-100），内部按 0-1 存储
 
-## 导入/导出格式
+## 导入/导出格式（支持必考题库 + 随机题库）
+
+### 新的考试规则
+
+- 题库分为两部分：
+  - `mandatory`（必考题库）：考试时全部纳入
+  - `random`（随机题库）：考试时按配置的抽取数量随机抽取，数量不足则全部抽取
+- 抽取数量配置项：`random_pick_count`
+  - 在 Excel 的“配置选项”工作表配置
+  - 在 JSON/YAML 的 `config.random_pick_count` 配置
 
 ### Excel（推荐）
 
-- 工作表名称：`Questions`（如不存在则读取活动表）
-- 表头（第一行）：`类型`、`内容`、`正确答案`、`分数`、`选项A`、`选项B`、`选项C`、`选项D`…（选项列可变，遇到空白停止读取）
+- 工作表：
+  - `配置选项`：第一行写 `随机抽取数量`，第二行填写数字（例如 `4`）
+  - `必考题库`：必考题列表
+  - `随机题库`：随机题列表
+- 表头（两类题库工作表的第一行一致）：
+  - `类型`、`内容`、`正确答案`、`分数`、`选项A`、`选项B`、`选项C`、`选项D`…（选项列可变，遇到空白停止读取）
 - 类型取值：`单选` / `多选` / `判断`（也支持 `single` / `multiple` / `truefalse`）
 - 正确答案：
   - 单选：填字母，如 `A`
@@ -73,55 +86,61 @@ python3 main.py
   - 判断：填 `true` 或 `false`（大小写不敏感）
 - 选项：从 `选项A` 开始依次填写；`判断`题不需要选项
 - 分数：在“分数”列填写数值；留空或格式不正确默认 `1` 分
+- 兼容说明：若只提供“必考题库”或“随机题库”之一，也可正常导入；若没有三表结构，仍兼容旧版单表 `Questions`（作为必考题库处理）
 
-操作入口：
-
-- 在“试题”页面：
-  - 选择试题后点击 `导入题目`，选择 Excel 文件（默认筛选 `.xlsx`）
-  - 点击 `导出题目示例`，生成包含示例题目的 Excel 文件（含“分数”列）
-- 在“成绩”页面：点击 `导出成绩Excel`，生成包含考试标题、分数与通过标识的 Excel 文件（通过为绿色、未通过为红色）
-- 在“用户”页面：支持 `导出用户Excel模板`与 `从Excel导入用户`（导入时校验用户名/密码为 ASCII）
-- 在“同步”页面：支持 `导出设备Excel模板`与 `从Excel导入设备`
-- JSON：
+### JSON
 
 ```json
-[
-  {"type":"single","text":"2+2=?","options":[{"key":"A","text":"4"},{"key":"B","text":"3"}],"correct":["A"],"score":2},
-  {"type":"multiple","text":"下列哪些是偶数?","options":[{"key":"A","text":"2"},{"key":"B","text":"3"},{"key":"C","text":"4"}],"correct":["A","C"],"score":3},
-  {"type":"truefalse","text":"Python是解释型语言","correct":[true],"score":1}
-]
+{
+  "config": { "random_pick_count": 4 },
+  "mandatory": [
+    { "type": "single", "text": "Python中获取列表长度的函数是?", "options": [ { "key": "A", "text": "len(list)" }, { "key": "B", "text": "size(list)" } ], "correct": ["A"], "score": 2 }
+  ],
+  "random": [
+    { "type": "truefalse", "text": "Linux中/etc目录通常存放系统配置文件", "correct": [true], "score": 1 }
+  ]
+}
 ```
 
-- YAML：
+### YAML
 
 ```yaml
-- type: single
-  text: "2+2=?"
-  score: 2
-  options:
-    - key: A
-      text: "4"
-    - key: B
-      text: "3"
-  correct:
-    - A
+config:
+  random_pick_count: 4
+mandatory:
+  - type: single
+    text: "Python中获取列表长度的函数是?"
+    score: 2
+    options:
+      - key: A
+        text: "len(list)"
+      - key: B
+        text: "size(list)"
+    correct:
+      - A
+random:
+  - type: truefalse
+    text: "Linux中/etc目录通常存放系统配置文件"
+    score: 1
+    correct:
+      - true
 ```
 
-- TOML：
+### 操作入口
 
-```toml
-[[questions]]
-type = "single"
-text = "2+2=?"
-score = 2
-[[questions.options]]
-key = "A"
-text = "4"
-[[questions.options]]
-key = "B"
-text = "3"
-correct = ["A"]
-```
+- 在“试题”页面：
+  - 选择试题后点击 `导入题目`，选择 Excel/JSON/YAML 文件（默认在 `~/Documents` 打开）
+  - 点击 `导出题目示例`，生成包含“配置选项/必考题库/随机题库”三工作表的 Excel 或对应结构的 JSON/YAML 示例文件
+- 在“成绩”页面：点击 `导出成绩Excel`，生成包含考试标题、分数与通过标识的 Excel 文件（通过为绿色、未通过为红色）
+- 在“用户”页面：支持 `导出用户Excel模板` 与 `从Excel导入用户`
+- 在“同步”页面：支持 `导出设备Excel模板` 与 `从Excel导入设备`
+
+### 考试时的抽题与显示
+
+- 必考题库：全部纳入试卷
+- 随机题库：按 `random_pick_count` 抽取；若配置值为 0 或未设置，则纳入随机题库所有题目
+- 题目顺序：每次开始考试会随机打乱试卷内题目顺序
+- 选项顺序：单选/多选题的选项在题目首次显示时会随机打乱，但提交与评分始终按照选项 `key`（如 `A/B/C`）进行匹配
 
 ## 界面与体验
 

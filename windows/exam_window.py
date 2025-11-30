@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QL
 from theme_manager import theme_manager
 from icon_manager import get_icon
 from exam_interface import ModernTimer, ModernProgressBar
-from models import list_questions, start_attempt, save_answer, submit_attempt, list_exams, grade_question
+from models import start_attempt, save_answer, submit_attempt, list_exams, grade_question, build_exam_questions_for_attempt
 from PySide6.QtWidgets import QMessageBox
 
 class ExamWindow(QMainWindow):
@@ -25,8 +25,12 @@ class ExamWindow(QMainWindow):
         self.resize(900, 600)
         self.user = user
         self.exam_id = exam_id
-        self.questions = list_questions(exam_id)
-        random.shuffle(self.questions)
+        self.questions = build_exam_questions_for_attempt(exam_id)
+        try:
+            random.shuffle(self.questions)
+        except Exception:
+            pass
+        self.option_orders = {}
         self.total_score = 0
         for q in self.questions:
             self.total_score += q["score"]
@@ -159,7 +163,19 @@ class ExamWindow(QMainWindow):
                 self.opts_layout.addWidget(btn)
                 self.opt_buttons.append(btn)
         else:
-            for opt in q['options']:
+            opts = list(q['options'])
+            order = self.option_orders.get(q['id'])
+            if order is None:
+                keys = [str(o.get('key')) for o in opts]
+                try:
+                    random.shuffle(keys)
+                except Exception:
+                    pass
+                self.option_orders[q['id']] = keys
+                order = keys
+            by_key = {str(o.get('key')): o for o in opts}
+            ordered_opts = [by_key[k] for k in order if k in by_key]
+            for opt in ordered_opts:
                 text = f"{opt.get('key')}. {opt.get('text')}"
                 btn = QPushButton(text)
                 btn.setCheckable(True)
@@ -242,6 +258,10 @@ class ExamWindow(QMainWindow):
             pass
         score, passed = submit_attempt(self.attempt_uuid)
         QMessageBox.information(self, '结果', f'得分:{score} {"通过" if passed==1 else "未通过"}')
+        try:
+            self.setWindowTitle(f'考试完成 得分:{score}/{self.total_score} {"通过" if passed==1 else "未通过"}')
+        except Exception:
+            pass
         p = self.parent()
         if p is not None and hasattr(p, 'refresh_attempts'):
             p.refresh_attempts()
@@ -319,6 +339,10 @@ class ExamWindow(QMainWindow):
                 pass
             score, passed = submit_attempt(self.attempt_uuid)
             QMessageBox.information(self, '结果', f'已退出考试，得分:{score} {"通过" if passed==1 else "未通过"}（未作答按0分）')
+            try:
+                self.setWindowTitle(f'考试完成 得分:{score}/{self.total_score} {"通过" if passed==1 else "未通过"}')
+            except Exception:
+                pass
             p = self.parent()
             if p is not None and hasattr(p, 'refresh_attempts'):
                 p.refresh_attempts()
