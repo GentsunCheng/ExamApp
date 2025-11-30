@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QL
 from theme_manager import theme_manager
 from icon_manager import get_icon
 from exam_interface import ModernTimer, ModernProgressBar
+from language import tr
 from models import start_attempt, save_answer, submit_attempt, list_exams, grade_question, build_exam_questions_for_attempt
 from PySide6.QtWidgets import QMessageBox
 
@@ -12,7 +13,7 @@ class ExamWindow(QMainWindow):
     def __init__(self, user, exam_id, parent=None):
         super().__init__(parent)
         if ExamWindow.instance is not None and ExamWindow.instance.isVisible():
-            QMessageBox.information(self, '提示', '已有考试正在进行')
+            QMessageBox.information(self, tr('common.hint'), tr('exam.already_running'))
             try:
                 ExamWindow.instance.raise_()
                 ExamWindow.instance.activateWindow()
@@ -36,7 +37,7 @@ class ExamWindow(QMainWindow):
             self.total_score += q["score"]
         self.attempt_uuid = start_attempt(user['id'], exam_id)
         self.current_index = 0
-        self.setWindowTitle(f'考试进行中, 总分: {self.total_score}')
+        self.setWindowTitle(tr('exam.in_progress', total=self.total_score))
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         colors = theme_manager.get_theme_colors()
@@ -80,9 +81,9 @@ class ExamWindow(QMainWindow):
         gb.setLayout(vb)
         lay.addWidget(gb)
         hb = QHBoxLayout()
-        self.prev_btn = QPushButton('上一题')
-        self.next_btn = QPushButton('下一题')
-        self.submit_btn = QPushButton('提交')
+        self.prev_btn = QPushButton(tr('exam.prev'))
+        self.next_btn = QPushButton(tr('exam.next'))
+        self.submit_btn = QPushButton(tr('exam.submit'))
         self.submit_btn.setIcon(get_icon('submit'))
         self.next_btn.setDefault(True)
         self.submit_btn.setEnabled(False)
@@ -138,7 +139,8 @@ class ExamWindow(QMainWindow):
         if self.current_index >= len(self.questions):
             self.current_index = len(self.questions) - 1
         q = self.questions[self.current_index]
-        self.q_title.setText(f'{self.current_index+1}/{len(self.questions)} {q["text"]} ({q["type"]} 分值:{q["score"]})')
+        tlabel = tr('exam.type.' + str(q.get('type')))
+        self.q_title.setText(tr('exam.question_title', index=self.current_index+1, total=len(self.questions), text=q["text"], type=tlabel, score=q["score"]))
         # 清空旧选项
         while self.opts_layout.count():
             child = self.opts_layout.takeAt(0)
@@ -154,7 +156,7 @@ class ExamWindow(QMainWindow):
             f"QPushButton:checked {{ background-color:{colors['primary']}; color:{colors['text_inverse']}; border-color:{colors['primary']}; }}"
         )
         if q['type'] == 'truefalse':
-            for label, val in [('正确', True), ('错误', False)]:
+            for label, val in [(tr('exam.true'), True), (tr('exam.false'), False)]:
                 btn = QPushButton(label)
                 btn.setCheckable(True)
                 btn.setStyleSheet(btn_style)
@@ -257,9 +259,9 @@ class ExamWindow(QMainWindow):
         except Exception:
             pass
         score, passed = submit_attempt(self.attempt_uuid)
-        QMessageBox.information(self, '结果', f'得分:{score} {"通过" if passed==1 else "未通过"}')
+        QMessageBox.information(self, tr('exam.result'), f'{tr("exam.score_label")}:{score} {tr("exam.pass_text") if passed==1 else tr("exam.fail_text")}')
         try:
-            self.setWindowTitle(f'考试完成 得分:{score}/{self.total_score} {"通过" if passed==1 else "未通过"}')
+            self.setWindowTitle(tr('exam.finished_title', score=score, total=self.total_score, passed=(tr('exam.pass_text') if passed==1 else tr('exam.fail_text'))))
         except Exception:
             pass
         p = self.parent()
@@ -329,7 +331,7 @@ class ExamWindow(QMainWindow):
             ExamWindow.instance = None
             event.accept()
             return
-        reply = QMessageBox.question(self, '确认', '确定要退出考试吗？未作答的题目按0分，其他题目正常记分', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        reply = QMessageBox.question(self, tr('common.hint'), tr('exam.confirm_exit'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if reply == QMessageBox.StandardButton.Yes:
             try:
                 self.save_current()
@@ -338,9 +340,9 @@ class ExamWindow(QMainWindow):
             except Exception:
                 pass
             score, passed = submit_attempt(self.attempt_uuid)
-            QMessageBox.information(self, '结果', f'已退出考试，得分:{score} {"通过" if passed==1 else "未通过"}（未作答按0分）')
+            QMessageBox.information(self, tr('exam.result'), tr('exam.exit_result', score=score, pass_text=(tr('exam.pass_text') if passed==1 else tr('exam.fail_text'))) + tr('exam.unanswered_note'))
             try:
-                self.setWindowTitle(f'考试完成 得分:{score}/{self.total_score} {"通过" if passed==1 else "未通过"}')
+                self.setWindowTitle(tr('exam.finished_title', score=score, total=self.total_score, passed=(tr('exam.pass_text') if passed==1 else tr('exam.fail_text'))))
             except Exception:
                 pass
             p = self.parent()

@@ -7,6 +7,10 @@ DIST_DIR="dist"
 BUILD_DIR="build"
 PYINSTALLER_ARGS="--onedir --noconsole --windowed --name ${APP_NAME} --distpath ${DIST_DIR} --workpath ${BUILD_DIR} --add-data resources:resources --icon resources/logo.icns --osx-bundle-identifier top.orii.exam"
 
+# 根据平台与可用模块添加隐性导入（动态 importlib 使用的模块）
+EXTRA_HIDDEN_IMPORTS=$(python -c 'import importlib; mods=["winreg","ctypes"]; print(" ".join(["--hidden-import "+m for m in mods if importlib.util.find_spec(m)]))')
+PYINSTALLER_ARGS="${PYINSTALLER_ARGS} ${EXTRA_HIDDEN_IMPORTS}"
+
 CMD="${1:-help}"
 
 case "$CMD" in

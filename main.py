@@ -8,6 +8,11 @@ from views.login_view import LoginView
 from views.admin_view import AdminView
 from views.user_view import UserView
 
+from language import set_language, get_system_language_codes
+
+__language__ = get_system_language_codes()
+set_language(__language__)
+
 
 class MainWindow(QMainWindow):
     def __init__(self):

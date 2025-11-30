@@ -13,6 +13,10 @@ PYINSTALLER_ARGS = --onedir --noconsole --windowed --name $(APP_NAME) --distpath
  --workpath $(BUILD_DIR) --add-data "resources:resources" --icon resources/logo.icns \
  --osx-bundle-identifier top.orii.exam
 
+# 根据平台与可用模块添加隐性导入（动态 importlib 使用的模块）
+EXTRA_HIDDEN_IMPORTS := $(shell python -c 'import importlib, sys; mods=["winreg","ctypes"]; print(" ".join(["--hidden-import "+m for m in mods if importlib.util.find_spec(m)]))')
+PYINSTALLER_ARGS += $(EXTRA_HIDDEN_IMPORTS)
+
 # 依赖的Python包
 REQUIRED_PACKAGES = \
     PySide6 \

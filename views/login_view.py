@@ -2,6 +2,7 @@ from PySide6.QtCore import Qt, QRegularExpression
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QLineEdit, QPushButton, QLabel, QMessageBox
 from PySide6.QtGui import QRegularExpressionValidator
 from models import authenticate, verify_encryption_ok
+from language import tr
 from theme_manager import theme_manager
 
 
@@ -34,26 +35,26 @@ class LoginView(QWidget):
         card.setFixedWidth(320)
         card.setStyleSheet(f"QGroupBox {{ border:1px solid {colors['border']}; border-radius:12px; padding:24px; background-color:{colors['card_background']}; }}")
         lay = QVBoxLayout()
-        title = QLabel('📝 登录')
+        title = QLabel(tr('login.title'))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet(
             f"font-size:20px; font-weight:bold; margin-bottom:16px; padding:6px 12px; border-radius:12px; "
             f"background-color:{colors['border_light']}; color:{colors['text_primary']}; border:1px solid {colors['border']};"
         )
         self.user = QLineEdit()
-        self.user.setPlaceholderText('用户名')
+        self.user.setPlaceholderText(tr('login.username'))
         self.user.setInputMethodHints(Qt.InputMethodHint.ImhNoPredictiveText | Qt.InputMethodHint.ImhNoAutoUppercase | Qt.InputMethodHint.ImhPreferLowercase)
         user_validator = QRegularExpressionValidator(QRegularExpression(r"^[A-Za-z0-9_@.\-]+$"))
         self.user.setValidator(user_validator)
         self.user.returnPressed.connect(lambda: self.pwd.setFocus())
         self.pwd = QLineEdit()
         self.pwd.setEchoMode(QLineEdit.EchoMode.Password)
-        self.pwd.setPlaceholderText('密码')
+        self.pwd.setPlaceholderText(tr('login.password'))
         self.pwd.setInputMethodHints(Qt.InputMethodHint.ImhHiddenText | Qt.InputMethodHint.ImhNoPredictiveText | Qt.InputMethodHint.ImhSensitiveData)
         pwd_validator = QRegularExpressionValidator(QRegularExpression(r"^[\x20-\x7E]+$"))
         self.pwd.setValidator(pwd_validator)
         self.pwd.returnPressed.connect(self.handle_login)
-        btn = QPushButton('登录')
+        btn = QPushButton(tr('login.button'))
         btn.setDefault(True)
         btn.clicked.connect(self.handle_login)
         self.login_btn = btn
@@ -72,7 +73,7 @@ class LoginView(QWidget):
                 self.user.setEnabled(False)
                 self.pwd.setEnabled(False)
                 self.login_btn.setEnabled(False)
-                msg = QLabel('数据库解密失败，请联系管理员')
+                msg = QLabel(tr('login.decrypt_failed'))
                 msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 colors2 = theme_manager.get_theme_colors()
                 msg.setStyleSheet(f"font-size:13px; color:{colors2['error']}; padding:6px; border:1px solid {colors2['error']}; border-radius:8px; background-color:{colors2['error_light']};")
@@ -84,6 +85,6 @@ class LoginView(QWidget):
             return
         u = authenticate(self.user.text().strip(), self.pwd.text())
         if not u:
-            QMessageBox.warning(self, '错误', '用户名或密码错误')
+            QMessageBox.warning(self, tr('common.error'), tr('error.bad_credentials'))
             return
         self.on_login(u)

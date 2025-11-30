@@ -3,6 +3,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QTabWidget, QAbstractItemView
 from icon_manager import get_icon
 from theme_manager import theme_manager
+from language import tr
 from models import list_exams, list_attempts, get_exam_title, get_exam_stats, list_questions
 from windows.exam_window import ExamWindow
 
@@ -33,14 +34,14 @@ class UserView(QWidget):
         self.user = user
         layout = QVBoxLayout()
         topbar = QHBoxLayout()
-        title = QLabel('用户中心')
+        title = QLabel(tr('user.center'))
         title.setStyleSheet("font-size:18px; font-weight:bold;")
         topbar.addWidget(title)
         topbar.addStretch()
         name_display = user.get('full_name')
-        user_label = QLabel(f'当前用户: {user["username"]}' + (f'（{name_display}）' if name_display else ''))
+        user_label = QLabel(tr('user.current_user_prefix') + f'{user["username"]}' + (tr('user.full_name_suffix', name=name_display) if name_display else ''))
         topbar.addWidget(user_label)
-        logout_btn = QPushButton('退出登录')
+        logout_btn = QPushButton(tr('common.logout'))
         logout_btn.setIcon(get_icon('confirm'))
         logout_btn.clicked.connect(self.handle_logout)
         topbar.addWidget(logout_btn)
@@ -50,17 +51,17 @@ class UserView(QWidget):
         exams_tab = QWidget()
         exams_v = QVBoxLayout()
         exams_toolbar = QHBoxLayout()
-        start_btn = QPushButton('开始考试')
+        start_btn = QPushButton(tr('user.start_exam'))
         start_btn.setIcon(get_icon('exam_start'))
         start_btn.clicked.connect(lambda: self.start_exam(None))
-        refresh_exams_btn = QPushButton('刷新')
+        refresh_exams_btn = QPushButton(tr('common.refresh'))
         refresh_exams_btn.clicked.connect(self.refresh_exams)
         exams_toolbar.addWidget(start_btn)
         exams_toolbar.addWidget(refresh_exams_btn)
         exams_toolbar.addStretch()
         exams_v.addLayout(exams_toolbar)
         self.exams_table_user = QTableWidget(0, 9)
-        self.exams_table_user.setHorizontalHeaderLabels(['ID', '标题', '描述', '限时(分钟)', '截止', '及格比例%', '题目数量', '总分', '历史最高分'])
+        self.exams_table_user.setHorizontalHeaderLabels([tr('exams.id'), tr('exams.title'), tr('exams.desc'), tr('exams.time_limit'), tr('exams.deadline'), tr('exams.pass_ratio'), tr('exams.q_count'), tr('exams.total'), tr('exams.best')])
         self.exams_table_user.setColumnWidth(0, 50)
         self.exams_table_user.setColumnWidth(1, 250)
         self.exams_table_user.setColumnWidth(2, 480)
@@ -77,19 +78,19 @@ class UserView(QWidget):
         self.refresh_exams()
         exams_v.addWidget(self.exams_table_user)
         exams_tab.setLayout(exams_v)
-        self.tabs.addTab(exams_tab, '试题列表')
+        self.tabs.addTab(exams_tab, tr('user.exams_tab'))
         self.tabs.setTabIcon(0, get_icon('exam'))
         # 历史成绩页面
         history_tab = QWidget()
         history_v = QVBoxLayout()
         history_toolbar = QHBoxLayout()
-        refresh_attempts_btn = QPushButton('刷新')
+        refresh_attempts_btn = QPushButton(tr('common.refresh'))
         refresh_attempts_btn.clicked.connect(self.refresh_attempts)
         history_toolbar.addWidget(refresh_attempts_btn)
         history_toolbar.addStretch()
         history_v.addLayout(history_toolbar)
         self.attempts_table = QTableWidget(0, 5)
-        self.attempts_table.setHorizontalHeaderLabels(['UUID记录', '试题', '开始', '提交', '分数/通过'])
+        self.attempts_table.setHorizontalHeaderLabels([tr('attempts.uuid'), tr('attempts.exam_title'), tr('attempts.started'), tr('attempts.submitted'), tr('attempts.score_pass')])
         self.attempts_table.setColumnWidth(0, 280)
         self.attempts_table.setColumnWidth(1, 250)
         self.attempts_table.setColumnWidth(2, 200)
@@ -99,7 +100,7 @@ class UserView(QWidget):
         self.refresh_attempts()
         history_v.addWidget(self.attempts_table)
         history_tab.setLayout(history_v)
-        self.tabs.addTab(history_tab, '历史成绩')
+        self.tabs.addTab(history_tab, tr('user.history_tab'))
         self.tabs.setTabIcon(1, get_icon('score'))
         layout.addWidget(self.tabs)
         self.setLayout(layout)
@@ -135,7 +136,7 @@ class UserView(QWidget):
             tbl.setItem(r, 2, QTableWidgetItem(e[2] or ''))
             tbl.setItem(r, 3, QTableWidgetItem(str(e[4])))
             stats = get_exam_stats(int(e[0]))
-            tbl.setItem(r, 4, QTableWidgetItem(e[5] if e[5] else '永久'))
+            tbl.setItem(r, 4, QTableWidgetItem(e[5] if e[5] else tr('common.permanent')))
             tbl.setItem(r, 5, QTableWidgetItem(f"{int(float(e[3])*100)}%"))
             tbl.setItem(r, 6, QTableWidgetItem(str(stats['count']) if stats else '0'))
             tbl.setItem(r, 7, QTableWidgetItem(str(int(stats['total_score'])) if stats else '0'))
@@ -169,7 +170,7 @@ class UserView(QWidget):
             self.attempts_table.setItem(r, 1, QTableWidgetItem(title or ''))
             self.attempts_table.setItem(r, 2, QTableWidgetItem(a[3] or ''))
             self.attempts_table.setItem(r, 3, QTableWidgetItem(a[4] or ''))
-            passed_text = '数据异常' if (len(a) > 7 and a[7] == 0) else ('通过' if a[6]==1 else '未通过')
+            passed_text = tr('attempts.data_invalid') if (len(a) > 7 and a[7] == 0) else (tr('attempts.pass') if a[6]==1 else tr('attempts.fail'))
             ucell = QTableWidgetItem(f'{a[5]} / {passed_text}')
             if len(a) > 7 and a[7] == 0:
                 ucell.setBackground(QColor('#fff3cd'))
@@ -192,28 +193,28 @@ class UserView(QWidget):
         if exam_id is None:
             tbl = getattr(self, 'exams_table_user', None)
             if tbl is None:
-                QMessageBox.warning(self, '错误', '请选择试题')
+                QMessageBox.warning(self, tr('common.error'), tr('error.select_exam'))
                 return
             sm = tbl.selectionModel()
             if sm is None:
-                QMessageBox.warning(self, '错误', '请选择试题')
+                QMessageBox.warning(self, tr('common.error'), tr('error.select_exam'))
                 return
             rows = sm.selectedRows()
             if len(rows) == 0:
-                QMessageBox.warning(self, '错误', '请选择试题')
+                QMessageBox.warning(self, tr('common.error'), tr('error.select_exam'))
                 return
             if len(rows) > 1:
-                QMessageBox.warning(self, '错误', '一次仅能选择一个试题')
+                QMessageBox.warning(self, tr('common.error'), tr('error.select_exam_single'))
                 return
             r = rows[0].row()
             it = tbl.item(r, 0)
             exam_id = int(it.text()) if it and it.text() else None
         if not exam_id:
-            QMessageBox.warning(self, '错误', '请选择试题')
+            QMessageBox.warning(self, tr('common.error'), tr('error.select_exam'))
             return
         qs = list_questions(int(exam_id))
         if not qs:
-            QMessageBox.warning(self, '错误', '该试题暂无题目，无法开始')
+            QMessageBox.warning(self, tr('common.error'), tr('error.no_questions'))
             return
         ExamWindow(self.user, exam_id, self).show()
     def handle_logout(self):
