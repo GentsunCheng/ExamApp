@@ -643,15 +643,9 @@ class AdminView(QWidget):
                 if not data_mand and not data_rand:
                     QMessageBox.warning(self, tr('common.error'), '缺少新格式工作表：请提供“必考题库”或“随机题库”（至少之一），可选“配置选项”设置随机抽取数量')
                     return
-                data = []
-                for x in data_mand:
-                    x['pool'] = 'mandatory'
-                    data.append(x)
-                for x in data_rand:
-                    x['pool'] = 'random'
-                    data.append(x)
+                data = {'mandatory': data_mand, 'random': data_rand, 'config': {}}
                 if rand_count is not None:
-                    update_exam_random_pick_count(exam_id, rand_count)
+                    data['config']['random_pick_count'] = rand_count
             else:
                 def read_text_with_fallback(path):
                     with open(path, 'rb') as f:
