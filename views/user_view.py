@@ -90,7 +90,7 @@ class UserView(QWidget):
         history_toolbar.addStretch()
         history_v.addLayout(history_toolbar)
         self.attempts_table = QTableWidget(0, 5)
-        self.attempts_table.setHorizontalHeaderLabels([tr('attempts.uuid'), tr('attempts.exam_title'), tr('attempts.started'), tr('attempts.submitted'), tr('attempts.score_pass')])
+        self.attempts_table.setHorizontalHeaderLabels([tr('attempts.uuid'), tr('attempts.exam_title'), tr('attempts.started'), tr('attempts.submitted'), tr('attempts.score_total_pass')])
         self.attempts_table.setColumnWidth(0, 280)
         self.attempts_table.setColumnWidth(1, 250)
         self.attempts_table.setColumnWidth(2, 200)
@@ -170,9 +170,10 @@ class UserView(QWidget):
             self.attempts_table.setItem(r, 1, QTableWidgetItem(title or ''))
             self.attempts_table.setItem(r, 2, QTableWidgetItem(a[3] or ''))
             self.attempts_table.setItem(r, 3, QTableWidgetItem(a[4] or ''))
-            passed_text = tr('attempts.data_invalid') if (len(a) > 7 and a[7] == 0) else (tr('attempts.pass') if a[6]==1 else tr('attempts.fail'))
-            ucell = QTableWidgetItem(f'{a[5]} / {passed_text}')
-            if len(a) > 7 and a[7] == 0:
+            passed_text = tr('attempts.data_invalid') if (len(a) > 8 and a[8] == 0) else (tr('attempts.pass') if a[6]==1 else tr('attempts.fail'))
+            total = int(a[7] or 0)
+            ucell = QTableWidgetItem(f'{a[5]} / {total} / {passed_text}')
+            if len(a) > 8 and a[8] == 0:
                 ucell.setBackground(QColor('#fff3cd'))
                 ucell.setForeground(QColor('#8a6d3b'))
             else:

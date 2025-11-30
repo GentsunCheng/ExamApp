@@ -1428,12 +1428,11 @@ class AdminView(QWidget):
             self.scores_table.setItem(r, 4, QTableWidgetItem(exam_title or ''))
             self.scores_table.setItem(r, 5, QTableWidgetItem(a[5] or ''))
             self.scores_table.setItem(r, 6, QTableWidgetItem(a[6] or tr('scores.not_submitted')))
-            is_valid = (len(a) > 9 and a[9] == 1)
+            is_valid = (len(a) > 10 and a[10] == 1)
             passed_text = '数据异常' if not is_valid else ('通过' if a[8] == 1 else '未通过')
             badge_bg = '#fff3cd' if not is_valid else ('#e1f3d8' if a[8] == 1 else '#fde2e2')
             badge_fg = '#8a6d3b' if not is_valid else ('#67c23a' if a[8] == 1 else '#f56c6c')
-            stats = get_exam_stats(int(a[4])) if a[4] is not None else {'total_score': 0}
-            total = int(stats['total_score']) if stats and stats.get('total_score') is not None else 0
+            total = int(a[9] or 0)
             self.scores_table.setCellWidget(r, 7, self.make_tag(f'{a[7]} / {total} / {passed_text}', badge_bg, badge_fg))
             for c in (3,4):
                 it = self.scores_table.item(r, c)
@@ -1473,7 +1472,7 @@ class AdminView(QWidget):
             border = Border(left=thin, right=thin, top=thin, bottom=thin)
             for a in list_attempts_with_user():
                 exam_title = get_exam_title(int(a[4])) if a[4] is not None else ''
-                is_valid = (len(a) > 9 and a[9] == 1)
+                is_valid = (len(a) > 10 and a[10] == 1)
                 text_pass = '数据异常' if not is_valid else ('通过' if a[8] == 1 else '未通过')
                 ws.append([a[0], a[1] or '', a[2] or '', int(a[3]), exam_title or '', a[5] or '', a[6] or '', a[7], text_pass])
                 cell = ws.cell(row=ws.max_row, column=9)

@@ -15,7 +15,7 @@ def ensure_db():
     c.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT, role TEXT, active INTEGER DEFAULT 1, created_at TEXT, full_name TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS exams (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, description TEXT, pass_ratio REAL, time_limit_minutes INTEGER, end_date TEXT, created_at TEXT, random_pick_count INTEGER)')
     c.execute('CREATE TABLE IF NOT EXISTS questions (id INTEGER PRIMARY KEY AUTOINCREMENT, exam_id INTEGER, type TEXT, text TEXT, options TEXT, correct_answers TEXT, score REAL, pool TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT UNIQUE, user_id INTEGER, exam_id INTEGER, started_at TEXT, submitted_at TEXT, score REAL, passed INTEGER, checksum TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT UNIQUE, user_id INTEGER, exam_id INTEGER, started_at TEXT, submitted_at TEXT, score REAL, passed INTEGER, total_score REAL, checksum TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS attempt_answers (id INTEGER PRIMARY KEY AUTOINCREMENT, attempt_uuid TEXT, question_id INTEGER, selected TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE, value TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS sync_targets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, ip TEXT, username TEXT, remote_path TEXT, ssh_password TEXT)')

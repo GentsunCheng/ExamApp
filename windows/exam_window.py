@@ -35,7 +35,7 @@ class ExamWindow(QMainWindow):
         self.total_score = 0
         for q in self.questions:
             self.total_score += q["score"]
-        self.attempt_uuid = start_attempt(user['id'], exam_id)
+        self.attempt_uuid = start_attempt(user['id'], exam_id, self.total_score)
         self.current_index = 0
         self.setWindowTitle(tr('exam.in_progress', total=self.total_score))
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
