@@ -640,9 +640,8 @@ class AdminView(QWidget):
                 if '随机题库' in wb.sheetnames:
                     data_rand = parse_sheet(wb['随机题库'])
                 if not data_mand and not data_rand:
-                    ws = wb['Questions'] if 'Questions' in wb.sheetnames else wb.active
-                    data_fallback = parse_sheet(ws)
-                    data_mand = data_fallback
+                    QMessageBox.warning(self, '错误', '缺少新格式工作表：请提供“必考题库”或“随机题库”（至少之一），可选“配置选项”设置随机抽取数量')
+                    return
                 data = []
                 for x in data_mand:
                     x['pool'] = 'mandatory'
@@ -723,6 +722,9 @@ class AdminView(QWidget):
                         pass
                 mand = data.get('mandatory') or []
                 rand = data.get('random') or []
+                if not mand and not rand:
+                    QMessageBox.warning(self, '错误', 'JSON/YAML 缺少新格式字段：请提供 mandatory 或 random（至少之一），可在 config.random_pick_count 设置抽取数量')
+                    return
                 for x in mand:
                     x['pool'] = 'mandatory'
                 for x in rand:
@@ -730,7 +732,8 @@ class AdminView(QWidget):
                 validate_list(mand, '必考题库')
                 validate_list(rand, '随机题库')
             else:
-                validate_list(data, '题库')
+                QMessageBox.warning(self, '错误', 'JSON/YAML 顶层必须为对象且包含 mandatory/random 字段')
+                return
             if not valid:
                 detail = '\n'.join(errs[:20]) if errs else '没有有效题目'
                 QMessageBox.warning(self, '错误', detail)

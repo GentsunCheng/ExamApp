@@ -74,15 +74,7 @@ def list_users():
 def add_exam(title, description, pass_ratio, time_limit_minutes, end_date, random_pick_count=0):
     conn = get_conn()
     c = conn.cursor()
-    try:
-        c.execute('INSERT INTO exams (title, description, pass_ratio, time_limit_minutes, end_date, created_at, random_pick_count) VALUES (?,?,?,?,?,?,?)', (encrypt_text(title), encrypt_text(description) if description is not None else None, float(pass_ratio), int(time_limit_minutes), end_date, now_iso(), int(random_pick_count)))
-    except Exception:
-        c.execute('INSERT INTO exams (title, description, pass_ratio, time_limit_minutes, end_date, created_at) VALUES (?,?,?,?,?,?)', (encrypt_text(title), encrypt_text(description) if description is not None else None, float(pass_ratio), int(time_limit_minutes), end_date, now_iso()))
-        try:
-            exam_id = c.lastrowid
-            c.execute('UPDATE exams SET random_pick_count=? WHERE id=?', (int(random_pick_count), exam_id))
-        except Exception:
-            pass
+    c.execute('INSERT INTO exams (title, description, pass_ratio, time_limit_minutes, end_date, created_at, random_pick_count) VALUES (?,?,?,?,?,?,?)', (encrypt_text(title), encrypt_text(description) if description is not None else None, float(pass_ratio), int(time_limit_minutes), end_date, now_iso(), int(random_pick_count)))
     conn.commit()
     conn.close()
 
@@ -141,10 +133,7 @@ def import_questions_from_json(exam_id, payload):
     c = conn.cursor()
     for q in payload:
         pool = (q.get('pool') or q.get('category') or 'mandatory')
-        try:
-            c.execute('INSERT INTO questions (exam_id, type, text, options, correct_answers, score, pool) VALUES (?,?,?,?,?,?,?)', (exam_id, q.get('type'), encrypt_text(q.get('text')), encrypt_json(q.get('options') or []), encrypt_json(q.get('correct') or []), float(q.get('score', 1)), pool))
-        except Exception:
-            c.execute('INSERT INTO questions (exam_id, type, text, options, correct_answers, score) VALUES (?,?,?,?,?,?)', (exam_id, q.get('type'), encrypt_text(q.get('text')), encrypt_json(q.get('options') or []), encrypt_json(q.get('correct') or []), float(q.get('score', 1))))
+        c.execute('INSERT INTO questions (exam_id, type, text, options, correct_answers, score, pool) VALUES (?,?,?,?,?,?,?)', (exam_id, q.get('type'), encrypt_text(q.get('text')), encrypt_json(q.get('options') or []), encrypt_json(q.get('correct') or []), float(q.get('score', 1)), pool))
     conn.commit()
     conn.close()
 
@@ -174,11 +163,7 @@ def start_attempt(user_id, exam_id):
     c = conn.cursor()
     ts = now_iso()
     checksum = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(a_uuid), str(user_id), str(exam_id), str(ts), '-', str(0.0), str(0)])).encode('utf-8'), hashlib.sha256).hexdigest()
-    try:
-        c.execute('INSERT INTO attempts (uuid, user_id, exam_id, started_at, submitted_at, score, passed, checksum) VALUES (?,?,?,?,?,?,?,?)', (a_uuid, user_id, exam_id, ts, None, 0.0, 0, checksum))
-    except Exception:
-        c.execute('INSERT INTO attempts (uuid, user_id, exam_id, started_at, submitted_at, score, passed) VALUES (?,?,?,?,?,?,?)', (a_uuid, user_id, exam_id, ts, None, 0.0, 0))
-        c.execute('UPDATE attempts SET checksum=? WHERE uuid=?', (checksum, a_uuid))
+    c.execute('INSERT INTO attempts (uuid, user_id, exam_id, started_at, submitted_at, score, passed, checksum) VALUES (?,?,?,?,?,?,?,?)', (a_uuid, user_id, exam_id, ts, None, 0.0, 0, checksum))
     conn.commit()
     conn.close()
     return a_uuid
@@ -272,21 +257,12 @@ def merge_remote_db(remote_db_path):
     lcur = lconn.cursor()
     rconn = sqlite3.connect(remote_db_path)
     rcur = rconn.cursor()
-    try:
-        rcur.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, checksum FROM attempts')
-        remote_rows = rcur.fetchall()
-    except Exception:
-        rcur.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed FROM attempts')
-        remote_rows = [tuple(list(x) + [None]) for x in rcur.fetchall()]
+    rcur.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, checksum FROM attempts')
+    remote_rows = rcur.fetchall()
     for a in remote_rows:
         lcur.execute('SELECT COUNT(*) FROM attempts WHERE uuid=?', (a[0],))
         if lcur.fetchone()[0] == 0:
-            try:
-                lcur.execute('INSERT INTO attempts (uuid, user_id, exam_id, started_at, submitted_at, score, passed, checksum) VALUES (?,?,?,?,?,?,?,?)', a)
-            except Exception:
-                lcur.execute('INSERT INTO attempts (uuid, user_id, exam_id, started_at, submitted_at, score, passed) VALUES (?,?,?,?,?,?,?)', a[:7])
-                ch = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(a[0]), str(a[1]), str(a[2]), str(a[3]), str(a[4]) if a[4] else '-', str(a[5]), str(a[6])])).encode('utf-8'), hashlib.sha256).hexdigest()
-                lcur.execute('UPDATE attempts SET checksum=? WHERE uuid=?', (ch, a[0]))
+            lcur.execute('INSERT INTO attempts (uuid, user_id, exam_id, started_at, submitted_at, score, passed, checksum) VALUES (?,?,?,?,?,?,?,?)', a)
             rcur2 = rconn.cursor()
             rcur2.execute('SELECT question_id, selected FROM attempt_answers WHERE attempt_uuid=?', (a[0],))
             for aa in rcur2.fetchall():
