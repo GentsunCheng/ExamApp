@@ -2,6 +2,7 @@ from PySide6.QtCore import Qt, QRegularExpression
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QLineEdit, QPushButton, QLabel, QMessageBox
 from PySide6.QtGui import QRegularExpressionValidator
 from models import authenticate, verify_encryption_ok
+from utils import show_warn
 from language import tr
 from theme_manager import theme_manager
 
@@ -85,6 +86,6 @@ class LoginView(QWidget):
             return
         u = authenticate(self.user.text().strip(), self.pwd.text())
         if not u:
-            QMessageBox.warning(self, tr('common.error'), tr('error.bad_credentials'))
+            show_warn(self, tr('common.error'), tr('error.bad_credentials'))
             return
         self.on_login(u)

@@ -5,9 +5,12 @@ import yaml
 import re
 import re
 from openpyxl import load_workbook, Workbook
+from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
+from openpyxl.utils import get_column_letter
 from PySide6.QtCore import Qt, QThread, Signal, QSize, QRegularExpression, QDateTime
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QFormLayout, QSpinBox, QDateTimeEdit, QFileDialog, QTabWidget, QTableWidget, QTableWidgetItem, QGroupBox, QCheckBox, QComboBox, QMessageBox, QProgressDialog, QListView, QAbstractItemView, QTextBrowser
 from PySide6.QtGui import QRegularExpressionValidator
+from utils import show_info, show_warn, ask_yes_no
 from database import DB_PATH
 from models import list_users, create_user, list_exams, add_exam, import_questions_from_json, list_sync_targets, upsert_sync_target, delete_user, update_user_role, update_user_active, delete_sync_target, update_sync_target, get_exam_title, get_exam_stats, update_exam_random_pick_count
 from theme_manager import theme_manager
@@ -82,7 +85,7 @@ class AdminView(QWidget):
             f"QTableWidget {{ {bd}:1px solid {colors['border']}; {br}:8px; {bkg}:{colors['card_background']}; {col}:{colors['text_primary']}; }}\n"
             f"QTableWidget::item:hover {{ {bkg}:{colors['border_light']}; }}\n"
             f"QTableWidget::item:selected {{ {bkg}:{colors['primary']}; {col}:{colors['text_inverse']}; }}\n"
-            f"QHeaderView::section {{ {bkg}:{colors['border_light']}; {col}:{colors['text_secondary']}; font-weight:600; {pd}:6px 8px; {bd}:none; {bd}-right:1px solid {colors['border']}; }}\n"
+            f"QHeaderView::section {{ {bkg}:{colors['border_light']}; {col}:{colors['text_secondary']}; font-weight:600; {pd}:6px 8px; {bd}:none; }}\n"
             f"QLineEdit, QTextEdit, QSpinBox, QDateTimeEdit {{ {pd}:6px; {bd}:1px solid {colors['input_border']}; {br}:8px; {bkg}:{colors['input_background']}; {col}:{colors['text_primary']}; }}\n"
             f"QLineEdit:focus, QTextEdit:focus {{ {bd}-color:{colors['primary']}; }}\n"
             f"QComboBox {{ {pd}:6px 8px; {bd}:1px solid {colors['input_border']}; {br}:8px; {bkg}:{colors['input_background']}; {col}:{colors['text_primary']}; }}\n"
@@ -168,6 +171,7 @@ class AdminView(QWidget):
         self.users_table.setColumnWidth(5, 300)
         self.users_table.horizontalHeader().setStretchLastSection(True)
         self.users_table.setAlternatingRowColors(True)
+        self.users_table.setShowGrid(False)
         self.refresh_users()
         vb.addWidget(self.users_table)
         gb.setLayout(vb)
@@ -293,50 +297,50 @@ class AdminView(QWidget):
         pwd = self.new_pwd.text()
         role = self.new_role.currentText()
         if not name or not pwd:
-            QMessageBox.warning(self, tr('common.error'), tr('error.input_username_password'))
+            show_warn(self, tr('common.error'), tr('error.input_username_password'))
             return
         try:
             full_name = self.new_fullname.text().strip() or None
             if not re.fullmatch(r"[A-Za-z0-9_@.\-]+", name):
-                QMessageBox.warning(self, tr('common.error'), tr('error.username_format'))
+                show_warn(self, tr('common.error'), tr('error.username_format'))
                 return
             if not re.fullmatch(r"[\x20-\x7E]+", pwd):
-                QMessageBox.warning(self, tr('common.error'), tr('error.password_format'))
+                show_warn(self, tr('common.error'), tr('error.password_format'))
                 return
             create_user(name, pwd, role, 1, full_name)
             self.refresh_users()
             self.new_user.clear()
             self.new_pwd.clear()
             self.new_fullname.clear()
-            QMessageBox.information(self, tr('common.success'), tr('info.user_created'))
+            show_info(self, tr('common.success'), tr('info.user_created'))
         except Exception as e:
-            QMessageBox.warning(self, '错误', str(e))
+            show_warn(self, tr('common.error'), str(e))
     def delete_user(self, user_id):
-        reply = QMessageBox.question(self, tr('common.hint'), tr('confirm.delete_user'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        reply = ask_yes_no(self, tr('common.hint'), tr('confirm.delete_user'), default_yes=False)
         if reply == QMessageBox.StandardButton.Yes:
             try:
                 delete_user(user_id)
                 self.refresh_users()
-                QMessageBox.information(self, tr('common.success'), tr('info.user_deleted'))
+                show_info(self, tr('common.success'), tr('info.user_deleted'))
             except Exception as e:
-                QMessageBox.warning(self, '错误', str(e))
+                show_warn(self, tr('common.error'), str(e))
     def toggle_user_role(self, user_id, current_role):
         new_role = 'admin' if current_role == 'user' else 'user'
         try:
             update_user_role(user_id, new_role)
             self.refresh_users()
-            QMessageBox.information(self, tr('common.success'), tr('info.user_role_updated', role=new_role))
+            show_info(self, tr('common.success'), tr('info.user_role_updated', role=new_role))
         except Exception as e:
-            QMessageBox.warning(self, '错误', str(e))
+            show_warn(self, tr('common.error'), str(e))
     def toggle_user_active(self, user_id, current_active):
         new_active = 0 if current_active == 1 else 1
         try:
             update_user_active(user_id, new_active)
             self.refresh_users()
             status = tr('admin.user.enable') if new_active == 1 else tr('admin.user.disable')
-            QMessageBox.information(self, tr('common.success'), tr('info.user_status_updated', status=status))
+            show_info(self, tr('common.success'), tr('info.user_status_updated', status=status))
         except Exception as e:
-            QMessageBox.warning(self, '错误', str(e))
+            show_warn(self, tr('common.error'), str(e))
     def exams_tab(self):
         w = QWidget()
         lay = QVBoxLayout()
@@ -355,6 +359,7 @@ class AdminView(QWidget):
         self.exams_table.setColumnWidth(8, 150)
         self.exams_table.horizontalHeader().setStretchLastSection(True)
         self.exams_table.setAlternatingRowColors(True)
+        self.exams_table.setShowGrid(False)
         self.exams_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.exams_table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.refresh_exams()
@@ -519,11 +524,11 @@ class AdminView(QWidget):
         tl = self.ex_time.value()
         end = None if self.ex_permanent.isChecked() else self.ex_end.dateTime().toString(Qt.DateFormat.ISODate)
         if not title:
-            QMessageBox.warning(self, tr('common.error'), tr('error.title_required'))
+            show_warn(self, tr('common.error'), tr('error.title_required'))
             return
         add_exam(title, desc, pass_ratio, tl, end, self.ex_random_count.value())
         self.refresh_exams()
-        QMessageBox.information(self, tr('common.success'), tr('info.exam_added'))
+        show_info(self, tr('common.success'), tr('info.exam_added'))
     def get_selected_exam_id(self):
         tbl = getattr(self, 'exams_table', None)
         if tbl is None:
@@ -536,7 +541,7 @@ class AdminView(QWidget):
     def import_questions(self):
         exam_id = self.get_selected_exam_id()
         if not exam_id:
-            QMessageBox.warning(self, tr('common.error'), tr('error.select_exam'))
+            show_warn(self, tr('common.error'), tr('error.select_exam'))
             return
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents')
         fn, sel = QFileDialog.getOpenFileName(self, tr('admin.import.title'), suggested, 'Excel (*.xlsx);;JSON (*.json);;YAML (*.yaml *.yml)')
@@ -641,7 +646,7 @@ class AdminView(QWidget):
                 if '随机题库' in wb.sheetnames:
                     data_rand = parse_sheet(wb['随机题库'])
                 if not data_mand and not data_rand:
-                    QMessageBox.warning(self, tr('common.error'), '缺少新格式工作表：请提供“必考题库”或“随机题库”（至少之一），可选“配置选项”设置随机抽取数量')
+                    show_warn(self, tr('common.error'), '缺少新格式工作表：请提供“必考题库”或“随机题库”（至少之一），可选“配置选项”设置随机抽取数量')
                     return
                 data = {'mandatory': data_mand, 'random': data_rand, 'config': {}}
                 if rand_count is not None:
@@ -659,7 +664,7 @@ class AdminView(QWidget):
                             return None
                 text = read_text_with_fallback(fn)
                 if text is None:
-                    QMessageBox.warning(self, tr('common.error'), tr('admin.import.error.file_decode'))
+                    show_warn(self, tr('common.error'), tr('admin.import.error.file_decode'))
                     return
                 data = None
                 if (sel and sel.startswith('JSON')) or ext == '.json':
@@ -674,10 +679,10 @@ class AdminView(QWidget):
                             data_yaml = yaml.safe_load(text)
                             data = data_yaml
                         except Exception:
-                            QMessageBox.warning(self, tr('common.error'), tr('admin.import.error.not_supported'))
+                            show_warn(self, tr('common.error'), tr('admin.import.error.not_supported'))
                             return
             if data is None:
-                QMessageBox.warning(self, tr('common.error'), tr('admin.import.error.no_data'))
+                show_warn(self, tr('common.error'), tr('admin.import.error.no_data'))
                 return
             valid = []
             errs = []
@@ -718,7 +723,7 @@ class AdminView(QWidget):
                 mand = data.get('mandatory') or []
                 rand = data.get('random') or []
                 if not mand and not rand:
-                    QMessageBox.warning(self, tr('common.error'), tr('admin.import.error.jsonyaml_missing'))
+                    show_warn(self, tr('common.error'), tr('admin.import.error.jsonyaml_missing'))
                     return
                 for x in mand:
                     x['pool'] = 'mandatory'
@@ -727,11 +732,11 @@ class AdminView(QWidget):
                 validate_list(mand, '必考题库')
                 validate_list(rand, '随机题库')
             else:
-                QMessageBox.warning(self, tr('common.error'), tr('admin.import.error.jsonyaml_dict'))
+                show_warn(self, tr('common.error'), tr('admin.import.error.jsonyaml_dict'))
                 return
             if not valid:
                 detail = '\n'.join(errs[:20]) if errs else tr('admin.import.error.no_valid')
-                QMessageBox.warning(self, tr('common.error'), detail)
+                show_warn(self, tr('common.error'), detail)
                 return
             import_questions_from_json(exam_id, valid)
             self.refresh_exams()
@@ -743,31 +748,31 @@ class AdminView(QWidget):
             extra = ''
             if errs:
                 extra = '\n部分题目未导入:\n' + '\n'.join(errs[:10])
-            QMessageBox.information(self, tr('common.success'), tr('admin.import.success', single=cnt_single, multiple=cnt_multiple, truefalse=cnt_tf, mandatory=cnt_mand, random=cnt_rand, extra=(tr('admin.import.extra_prefix') + '\n'.join(errs[:10]) if errs else '')))
+            show_info(self, tr('common.success'), tr('admin.import.success', single=cnt_single, multiple=cnt_multiple, truefalse=cnt_tf, mandatory=cnt_mand, random=cnt_rand, extra=(tr('admin.import.extra_prefix') + '\n'.join(errs[:10]) if errs else '')))
         except Exception as e:
-            QMessageBox.warning(self, '错误', str(e))
+            show_warn(self, tr('common.error'), str(e))
     def clear_exam(self, exam_id):
-        reply = QMessageBox.question(self, tr('common.hint'), tr('admin.exams.clear_confirm'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        reply = ask_yes_no(self, tr('common.hint'), tr('admin.exams.clear_confirm'), default_yes=False)
         if reply != QMessageBox.StandardButton.Yes:
             return
         try:
             from models import clear_exam_questions
             clear_exam_questions(exam_id)
             self.refresh_exams()
-            QMessageBox.information(self, tr('common.success'), tr('admin.exams.clear_done'))
+            show_info(self, tr('common.success'), tr('admin.exams.clear_done'))
         except Exception as e:
-            QMessageBox.warning(self, '错误', str(e))
+            show_warn(self, tr('common.error'), str(e))
     def delete_exam(self, exam_id):
-        reply = QMessageBox.question(self, tr('common.hint'), tr('admin.exams.delete_confirm'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        reply = ask_yes_no(self, tr('common.hint'), tr('admin.exams.delete_confirm'), default_yes=False)
         if reply != QMessageBox.StandardButton.Yes:
             return
         try:
             from models import delete_exam
             delete_exam(exam_id)
             self.refresh_exams()
-            QMessageBox.information(self, tr('common.success'), tr('admin.exams.delete_done'))
+            show_info(self, tr('common.success'), tr('admin.exams.delete_done'))
         except Exception as e:
-            QMessageBox.warning(self, '错误', str(e))
+            show_warn(self, tr('common.error'), str(e))
     def export_sample(self):
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents/exam')
         fn, sel = QFileDialog.getSaveFileName(self, tr('admin.export.sample.title'), suggested, 'Excel (*.xlsx);;JSON (*.json);;YAML (*.yaml)')
@@ -790,9 +795,7 @@ class AdminView(QWidget):
                 {"type":"multiple","text":"以下哪些属于Python打包/分发相关工具?","options":[{"key":"A","text":"setuptools"},{"key":"B","text":"wheel"},{"key":"C","text":"pip"},{"key":"D","text":"twine"}],"correct":["A","B","D"],"score":3}
             ]
             if (sel and sel.startswith('Excel')) or ext == '.xlsx' or ext == '':
-                from openpyxl import Workbook
-                from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
-                from openpyxl.utils import get_column_letter
+                # use top-level imports
                 out = fn if ext == '.xlsx' else fn + '.xlsx'
                 wb = Workbook()
                 ws_cfg = wb.active
@@ -813,7 +816,8 @@ class AdminView(QWidget):
                 ws_r = wb.create_sheet('随机题库')
                 write_sheet(ws_r, rand)
                 header_fill = PatternFill(start_color='FF409EFF', end_color='FF409EFF', fill_type='solid')
-                header_font = Font(bold=True, color='FFFFFFFF')
+                header_font = Font(bold=True, color='FFFFFFFF', size=13)
+                data_font = Font(size=12)
                 center = Alignment(horizontal='center', vertical='center')
                 left = Alignment(horizontal='left', vertical='center')
                 thin = Side(style='thin', color='FFDDDDDD')
@@ -825,12 +829,16 @@ class AdminView(QWidget):
                         cell.fill = header_fill
                         cell.font = header_font
                         cell.alignment = center
+                    ws.row_dimensions[1].height = 26
                     for r in range(2, ws.max_row+1):
                         for c in range(1, len(headers)+1):
-                            ws.cell(row=r, column=c).border = border
+                            cell = ws.cell(row=r, column=c)
+                            cell.border = border
+                            cell.font = data_font
                         ws.cell(row=r, column=4).alignment = center
                         for c in (1,2,3,5,6,7,8):
                             ws.cell(row=r, column=c).alignment = left
+                        ws.row_dimensions[r].height = 22
                     widths = [0] * len(headers)
                     for r in ws.iter_rows(values_only=True):
                         for idx, val in enumerate(r):
@@ -838,7 +846,7 @@ class AdminView(QWidget):
                             widths[idx] = max(widths[idx], l)
                     for i, w in enumerate(widths, start=1):
                         letter = get_column_letter(i)
-                        ws.column_dimensions[letter].width = max(12, min(36, w + 2))
+                        ws.column_dimensions[letter].width = max(16, min(48, w + 6))
                     ws.freeze_panes = 'A2'
                     ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{ws.max_row}"
                 wb.save(out)
@@ -875,11 +883,9 @@ class AdminView(QWidget):
                 write_yaml_block('random', rand)
                 with open(out, 'w', encoding='utf-8') as f:
                     f.write('\n'.join(lines) + '\n')
-            QMessageBox.information(self, tr('common.success'), tr('admin.export.sample.done'))
-        except ImportError:
-            QMessageBox.warning(self, '错误', '需要安装openpyxl: pip install openpyxl')
+            show_info(self, tr('common.success'), tr('admin.export.sample.done'))
         except Exception as e:
-            QMessageBox.warning(self, '错误', str(e))
+            show_warn(self, tr('common.error'), str(e))
     def sync_tab(self):
         w = QWidget()
         lay = QVBoxLayout()
@@ -893,6 +899,7 @@ class AdminView(QWidget):
         self.targets_table.setColumnWidth(3, 300)
         self.targets_table.setColumnWidth(4, 150)
         self.targets_table.horizontalHeader().setStretchLastSection(True)
+        self.targets_table.setShowGrid(False)
         self.refresh_targets()
         vb1.addWidget(self.targets_table)
         gb1.setLayout(vb1)
@@ -965,7 +972,7 @@ class AdminView(QWidget):
             return
         headers = ['用户名', '密码', '姓名', '角色', '状态']
         try:
-            from openpyxl import Workbook
+            # use top-level imports
             ext = os.path.splitext(fn)[1].lower()
             out = fn if ext == '.xlsx' else fn + '.xlsx'
             wb = Workbook()
@@ -973,19 +980,51 @@ class AdminView(QWidget):
             ws.title = 'Users'
             ws.append(headers)
             ws.append(['', '', '', 'user/admin', '1或0'])
+            header_fill = PatternFill(start_color='FF409EFF', end_color='FF409EFF', fill_type='solid')
+            header_font = Font(bold=True, color='FFFFFFFF', size=13)
+            data_font = Font(size=12)
+            center = Alignment(horizontal='center', vertical='center')
+            left = Alignment(horizontal='left', vertical='center')
+            thin = Side(style='thin', color='FFDDDDDD')
+            border = Border(left=thin, right=thin, top=thin, bottom=thin)
+            for c in range(1, len(headers)+1):
+                cell = ws.cell(row=1, column=c)
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = center
+            ws.row_dimensions[1].height = 26
+            for r in range(2, ws.max_row+1):
+                for c in range(1, len(headers)+1):
+                    cell = ws.cell(row=r, column=c)
+                    cell.border = border
+                    cell.font = data_font
+                ws.cell(row=r, column=2).alignment = center
+                ws.cell(row=r, column=4).alignment = center
+                ws.cell(row=r, column=5).alignment = center
+                ws.cell(row=r, column=1).alignment = left
+                ws.cell(row=r, column=3).alignment = left
+                ws.row_dimensions[r].height = 22
+            widths = [0] * len(headers)
+            for r in ws.iter_rows(values_only=True):
+                for idx, val in enumerate(r):
+                    l = len(str(val)) if val is not None else 0
+                    widths[idx] = max(widths[idx], l)
+            for i, w in enumerate(widths, start=1):
+                letter = get_column_letter(i)
+                ws.column_dimensions[letter].width = max(16, min(48, w + 6))
+            ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{ws.max_row}"
+            ws.freeze_panes = 'A2'
             wb.save(out)
-            QMessageBox.information(self, '成功', '用户模板已导出')
-        except ImportError:
-            QMessageBox.warning(self, '错误', '需要安装openpyxl: pip install openpyxl')
+            show_info(self, tr('common.success'), tr('admin.export.users_tpl.done'))
+        
         except Exception as e:
-            QMessageBox.warning(self, '错误', str(e))
+            show_warn(self, tr('common.error'), str(e))
     def import_users_from_excel(self):
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents')
         fn, sel = QFileDialog.getOpenFileName(self, '选择用户Excel', suggested, 'Excel (*.xlsx)')
         if not fn:
             return
         try:
-            from openpyxl import load_workbook
             wb = load_workbook(fn)
             ws = wb['Users'] if 'Users' in wb.sheetnames else wb.active
             header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
@@ -997,7 +1036,7 @@ class AdminView(QWidget):
                     return -1
             iu = idx('用户名'); ip = idx('密码'); iname = idx('姓名'); ir = idx('角色'); ia = idx('状态')
             if min(iu, ip, ir, ia) < 0:
-                QMessageBox.warning(self, '错误', '缺少必要列: 用户名/密码/角色/状态')
+                show_warn(self, tr('common.error'), tr('admin.import.users.error.missing'))
                 return
             ok = 0; fail = 0
             format_errs = []
@@ -1028,14 +1067,13 @@ class AdminView(QWidget):
                 except Exception:
                     fail += 1
             self.refresh_users()
-            QMessageBox.information(self, '完成', f'导入成功:{ok} 失败:{fail}')
+            show_info(self, tr('common.success'), tr('admin.import.users.result', ok=ok, fail=fail))
             if format_errs:
                 detail = '\n'.join(format_errs[:20])
-                QMessageBox.warning(self, '格式错误', detail)
-        except ImportError:
-            QMessageBox.warning(self, '错误', '需要安装openpyxl: pip install openpyxl')
+                show_warn(self, tr('admin.import.users.format_error'), detail)
+        
         except Exception as e:
-            QMessageBox.warning(self, '错误', str(e))
+            show_warn(self, tr('common.error'), str(e))
     def export_targets_template(self):
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents/targets_template')
         fn, sel = QFileDialog.getSaveFileName(self, '导出设备Excel模板', suggested, 'Excel (*.xlsx)')
@@ -1043,7 +1081,6 @@ class AdminView(QWidget):
             return
         headers = ['名称', 'IP', '用户名', '远程路径', 'SSH密码']
         try:
-            from openpyxl import Workbook
             ext = os.path.splitext(fn)[1].lower()
             out = fn if ext == '.xlsx' else fn + '.xlsx'
             wb = Workbook()
@@ -1052,18 +1089,16 @@ class AdminView(QWidget):
             ws.append(headers)
             ws.append(['设备A', '192.168.1.10', 'user', '~/.exam_system/exam.db', ''])
             wb.save(out)
-            QMessageBox.information(self, '成功', '设备模板已导出')
-        except ImportError:
-            QMessageBox.warning(self, '错误', '需要安装openpyxl: pip install openpyxl')
+            show_info(self, tr('common.success'), tr('admin.export.targets_tpl.done'))
+        
         except Exception as e:
-            QMessageBox.warning(self, '错误', str(e))
+            show_warn(self, tr('common.error'), str(e))
     def import_targets_from_excel(self):
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents')
         fn, sel = QFileDialog.getOpenFileName(self, '选择设备Excel', suggested, 'Excel (*.xlsx)')
         if not fn:
             return
         try:
-            from openpyxl import load_workbook
             wb = load_workbook(fn)
             ws = wb['Targets'] if 'Targets' in wb.sheetnames else wb.active
             header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
@@ -1075,7 +1110,7 @@ class AdminView(QWidget):
                     return -1
             iname = idx('名称'); iip = idx('IP'); iuser = idx('用户名'); ipath = idx('远程路径'); ipwd = idx('SSH密码')
             if min(iname, iip, iuser, ipath) < 0:
-                QMessageBox.warning(self, '错误', '缺少必要列: 名称/IP/用户名/远程路径')
+                show_warn(self, tr('common.error'), tr('admin.import.targets.error.missing'))
                 return
             ok = 0; fail = 0
             for r in ws.iter_rows(min_row=2, values_only=True):
@@ -1093,11 +1128,10 @@ class AdminView(QWidget):
                 except Exception:
                     fail += 1
             self.refresh_targets()
-            QMessageBox.information(self, '完成', f'导入成功:{ok} 失败:{fail}')
-        except ImportError:
-            QMessageBox.warning(self, '错误', '需要安装openpyxl: pip install openpyxl')
+            show_info(self, tr('common.success'), f'导入成功:{ok} 失败:{fail}')
+        
         except Exception as e:
-            QMessageBox.warning(self, '错误', str(e))
+            show_warn(self, tr('common.error'), str(e))
     def refresh_targets(self):
         targets = list_sync_targets()
         self.targets_table.blockSignals(True)
@@ -1151,7 +1185,7 @@ class AdminView(QWidget):
         if col == 1:
             username = item.text().strip()
             if not username:
-                QMessageBox.warning(self, '错误', '用户名不能为空')
+                show_warn(self, tr('common.error'), '用户名不能为空')
                 self.refresh_users()
                 return
             update_user_basic(user_id, username=username)
@@ -1171,7 +1205,7 @@ class AdminView(QWidget):
         if col == 1:
             title = item.text().strip()
             if not title:
-                QMessageBox.warning(self, '错误', '标题不能为空')
+                show_warn(self, tr('common.error'), '标题不能为空')
                 self.refresh_exams()
                 return
             update_exam_title_desc(exam_id, title=title)
@@ -1194,15 +1228,15 @@ class AdminView(QWidget):
         username = self.targets_table.item(row, 2).text() if self.targets_table.item(row, 2) else ''
         remote_path = self.targets_table.item(row, 3).text() if self.targets_table.item(row, 3) else ''
         if not name or not ip or not username or not remote_path:
-            QMessageBox.warning(self, '错误', '设备信息不能为空')
+            show_warn(self, tr('common.error'), '设备信息不能为空')
             self.refresh_targets()
             return
         try:
             update_sync_target(int(target_id), name, ip, username, remote_path, None)
             self.refresh_targets()
-            QMessageBox.information(self, '成功', '设备信息已更新')
+            show_info(self, tr('common.success'), '设备信息已更新')
         except Exception as e:
-            QMessageBox.warning(self, '错误', str(e))
+            show_warn(self, tr('common.error'), str(e))
     def add_target(self):
         name = self.t_name.text().strip()
         ip = self.t_ip.text().strip()
@@ -1210,7 +1244,7 @@ class AdminView(QWidget):
         path = self.t_path.text().strip()
         password = self.t_password.text().strip()
         if not name or not ip or not user or not path:
-            QMessageBox.warning(self, '错误', '请完整填写设备信息')
+            show_warn(self, tr('common.error'), '请完整填写设备信息')
             return
         upsert_sync_target(name, ip, user, path, password if password else None)
         self.refresh_targets()
@@ -1219,7 +1253,7 @@ class AdminView(QWidget):
         self.t_user.clear()
         self.t_path.clear()
         self.t_password.clear()
-        QMessageBox.information(self, '成功', '设备已添加')
+        show_info(self, tr('common.success'), '设备已添加')
     def edit_target(self, target_id):
         targets = list_sync_targets()
         target = None
@@ -1256,31 +1290,31 @@ class AdminView(QWidget):
             new_path = path_edit.text().strip()
             new_password = password_edit.text().strip()
             if not new_name or not new_ip or not new_user or not new_path:
-                QMessageBox.warning(dialog, '错误', '请完整填写设备信息')
+                show_warn(dialog, tr('common.error'), '请完整填写设备信息')
                 return
             try:
                 update_sync_target(target_id, new_name, new_ip, new_user, new_path, new_password if new_password else None)
                 self.refresh_targets()
                 dialog.accept()
-                QMessageBox.information(self, '成功', '设备已更新')
+                show_info(self, tr('common.success'), '设备已更新')
             except Exception as e:
-                QMessageBox.warning(dialog, '错误', str(e))
+                show_warn(dialog, tr('common.error'), str(e))
         buttons.accepted.connect(save_changes)
         buttons.rejected.connect(dialog.reject)
         dialog.exec()
     def delete_target(self, target_id):
-        reply = QMessageBox.question(self, '确认', '确定要删除该设备吗？', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        reply = ask_yes_no(self, '确认', '确定要删除该设备吗？', default_yes=False)
         if reply == QMessageBox.StandardButton.Yes:
             try:
                 delete_sync_target(target_id)
                 self.refresh_targets()
-                QMessageBox.information(self, '成功', '设备已删除')
+                show_info(self, tr('common.success'), '设备已删除')
             except Exception as e:
-                QMessageBox.warning(self, '错误', str(e))
+                show_warn(self, tr('common.error'), str(e))
     def push_all(self):
         targets = list_sync_targets()
         if not targets:
-            QMessageBox.information(self, '提示', '没有配置任何设备')
+            show_info(self, tr('sync.status.info'), tr('info.no_targets'))
             return
         self.set_sync_buttons_enabled(False)
         if hasattr(self, 'push_btn'):
@@ -1301,7 +1335,7 @@ class AdminView(QWidget):
     def pull_all(self):
         targets = list_sync_targets()
         if not targets:
-            QMessageBox.information(self, '提示', '没有配置任何设备')
+            show_info(self, tr('sync.status.info'), tr('info.no_targets'))
             return
         self.set_sync_buttons_enabled(False)
         if hasattr(self, 'push_btn'):
@@ -1371,7 +1405,7 @@ class AdminView(QWidget):
             self.sync_progress_dialog = None
         if '拉取' in results:
             self.refresh_scores()
-        QMessageBox.information(self, tr('sync.finished.title'), tr('sync.operation_done', results=results))
+        show_info(self, tr('sync.finished.title'), tr('sync.operation_done', results=results))
     def on_sync_error(self, error):
         self.set_sync_buttons_enabled(True)
         if hasattr(self, 'sync_worker'):
@@ -1384,7 +1418,7 @@ class AdminView(QWidget):
             except Exception:
                 pass
             self.sync_progress_dialog = None
-        QMessageBox.warning(self, tr('sync.error.title'), tr('sync.error.message', error=error))
+        show_warn(self, tr('sync.error.title'), tr('sync.error.message', error=error))
     def scores_tab(self):
         w = QWidget()
         lay = QVBoxLayout()
@@ -1401,6 +1435,7 @@ class AdminView(QWidget):
         self.scores_table.setColumnWidth(5, 200)
         self.scores_table.setColumnWidth(6, 200)
         self.scores_table.setAlternatingRowColors(True)
+        self.scores_table.setShowGrid(False)
         self.refresh_scores()
         vb.addWidget(self.scores_table)
         hb = QHBoxLayout()
@@ -1452,8 +1487,6 @@ class AdminView(QWidget):
         if not fn:
             return
         try:
-            from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
-            from openpyxl.utils import get_column_letter
             ext = os.path.splitext(fn)[1].lower()
             out = fn if ext == '.xlsx' else fn + '.xlsx'
             wb = Workbook()
@@ -1465,7 +1498,8 @@ class AdminView(QWidget):
             green_fill = PatternFill(start_color='FF67C23A', end_color='FF67C23A', fill_type='solid')
             red_fill = PatternFill(start_color='FFF56C6C', end_color='FFF56C6C', fill_type='solid')
             header_fill = PatternFill(start_color='FF409EFF', end_color='FF409EFF', fill_type='solid')
-            header_font = Font(bold=True, color='FFFFFFFF')
+            header_font = Font(bold=True, color='FFFFFFFF', size=13)
+            data_font = Font(size=12)
             center = Alignment(horizontal='center', vertical='center')
             left = Alignment(horizontal='left', vertical='center')
             thin = Side(style='thin', color='FFDDDDDD')
@@ -1477,7 +1511,6 @@ class AdminView(QWidget):
                 ws.append([a[0], a[1] or '', a[2] or '', int(a[3]), exam_title or '', a[5] or '', a[6] or '', a[7], text_pass])
                 cell = ws.cell(row=ws.max_row, column=9)
                 if not is_valid:
-                    from openpyxl.styles import PatternFill
                     cell.fill = PatternFill(start_color='FFFFF3CD', end_color='FFFFF3CD', fill_type='solid')
                 else:
                     cell.fill = green_fill if a[8] == 1 else red_fill
@@ -1486,9 +1519,12 @@ class AdminView(QWidget):
                 cell.fill = header_fill
                 cell.font = header_font
                 cell.alignment = center
+            ws.row_dimensions[1].height = 26
             for r in range(2, ws.max_row+1):
                 for c in range(1, len(headers)+1):
-                    ws.cell(row=r, column=c).border = border
+                    cell = ws.cell(row=r, column=c)
+                    cell.border = border
+                    cell.font = data_font
                 ws.cell(row=r, column=4).alignment = center
                 ws.cell(row=r, column=6).alignment = center
                 ws.cell(row=r, column=7).alignment = center
@@ -1497,6 +1533,7 @@ class AdminView(QWidget):
                 ws.cell(row=r, column=1).alignment = left
                 ws.cell(row=r, column=2).alignment = left
                 ws.cell(row=r, column=3).alignment = left
+                ws.row_dimensions[r].height = 22
                 ws.cell(row=r, column=5).alignment = left
             widths = [0] * len(headers)
             for r in ws.iter_rows(values_only=True):
@@ -1505,10 +1542,10 @@ class AdminView(QWidget):
                     widths[idx] = max(widths[idx], l)
             for i, w in enumerate(widths, start=1):
                 letter = get_column_letter(i)
-                ws.column_dimensions[letter].width = max(12, min(36, w + 2))
+                ws.column_dimensions[letter].width = max(16, min(48, w + 6))
             ws.freeze_panes = 'A2'
             ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{ws.max_row}"
             wb.save(out)
-            QMessageBox.information(self, tr('common.success'), tr('export.scores.done'))
+            show_info(self, tr('common.success'), tr('export.scores.done'))
         except Exception as e:
-            QMessageBox.warning(self, '错误', str(e))
+            show_warn(self, tr('common.error'), str(e))

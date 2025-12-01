@@ -7,13 +7,14 @@ from exam_interface import ModernTimer, ModernProgressBar
 from language import tr
 from models import start_attempt, save_answer, submit_attempt, list_exams, grade_question, build_exam_questions_for_attempt
 from PySide6.QtWidgets import QMessageBox
+from utils import show_info, show_warn, ask_yes_no
 
 class ExamWindow(QMainWindow):
     instance = None
     def __init__(self, user, exam_id, parent=None):
         super().__init__(parent)
         if ExamWindow.instance is not None and ExamWindow.instance.isVisible():
-            QMessageBox.information(self, tr('common.hint'), tr('exam.already_running'))
+            show_info(self, tr('common.hint'), tr('exam.already_running'))
             try:
                 ExamWindow.instance.raise_()
                 ExamWindow.instance.activateWindow()
@@ -259,7 +260,7 @@ class ExamWindow(QMainWindow):
         except Exception:
             pass
         score, passed = submit_attempt(self.attempt_uuid)
-        QMessageBox.information(self, tr('exam.result'), f'{tr("exam.score_label")}:{score} {tr("exam.pass_text") if passed==1 else tr("exam.fail_text")}')
+        show_info(self, tr('exam.result'), f'{tr("exam.score_label")}:{score} {tr("exam.pass_text") if passed==1 else tr("exam.fail_text")}')
         try:
             self.setWindowTitle(tr('exam.finished_title', score=score, total=self.total_score, passed=(tr('exam.pass_text') if passed==1 else tr('exam.fail_text'))))
         except Exception:
@@ -331,7 +332,7 @@ class ExamWindow(QMainWindow):
             ExamWindow.instance = None
             event.accept()
             return
-        reply = QMessageBox.question(self, tr('common.hint'), tr('exam.confirm_exit'), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        reply = ask_yes_no(self, tr('common.hint'), tr('exam.confirm_exit'), default_yes=False)
         if reply == QMessageBox.StandardButton.Yes:
             try:
                 self.save_current()
@@ -340,7 +341,7 @@ class ExamWindow(QMainWindow):
             except Exception:
                 pass
             score, passed = submit_attempt(self.attempt_uuid)
-            QMessageBox.information(self, tr('exam.result'), tr('exam.exit_result', score=score, pass_text=(tr('exam.pass_text') if passed==1 else tr('exam.fail_text'))) + tr('exam.unanswered_note'))
+            show_info(self, tr('exam.result'), tr('exam.exit_result', score=score, pass_text=(tr('exam.pass_text') if passed==1 else tr('exam.fail_text'))) + tr('exam.unanswered_note'))
             try:
                 self.setWindowTitle(tr('exam.finished_title', score=score, total=self.total_score, passed=(tr('exam.pass_text') if passed==1 else tr('exam.fail_text'))))
             except Exception:

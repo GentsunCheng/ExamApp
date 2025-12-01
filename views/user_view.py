@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushBu
 from icon_manager import get_icon
 from theme_manager import theme_manager
 from language import tr
+from utils import show_info, show_warn, ask_yes_no
 from models import list_exams, list_attempts, get_exam_title, get_exam_stats, list_questions
 from windows.exam_window import ExamWindow
 
@@ -28,7 +29,7 @@ class UserView(QWidget):
             f"QTableWidget {{ {bd}:1px solid {colors['border']}; {br}:8px; {bkg}:{colors['card_background']}; {col}:{colors['text_primary']}; }}\n"
             f"QTableWidget::item:hover {{ {bkg}:{colors['border_light']}; }}\n"
             f"QTableWidget::item:selected {{ {bkg}:{colors['primary']}; {col}:{colors['text_inverse']}; }}\n"
-            f"QHeaderView::section {{ {bkg}:{colors['border_light']}; {col}:{colors['text_secondary']}; font-weight:600; {pd}:6px 8px; {bd}:none; {bd}-right:1px solid {colors['border']}; }}\n"
+            f"QHeaderView::section {{ {bkg}:{colors['border_light']}; {col}:{colors['text_secondary']}; font-weight:600; {pd}:6px 8px; {bd}:none; }}\n"
         )
         self.setStyleSheet(ss_user)
         self.user = user
@@ -73,6 +74,7 @@ class UserView(QWidget):
         self.exams_table_user.setColumnWidth(8, 50)
         self.exams_table_user.horizontalHeader().setStretchLastSection(True)
         self.exams_table_user.setAlternatingRowColors(True)
+        self.exams_table_user.setShowGrid(False)
         self.exams_table_user.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.exams_table_user.setSelectionMode(QAbstractItemView.SingleSelection)
         self.refresh_exams()
@@ -97,6 +99,7 @@ class UserView(QWidget):
         self.attempts_table.setColumnWidth(3, 200)
         self.attempts_table.horizontalHeader().setStretchLastSection(True)
         self.attempts_table.setAlternatingRowColors(True)
+        self.attempts_table.setShowGrid(False)
         self.refresh_attempts()
         history_v.addWidget(self.attempts_table)
         history_tab.setLayout(history_v)
@@ -194,28 +197,28 @@ class UserView(QWidget):
         if exam_id is None:
             tbl = getattr(self, 'exams_table_user', None)
             if tbl is None:
-                QMessageBox.warning(self, tr('common.error'), tr('error.select_exam'))
+                show_warn(self, tr('common.error'), tr('error.select_exam'))
                 return
             sm = tbl.selectionModel()
             if sm is None:
-                QMessageBox.warning(self, tr('common.error'), tr('error.select_exam'))
+                show_warn(self, tr('common.error'), tr('error.select_exam'))
                 return
             rows = sm.selectedRows()
             if len(rows) == 0:
-                QMessageBox.warning(self, tr('common.error'), tr('error.select_exam'))
+                show_warn(self, tr('common.error'), tr('error.select_exam'))
                 return
             if len(rows) > 1:
-                QMessageBox.warning(self, tr('common.error'), tr('error.select_exam_single'))
+                show_warn(self, tr('common.error'), tr('error.select_exam_single'))
                 return
             r = rows[0].row()
             it = tbl.item(r, 0)
             exam_id = int(it.text()) if it and it.text() else None
         if not exam_id:
-            QMessageBox.warning(self, tr('common.error'), tr('error.select_exam'))
+            show_warn(self, tr('common.error'), tr('error.select_exam'))
             return
         qs = list_questions(int(exam_id))
         if not qs:
-            QMessageBox.warning(self, tr('common.error'), tr('error.no_questions'))
+            show_warn(self, tr('common.error'), tr('error.no_questions'))
             return
         ExamWindow(self.user, exam_id, self).show()
     def handle_logout(self):
