@@ -1088,6 +1088,39 @@ class AdminView(QWidget):
             ws.title = 'Targets'
             ws.append(headers)
             ws.append(['设备A', '192.168.1.10', 'user', '~/.exam_system/exam.db', ''])
+            header_fill = PatternFill(start_color='FF409EFF', end_color='FF409EFF', fill_type='solid')
+            header_font = Font(bold=True, color='FFFFFFFF', size=13)
+            data_font = Font(size=12)
+            center = Alignment(horizontal='center', vertical='center')
+            left = Alignment(horizontal='left', vertical='center')
+            thin = Side(style='thin', color='FFDDDDDD')
+            border = Border(left=thin, right=thin, top=thin, bottom=thin)
+            for c in range(1, len(headers)+1):
+                cell = ws.cell(row=1, column=c)
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = center
+            ws.row_dimensions[1].height = 26
+            for r in range(2, ws.max_row+1):
+                for c in range(1, len(headers)+1):
+                    cell = ws.cell(row=r, column=c)
+                    cell.border = border
+                    cell.font = data_font
+                ws.cell(row=r, column=2).alignment = center
+                ws.cell(row=r, column=1).alignment = left
+                ws.cell(row=r, column=3).alignment = left
+                ws.cell(row=r, column=4).alignment = left
+                ws.cell(row=r, column=5).alignment = left
+                ws.row_dimensions[r].height = 22
+            widths = [0] * len(headers)
+            for r in ws.iter_rows(values_only=True):
+                for idx, val in enumerate(r):
+                    l = len(str(val)) if val is not None else 0
+                    widths[idx] = max(widths[idx], l)
+            for i, w in enumerate(widths, start=1):
+                letter = get_column_letter(i)
+                ws.column_dimensions[letter].width = max(16, min(48, w + 6))
+            ws.freeze_panes = 'A2'
             wb.save(out)
             show_info(self, tr('common.success'), tr('admin.export.targets_tpl.done'))
         
