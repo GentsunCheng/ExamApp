@@ -166,24 +166,36 @@ class ExamWindow(QMainWindow):
                 self.opts_layout.addWidget(btn)
                 self.opt_buttons.append(btn)
         else:
-            opts = list(q['options'])
+            raw_opts = list(q['options'] or [])
+            normalized = []
+            for idx, o in enumerate(raw_opts):
+                if isinstance(o, dict):
+                    kv = o.get('key')
+                    tv = o.get('text') if o.get('text') is not None else (str(o.get('value')) if o.get('value') is not None else str(kv))
+                    kstr = str(kv) if kv is not None else str(idx)
+                    normalized.append({'key_val': kv if kv is not None else idx, 'key_str': kstr, 'text': tv})
+                else:
+                    kv = o
+                    kstr = str(kv)
+                    normalized.append({'key_val': kv, 'key_str': kstr, 'text': str(o)})
             order = self.option_orders.get(q['id'])
             if order is None:
-                keys = [str(o.get('key')) for o in opts]
+                keys = [opt['key_str'] for opt in normalized]
                 try:
                     random.shuffle(keys)
                 except Exception:
                     pass
                 self.option_orders[q['id']] = keys
                 order = keys
-            by_key = {str(o.get('key')): o for o in opts}
+            by_key = {opt['key_str']: opt for opt in normalized}
             ordered_opts = [by_key[k] for k in order if k in by_key]
             for opt in ordered_opts:
-                text = f"{opt.get('key')}. {opt.get('text')}"
+                text = f"{opt['key_str']}. {opt['text']}"
                 btn = QPushButton(text)
                 btn.setCheckable(True)
                 btn.setStyleSheet(btn_style)
-                btn.setProperty('key', opt.get('key'))
+                btn.setProperty('key', opt['key_str'])
+                btn.setProperty('key_val', opt['key_val'])
                 btn.clicked.connect(lambda checked, b=btn: self.on_option_clicked(b))
                 self.opts_layout.addWidget(btn)
                 self.opt_buttons.append(btn)
@@ -197,8 +209,8 @@ class ExamWindow(QMainWindow):
             else:
                 sset = set(sel)
                 for b in self.opt_buttons:
-                    key = b.property('key')
-                    b.setChecked(key in sset if key is not None else False)
+                    kval = b.property('key_val')
+                    b.setChecked(kval in sset if kval is not None else False)
         self.update_buttons_state()
         self.progress_bar.setValue(self.current_index + 1)
         if getattr(self, '_submitted', False):
@@ -214,7 +226,7 @@ class ExamWindow(QMainWindow):
                 if q['type'] == 'truefalse':
                     selected = [bool(b.property('tf_value'))]
                 else:
-                    selected.append(str(b.property('key')))
+                    selected.append(b.property('key_val'))
         if q['type'] == 'single':
             selected = selected[:1]
         return selected

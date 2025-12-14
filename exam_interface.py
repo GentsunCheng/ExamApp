@@ -3,7 +3,7 @@
 提供现代化的计时器、进度显示和考试管理功能
 """
 
-from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, Signal
+from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, Signal, Property
 from PySide6.QtWidgets import (
     QWidget, QLabel, QProgressBar, QFrame, QVBoxLayout, QHBoxLayout,
     QPushButton, QButtonGroup,
@@ -36,7 +36,13 @@ class ModernTimer(QLabel):
         self.pulse_animation = QPropertyAnimation(self, b"pulse_scale")
         self.pulse_animation.setDuration(1000)
         self.pulse_animation.setEasingCurve(QEasingCurve.Type.InOutSine)
-        self.pulse_scale = 1.0
+        try:
+            self.pulse_animation.setStartValue(1.0)
+            self.pulse_animation.setEndValue(1.05)
+            self.pulse_animation.setLoopCount(-1)
+        except Exception:
+            pass
+        self._pulse_scale = 1.0
         
         self.setup_ui()
         self.update_style()
@@ -151,8 +157,16 @@ class ModernTimer(QLabel):
             self.pulse_animation = QPropertyAnimation(self, b"pulse_scale")
             self.pulse_animation.setDuration(1000)
             self.pulse_animation.setEasingCurve(QEasingCurve.Type.InOutSine)
-            
-        self.pulse_animation.start()
+            try:
+                self.pulse_animation.setStartValue(1.0)
+                self.pulse_animation.setEndValue(1.05)
+                self.pulse_animation.setLoopCount(-1)
+            except Exception:
+                pass
+        try:
+            self.pulse_animation.start()
+        except Exception:
+            pass
 
     def get_time_remaining(self):
         """获取剩余时间"""
@@ -162,6 +176,17 @@ class ModernTimer(QLabel):
         """设置剩余时间"""
         self.time_remaining = seconds
         self.update_display()
+
+    def get_pulse_scale(self):
+        return self._pulse_scale
+
+    def set_pulse_scale(self, value):
+        try:
+            self._pulse_scale = float(value)
+        except Exception:
+            self._pulse_scale = 1.0
+
+    pulse_scale = Property(float, get_pulse_scale, set_pulse_scale)
 
 class ModernProgressBar(QProgressBar):
     """现代化进度条组件"""

@@ -1,7 +1,7 @@
 import os
 import sys
 import subprocess
-from database import DB_PATH
+from database import DB_DIR, USERS_DB_PATH, EXAMS_DB_PATH, SCORES_DB_PATH, CONFIG_DB_PATH
 import tempfile
 import shutil
 
@@ -45,66 +45,87 @@ if os.path.exists(SSHPASS_PATH):
     print(f"Found sshpass binary: {SSHPASS_PATH}")
 else:
     print(f"Error: sshpass binary not found at {SSHPASS_PATH}")
-def rsync_push(ip, username, remote_path, ssh_password=None):
-    """Push database file to remote device using rsync"""
-    # First, create remote directory if it doesn't exist
-    remote_dir = os.path.dirname(remote_path)
-    
+
+def _run_ssh(ip, username, remote_cmd, ssh_password=None):
     if ssh_password:
-        # Create remote directory using SSH with password
-        mkdir_cmd = [SSHPASS_PATH, '-p', ssh_password, 'ssh', '-o', 'StrictHostKeyChecking=no', 
-                     f'{username}@{ip}', f'mkdir -p {remote_dir}']
-        mkdir_result = subprocess.run(mkdir_cmd, capture_output=True, text=True)
-        
-        if mkdir_result.returncode != 0:
-            return mkdir_result.returncode, mkdir_result.stdout, f"Failed to create remote directory: {mkdir_result.stderr}"
-        
-        # Use sshpass for password authentication
-        cmd = [SSHPASS_PATH, '-p', ssh_password, 'rsync', '-avz', '-e', 'ssh -o StrictHostKeyChecking=no', 
-               DB_PATH, f'{username}@{ip}:{remote_path}']
+        cmd = [SSHPASS_PATH, '-p', ssh_password, 'ssh', '-o', 'StrictHostKeyChecking=no', f'{username}@{ip}', remote_cmd]
     else:
-        # Create remote directory using SSH with key authentication
-        mkdir_cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', f'{username}@{ip}', f'mkdir -p {remote_dir}']
-        mkdir_result = subprocess.run(mkdir_cmd, capture_output=True, text=True)
-        
-        if mkdir_result.returncode != 0:
-            return mkdir_result.returncode, mkdir_result.stdout, f"Failed to create remote directory: {mkdir_result.stderr}"
-        
-        # Use key-based authentication
-        cmd = ['rsync', '-avz', '-e', 'ssh -o StrictHostKeyChecking=no', 
-               DB_PATH, f'{username}@{ip}:{remote_path}']
-    
+        cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', f'{username}@{ip}', remote_cmd]
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+ 
+def _get_remote_cwd(ip, username, ssh_password=None):
+    try:
+        r = _run_ssh(ip, username, 'pwd', ssh_password)
+        out = (r.stdout or '').strip()
+        if out:
+            return out
+    except Exception:
+        pass
+    try:
+        r = _run_ssh(ip, username, 'powershell -NoProfile -Command "$pwd.Path"', ssh_password)
+        out = (r.stdout or '').strip()
+        if out:
+            return out
+    except Exception:
+        pass
+    try:
+        r = _run_ssh(ip, username, 'cmd /c cd', ssh_password)
+        out = (r.stdout or '').strip()
+        if out:
+            return out
+    except Exception:
+        pass
+    return ''
+
+def _ensure_remote_dir(ip, username, remote_dir, ssh_password=None):
+    cmd1 = f"test -d {remote_dir} || mkdir -p {remote_dir}"
+    r1 = _run_ssh(ip, username, cmd1, ssh_password)
+    if r1.returncode == 0:
+        return 0, r1.stdout, r1.stderr
+    cmd2 = f"powershell -NoProfile -Command \"if (!(Test-Path -Path '{remote_dir}')) {{ New-Item -ItemType Directory -Path '{remote_dir}' }}\""
+    r2 = _run_ssh(ip, username, cmd2, ssh_password)
+    return r2.returncode, r2.stdout, r2.stderr
+
+def _check_remote_file_exists(ip, username, remote_path, ssh_password=None):
+    cmd1 = f"test -f {remote_path} && echo 'exists' || echo 'not found'"
+    r1 = _run_ssh(ip, username, cmd1, ssh_password)
+    if r1.returncode == 0 and 'exists' in (r1.stdout or ''):
+        return True
+    cmd2 = f"powershell -NoProfile -Command \"if (Test-Path -Path '{remote_path}') {{ Write-Output 'exists' }} else {{ Write-Output 'not found' }}\""
+    r2 = _run_ssh(ip, username, cmd2, ssh_password)
+    return (r2.returncode == 0) and ('exists' in (r2.stdout or ''))
+
+def rsync_push(ip, username, remote_dir, ssh_password=None):
+    """Push selected local databases to remote directory (skip admin, skip exams)"""
+    if remote_dir and remote_dir.startswith('~'):
+        base = _get_remote_cwd(ip, username, ssh_password) or ''
+        remote_dir = (base + remote_dir[1:]) if base else remote_dir
+    local_files = [SCORES_DB_PATH, USERS_DB_PATH, CONFIG_DB_PATH]
+    code_mk, out_mk, err_mk = _ensure_remote_dir(ip, username, remote_dir, ssh_password)
+    if code_mk != 0:
+        return code_mk, out_mk, f"Failed to create remote directory '{remote_dir}': {err_mk}"
+    # Compose rsync command
+    if ssh_password:
+        cmd = [SSHPASS_PATH, '-p', ssh_password, 'rsync', '-avz', '-e', 'ssh -o StrictHostKeyChecking=no'] + local_files + [f'{username}@{ip}:{remote_dir}/']
+    else:
+        cmd = ['rsync', '-avz', '-e', 'ssh -o StrictHostKeyChecking=no'] + local_files + [f'{username}@{ip}:{remote_dir}/']
     p = subprocess.run(cmd, capture_output=True, text=True)
     return p.returncode, p.stdout, p.stderr
 
-def rsync_pull(ip, username, remote_path, local_dir, ssh_password=None):
-    """Pull database file from remote device using rsync"""
+def rsync_pull_scores(ip, username, remote_dir, local_dir, ssh_password=None):
+    """Pull scores.db from remote directory to local_dir using rsync"""
     os.makedirs(local_dir, exist_ok=True)
-    
+    if remote_dir and remote_dir.startswith('~'):
+        base = _get_remote_cwd(ip, username, ssh_password) or ''
+        remote_dir = (base + remote_dir[1:]) if base else remote_dir
+    remote_scores = os.path.join(remote_dir, 'scores.db')
+    exists = _check_remote_file_exists(ip, username, remote_scores, ssh_password)
+    if not exists:
+        return 1, '', f'Remote file not found: {remote_scores}'
     if ssh_password:
-        # Check if remote file exists using SSH with password
-        check_cmd = [SSHPASS_PATH, '-p', ssh_password, 'ssh', '-o', 'StrictHostKeyChecking=no', 
-                     f'{username}@{ip}', f'test -f {remote_path} && echo "exists" || echo "not found"']
-        check_result = subprocess.run(check_cmd, capture_output=True, text=True)
-        
-        if check_result.returncode != 0 or 'not found' in check_result.stdout:
-            return 1, '', f'Remote file not found: {remote_path}'
-        
-        # Use sshpass for password authentication
-        cmd = [SSHPASS_PATH, '-p', ssh_password, 'rsync', '-avz', '-e', 'ssh -o StrictHostKeyChecking=no', 
-               f'{username}@{ip}:{remote_path}', local_dir]
+        cmd = [SSHPASS_PATH, '-p', ssh_password, 'rsync', '-avz', '-e', 'ssh -o StrictHostKeyChecking=no', f'{username}@{ip}:{remote_scores}', local_dir]
     else:
-        # Check if remote file exists using SSH with key authentication
-        check_cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', f'{username}@{ip}', 
-                     f'test -f {remote_path} && echo "exists" || echo "not found"']
-        check_result = subprocess.run(check_cmd, capture_output=True, text=True)
-        
-        if check_result.returncode != 0 or 'not found' in check_result.stdout:
-            return 1, '', f'Remote file not found: {remote_path}'
-        
-        # Use key-based authentication
-        cmd = ['rsync', '-avz', '-e', 'ssh -o StrictHostKeyChecking=no', 
-               f'{username}@{ip}:{remote_path}', local_dir]
-    
+        cmd = ['rsync', '-avz', '-e', 'ssh -o StrictHostKeyChecking=no', f'{username}@{ip}:{remote_scores}', local_dir]
     p = subprocess.run(cmd, capture_output=True, text=True)
     return p.returncode, p.stdout, p.stderr

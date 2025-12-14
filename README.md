@@ -43,15 +43,21 @@ python3 main.py
 
 ## 数据存储
 
-- 数据库路径：`~/.exam_system/exam.db`
-- 拉取的远端数据库副本：`~/.exam_system/pulled/<设备IP>/`
+- 本地数据库目录：`~/.exam_system/`
+  - `admin.db`（管理员账户）
+  - `users.db`（用户信息）
+  - `exams.db`（试卷与题目）
+  - `scores.db`（成绩与作答）
+  - `config.db`（系统设置与同步设备）
+- 拉取的远端成绩副本缓存：`~/.exam_system/pulled/<设备IP>/scores.db`
 
 ## 同步说明
 
-- 推送题库：将本地 SQLite 数据库通过 `rsync` 上传到目标设备的远端路径（如 `~/exam_system/exam.db`）
-- 拉取成绩：从设备拉取数据库文件并合并到本地（attempts/attempt_answers）
+- 远端“路径”字段为目录。例如：`~/exam_system`。
+- 推送：将本地 `users.db/exams.db/scores.db/config.db` 同步到远端目录（不包含 `admin.db`）。
+- 拉取：仅从远端目录拉取 `scores.db` 到本地缓存并自动合并到本地成绩库，再进行推送以回传合并后的最新成绩。
 - 设备配置字段：
-  - 名称、IP、用户名、远程路径、SSH密码（可选）
+  - 名称、IP、用户名、远程路径（目录）、SSH密码（可选）
 - 支持无密码（密钥）或 `sshpass` 密码方式
 
 ## 试题与题目

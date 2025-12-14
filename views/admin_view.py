@@ -11,13 +11,13 @@ from PySide6.QtCore import Qt, QThread, Signal, QSize, QRegularExpression, QDate
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QFormLayout, QSpinBox, QDateTimeEdit, QFileDialog, QTabWidget, QTableWidget, QTableWidgetItem, QGroupBox, QCheckBox, QComboBox, QMessageBox, QProgressDialog, QListView, QAbstractItemView, QTextBrowser
 from PySide6.QtGui import QRegularExpressionValidator
 from utils import show_info, show_warn, ask_yes_no
-from database import DB_PATH
+from database import DB_DIR
 from models import list_users, create_user, list_exams, add_exam, import_questions_from_json, list_sync_targets, upsert_sync_target, delete_user, update_user_role, update_user_active, delete_sync_target, update_sync_target, get_exam_title, get_exam_stats, update_exam_random_pick_count
 from theme_manager import theme_manager
 from language import tr
 from icon_manager import get_icon
 from status_indicators import LoadingIndicator
-from sync import rsync_push, rsync_pull
+from sync import rsync_push, rsync_pull_scores
 
 class SyncWorker(QThread):
     progress = Signal(str)
@@ -32,32 +32,57 @@ class SyncWorker(QThread):
         for t in self.targets:
             try:
                 ssh_password = t[5] if len(t) > 5 else None
-                if self.operation == 'push':
-                    code, out, err = rsync_push(t[2], t[3], t[4], ssh_password)
-                    if code == 0:
-                        result = f'{t[1]} ({t[2]}) 推送成功'
-                    else:
-                        result = f'{t[1]} ({t[2]}) 推送失败: {err or "未知错误"}'
-                else:
-                    base_dir = os.path.join(os.path.dirname(DB_PATH), 'pulled')
+                if self.operation == 'sync':
+                    base_dir = os.path.join(DB_DIR, 'pulled')
                     os.makedirs(base_dir, exist_ok=True)
                     ip = t[2]
                     dest_dir = os.path.join(base_dir, ip)
                     os.makedirs(dest_dir, exist_ok=True)
-                    code, out, err = rsync_pull(ip, t[3], t[4], dest_dir, ssh_password)
+                    pull_msg = ''
+                    code, out, err = rsync_pull_scores(ip, t[3], t[4], dest_dir, ssh_password)
+                    if code == 0:
+                        pull_msg = f'{t[1]} ({ip}) 拉取成功'
+                        rp = os.path.join(dest_dir, 'scores.db')
+                        try:
+                            from models import merge_remote_scores_db
+                            merge_remote_scores_db(rp)
+                            pull_msg += ' (成绩已合并)'
+                        except Exception as me:
+                            pull_msg += f' (合并失败: {str(me)})'
+                    else:
+                        pull_msg = f'{t[1]} ({ip}) 未找到远端成绩，跳过合并'
+                    self.progress.emit(pull_msg)
+                    code2, out2, err2 = rsync_push(t[2], t[3], t[4], ssh_password)
+                    if code2 == 0:
+                        push_msg = f'{t[1]} ({t[2]}) 上传完成'
+                    else:
+                        push_msg = f'{t[1]} ({t[2]}) 上传失败: {err2 or "未知错误"}'
+                    self.progress.emit(push_msg)
+                    result = pull_msg + '；' + push_msg
+                elif self.operation == 'push':
+                    code, out, err = rsync_push(t[2], t[3], t[4], ssh_password)
+                    result = f'{t[1]} ({t[2]}) ' + ('推送成功' if code == 0 else f'推送失败: {err or "未知错误"}')
+                    self.progress.emit(result)
+                else:
+                    base_dir = os.path.join(DB_DIR, 'pulled')
+                    os.makedirs(base_dir, exist_ok=True)
+                    ip = t[2]
+                    dest_dir = os.path.join(base_dir, ip)
+                    os.makedirs(dest_dir, exist_ok=True)
+                    code, out, err = rsync_pull_scores(ip, t[3], t[4], dest_dir, ssh_password)
                     if code == 0:
                         result = f'{t[1]} ({ip}) 拉取成功'
-                        rp = os.path.join(dest_dir, os.path.basename(t[4]))
+                        rp = os.path.join(dest_dir, 'scores.db')
                         try:
-                            from models import merge_remote_db
-                            merge_remote_db(rp)
+                            from models import merge_remote_scores_db
+                            merge_remote_scores_db(rp)
                             result += ' (成绩已合并)'
                         except Exception as me:
                             result += f' (合并失败: {str(me)})'
                     else:
                         result = f'{t[1]} ({ip}) 拉取失败: {err or "未知错误"}'
+                    self.progress.emit(result)
                 results.append(result)
-                self.progress.emit(result)
             except Exception as e:
                 error_msg = f'{t[1]} 错误: {str(e)}'
                 results.append(error_msg)
@@ -389,10 +414,6 @@ class AdminView(QWidget):
         self.ex_time.setRange(1, 600)
         self.ex_time.setValue(60)
         self.ex_time.setStyleSheet(spin_style)
-        self.ex_random_count = QSpinBox()
-        self.ex_random_count.setRange(0, 1000)
-        self.ex_random_count.setValue(4)
-        self.ex_random_count.setStyleSheet(spin_style)
         self.ex_end = QDateTimeEdit()
         self.ex_end.setDateTime(QDateTime.currentDateTime())
         self.ex_end.setDisplayFormat('yyyy-MM-dd HH:mm')
@@ -440,7 +461,7 @@ class AdminView(QWidget):
         form.addRow(tr('admin.exams.form.pass_ratio'), self.ex_pass)
         form.addRow(tr('admin.exams.form.time_limit'), self.ex_time)
         form.addRow(tr('admin.exams.form.end_date'), self.ex_end)
-        form.addRow(tr('admin.exams.form.random_pick'), self.ex_random_count)
+        # 随机抽取数量改为仅在 Excel 导入配置，界面不提供该项
         form.addRow('', self.ex_permanent)
         add_btn = QPushButton(tr('admin.exams.add_btn'))
         add_btn.setIcon(get_icon('exam_add'))
@@ -526,7 +547,7 @@ class AdminView(QWidget):
         if not title:
             show_warn(self, tr('common.error'), tr('error.title_required'))
             return
-        add_exam(title, desc, pass_ratio, tl, end, self.ex_random_count.value())
+        add_exam(title, desc, pass_ratio, tl, end)
         self.refresh_exams()
         show_info(self, tr('common.success'), tr('info.exam_added'))
     def get_selected_exam_id(self):
@@ -942,14 +963,10 @@ class AdminView(QWidget):
         hb_tpl.addWidget(btn_import_targets_excel)
         lay.addLayout(hb_tpl)
         hb = QHBoxLayout()
-        self.push_btn = QPushButton(tr('sync.push_btn'))
-        self.push_btn.setIcon(get_icon('push'))
-        self.push_btn.clicked.connect(self.push_all)
-        self.pull_btn = QPushButton(tr('sync.pull_btn'))
-        self.pull_btn.setIcon(get_icon('pull'))
-        self.pull_btn.clicked.connect(self.pull_all)
-        hb.addWidget(self.push_btn)
-        hb.addWidget(self.pull_btn)
+        self.sync_btn = QPushButton(tr('sync.sync_btn'))
+        self.sync_btn.setIcon(get_icon('push'))
+        self.sync_btn.clicked.connect(self.sync_all)
+        hb.addWidget(self.sync_btn)
         lay.addLayout(hb)
         self.sync_spinner = LoadingIndicator(self)
         self.sync_spinner.hide()
@@ -1364,7 +1381,7 @@ class AdminView(QWidget):
         self.sync_worker.progress.connect(self.append_sync_log)
         self.sync_worker.progress.connect(self.update_progress_message)
         self.sync_worker.start()
-        self.show_sync_progress('正在同步题库到设备，请稍候...')
+        self.show_sync_progress(tr('sync.pushing_message'))
     def pull_all(self):
         targets = list_sync_targets()
         if not targets:
@@ -1385,7 +1402,27 @@ class AdminView(QWidget):
         self.sync_worker.progress.connect(self.append_sync_log)
         self.sync_worker.progress.connect(self.update_progress_message)
         self.sync_worker.start()
-        self.show_sync_progress('正在拉取成绩，请稍候...')
+        self.show_sync_progress(tr('sync.pulling_message'))
+
+    def sync_all(self):
+        targets = list_sync_targets()
+        if not targets:
+            show_info(self, tr('sync.status.info'), tr('info.no_targets'))
+            return
+        self.set_sync_buttons_enabled(False)
+        if hasattr(self, 'sync_btn'):
+            self.sync_btn.setEnabled(False)
+        if hasattr(self, 'sync_spinner'):
+            self.sync_spinner.show()
+        if hasattr(self, 'sync_log'):
+            self.sync_log.clear()
+        self.sync_worker = SyncWorker(targets, 'sync')
+        self.sync_worker.finished.connect(self.on_sync_finished)
+        self.sync_worker.error.connect(self.on_sync_error)
+        self.sync_worker.progress.connect(self.append_sync_log)
+        self.sync_worker.progress.connect(self.update_progress_message)
+        self.sync_worker.start()
+        self.show_sync_progress(tr('sync.syncing_message'))
 
     def update_progress_message(self, msg):
         try:
@@ -1420,10 +1457,8 @@ class AdminView(QWidget):
             if widget:
                 for child in widget.findChildren(QPushButton):
                     child.setEnabled(enabled)
-        if hasattr(self, 'push_btn'):
-            self.push_btn.setEnabled(enabled)
-        if hasattr(self, 'pull_btn'):
-            self.pull_btn.setEnabled(enabled)
+        if hasattr(self, 'sync_btn'):
+            self.sync_btn.setEnabled(enabled)
     def on_sync_finished(self, results):
         self.set_sync_buttons_enabled(True)
         if hasattr(self, 'sync_worker'):
@@ -1436,8 +1471,7 @@ class AdminView(QWidget):
             except Exception:
                 pass
             self.sync_progress_dialog = None
-        if '拉取' in results:
-            self.refresh_scores()
+        self.refresh_scores()
         show_info(self, tr('sync.finished.title'), tr('sync.operation_done', results=results))
     def on_sync_error(self, error):
         self.set_sync_buttons_enabled(True)

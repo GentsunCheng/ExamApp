@@ -1,7 +1,16 @@
 import random
 import uuid
 from datetime import datetime
-from database import get_conn, now_iso, ensure_key_probe, verify_db_encryption_key
+from database import (
+    get_admin_conn,
+    get_user_conn,
+    get_exam_conn,
+    get_score_conn,
+    get_config_conn,
+    now_iso,
+    ensure_key_probe,
+    verify_db_encryption_key,
+)
 from utils import hash_password, verify_password
 import sqlite3
 from crypto_util import encrypt_text, decrypt_text, encrypt_json, decrypt_json
@@ -13,15 +22,15 @@ except Exception:
     SERECT_KEY = 'example'
 
 def create_admin_if_absent():
-    conn = get_conn()
+    conn = get_admin_conn()
     c = conn.cursor()
-    c.execute('SELECT COUNT(*) FROM users WHERE role=?', ('admin',))
+    c.execute('SELECT COUNT(*) FROM admins')
     count = c.fetchone()[0]
     if count == 0:
         try:
-            c.execute('INSERT INTO users (username, password_hash, role, active, created_at, full_name) VALUES (?,?,?,?,?,?)', ('admin', hash_password('admin'), 'admin', 1, now_iso(), encrypt_text('管理员')))
+            c.execute('INSERT INTO admins (username, password_hash, active, created_at, full_name) VALUES (?,?,?,?,?)', ('admin', hash_password('admin'), 1, now_iso(), encrypt_text('管理员')))
         except Exception:
-            c.execute('INSERT INTO users (username, password_hash, role, active, created_at) VALUES (?,?,?,?,?)', ('admin', hash_password('admin'), 'admin', 1, now_iso()))
+            c.execute('INSERT INTO admins (username, password_hash, active, created_at) VALUES (?,?,?,?)', ('admin', hash_password('admin'), 1, now_iso()))
         conn.commit()
     conn.close()
 
@@ -33,7 +42,7 @@ def verify_encryption_ok():
         return False
 
 def create_user(username, password, role='user', active=1, full_name=None):
-    conn = get_conn()
+    conn = get_user_conn()
     c = conn.cursor()
     try:
         c.execute('INSERT INTO users (username, password_hash, role, active, created_at, full_name) VALUES (?,?,?,?,?,?)', (username, hash_password(password), role, active, now_iso(), encrypt_text(full_name) if full_name is not None else None))
@@ -43,11 +52,24 @@ def create_user(username, password, role='user', active=1, full_name=None):
     conn.close()
 
 def authenticate(username, password):
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute('SELECT id, username, password_hash, role, active, full_name FROM users WHERE username=?', (username,))
-    row = c.fetchone()
-    conn.close()
+    # 先查管理员库
+    conn_a = get_admin_conn()
+    ca = conn_a.cursor()
+    ca.execute('SELECT id, username, password_hash, active, full_name FROM admins WHERE username=?', (username,))
+    row_a = ca.fetchone()
+    conn_a.close()
+    if row_a:
+        if row_a[3] != 1:
+            return None
+        if not verify_password(password, row_a[2]):
+            return None
+        return {'id': row_a[0], 'username': row_a[1], 'role': 'admin', 'full_name': decrypt_text(row_a[4]) if len(row_a) > 4 else None}
+    # 再查用户库
+    conn_u = get_user_conn()
+    cu = conn_u.cursor()
+    cu.execute('SELECT id, username, password_hash, role, active, full_name FROM users WHERE username=?', (username,))
+    row = cu.fetchone()
+    conn_u.close()
     if not row:
         return None
     if row[4] != 1:
@@ -57,7 +79,7 @@ def authenticate(username, password):
     return {'id': row[0], 'username': row[1], 'role': row[3], 'full_name': decrypt_text(row[5]) if len(row) > 5 else None}
 
 def list_users():
-    conn = get_conn()
+    conn = get_user_conn()
     c = conn.cursor()
     try:
         c.execute('SELECT id, username, full_name, role, active, created_at FROM users ORDER BY id DESC')
@@ -72,14 +94,14 @@ def list_users():
     return out
 
 def add_exam(title, description, pass_ratio, time_limit_minutes, end_date, random_pick_count=0):
-    conn = get_conn()
+    conn = get_exam_conn()
     c = conn.cursor()
     c.execute('INSERT INTO exams (title, description, pass_ratio, time_limit_minutes, end_date, created_at, random_pick_count) VALUES (?,?,?,?,?,?,?)', (encrypt_text(title), encrypt_text(description) if description is not None else None, float(pass_ratio), int(time_limit_minutes), end_date, now_iso(), int(random_pick_count)))
     conn.commit()
     conn.close()
 
 def list_exams(include_expired=False):
-    conn = get_conn()
+    conn = get_exam_conn()
     c = conn.cursor()
     if include_expired:
         c.execute('SELECT id, title, description, pass_ratio, time_limit_minutes, end_date FROM exams ORDER BY id DESC')
@@ -93,7 +115,7 @@ def list_exams(include_expired=False):
     return out
 
 def get_exam_title(exam_id):
-    conn = get_conn()
+    conn = get_exam_conn()
     c = conn.cursor()
     c.execute('SELECT title FROM exams WHERE id=?', (exam_id,))
     row = c.fetchone()
@@ -101,14 +123,14 @@ def get_exam_title(exam_id):
     return decrypt_text(row[0]) if row else None
 
 def add_question(exam_id, qtype, text, options, correct_answers, score):
-    conn = get_conn()
+    conn = get_exam_conn()
     c = conn.cursor()
     c.execute('INSERT INTO questions (exam_id, type, text, options, correct_answers, score) VALUES (?,?,?,?,?,?)', (exam_id, qtype, encrypt_text(text), encrypt_json(options or []), encrypt_json(correct_answers), float(score)))
     conn.commit()
     conn.close()
 
 def list_questions(exam_id):
-    conn = get_conn()
+    conn = get_exam_conn()
     c = conn.cursor()
     c.execute('SELECT id, type, text, options, correct_answers, score FROM questions WHERE exam_id=? ORDER BY id', (exam_id,))
     rows = c.fetchall()
@@ -119,7 +141,7 @@ def list_questions(exam_id):
     return result
 
 def get_exam_stats(exam_id):
-    conn = get_conn()
+    conn = get_exam_conn()
     c = conn.cursor()
     c.execute('SELECT COUNT(*), COALESCE(SUM(score), 0) FROM questions WHERE exam_id=?', (exam_id,))
     row = c.fetchone()
@@ -129,7 +151,7 @@ def get_exam_stats(exam_id):
     return {'count': cnt, 'total_score': total}
 
 def import_questions_from_json(exam_id, payload):
-    conn = get_conn()
+    conn = get_exam_conn()
     c = conn.cursor()
     for q in payload:
         pool = (q.get('pool') or q.get('category') or 'mandatory')
@@ -138,28 +160,34 @@ def import_questions_from_json(exam_id, payload):
     conn.close()
 
 def clear_exam_questions(exam_id):
-    conn = get_conn()
+    conn = get_exam_conn()
     c = conn.cursor()
     c.execute('DELETE FROM questions WHERE exam_id=?', (exam_id,))
     conn.commit()
     conn.close()
 
 def delete_exam(exam_id):
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute('SELECT uuid FROM attempts WHERE exam_id=?', (exam_id,))
-    uuids = [r[0] for r in c.fetchall()]
+    # 删除成绩库中的关联记录
+    scon = get_score_conn()
+    sc = scon.cursor()
+    sc.execute('SELECT uuid FROM attempts WHERE exam_id=?', (exam_id,))
+    uuids = [r[0] for r in sc.fetchall()]
     for u in uuids:
-        c.execute('DELETE FROM attempt_answers WHERE attempt_uuid=?', (u,))
-    c.execute('DELETE FROM attempts WHERE exam_id=?', (exam_id,))
-    c.execute('DELETE FROM questions WHERE exam_id=?', (exam_id,))
-    c.execute('DELETE FROM exams WHERE id=?', (exam_id,))
-    conn.commit()
-    conn.close()
+        sc.execute('DELETE FROM attempt_answers WHERE attempt_uuid=?', (u,))
+    sc.execute('DELETE FROM attempts WHERE exam_id=?', (exam_id,))
+    scon.commit()
+    scon.close()
+    # 删除题库中的题目与试卷
+    econn = get_exam_conn()
+    ec = econn.cursor()
+    ec.execute('DELETE FROM questions WHERE exam_id=?', (exam_id,))
+    ec.execute('DELETE FROM exams WHERE id=?', (exam_id,))
+    econn.commit()
+    econn.close()
 
 def start_attempt(user_id, exam_id, total_score):
     a_uuid = str(uuid.uuid4())
-    conn = get_conn()
+    conn = get_score_conn()
     c = conn.cursor()
     ts = now_iso()
     checksum = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(a_uuid), str(user_id), str(exam_id), str(ts), '-', str(0.0), str(0), str(total_score)])).encode('utf-8'), hashlib.sha256).hexdigest()
@@ -169,7 +197,7 @@ def start_attempt(user_id, exam_id, total_score):
     return a_uuid
 
 def save_answer(attempt_uuid, question_id, selected):
-    conn = get_conn()
+    conn = get_score_conn()
     c = conn.cursor()
     c.execute('DELETE FROM attempt_answers WHERE attempt_uuid=? AND question_id=?', (attempt_uuid, question_id))
     c.execute('INSERT INTO attempt_answers (attempt_uuid, question_id, selected) VALUES (?,?,?)', (attempt_uuid, question_id, encrypt_json(selected)))
@@ -177,7 +205,7 @@ def save_answer(attempt_uuid, question_id, selected):
     conn.close()
 
 def submit_attempt(attempt_uuid):
-    conn = get_conn()
+    conn = get_score_conn()
     c = conn.cursor()
     c.execute('SELECT exam_id, user_id, started_at, total_score FROM attempts WHERE uuid=?', (attempt_uuid,))
     row = c.fetchone()
@@ -196,8 +224,12 @@ def submit_attempt(attempt_uuid):
         answers[r[0]] = val if val is not None else []
     for q in qs:
         total += float(q['score']) if grade_question(q, answers.get(q['id'])) else 0.0
-    c.execute('SELECT pass_ratio FROM exams WHERE id=?', (exam_id,))
-    pass_ratio = c.fetchone()[0]
+    # 从题库查询通过比例
+    econn = get_exam_conn()
+    ec = econn.cursor()
+    ec.execute('SELECT pass_ratio FROM exams WHERE id=?', (exam_id,))
+    pass_ratio = ec.fetchone()[0]
+    econn.close()
     denom = attempt_total if attempt_total > 0 else sum(float(q['score']) for q in qs)
     passed = 1 if (denom > 0 and total / denom >= pass_ratio) else 0
     sub_ts = now_iso()
@@ -221,7 +253,7 @@ def grade_question(q, sel):
     return False
 
 def list_attempts(user_id=None):
-    conn = get_conn()
+    conn = get_score_conn()
     c = conn.cursor()
     if user_id:
         c.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, total_score, checksum FROM attempts WHERE user_id=? ORDER BY id DESC', (user_id,))
@@ -237,26 +269,40 @@ def list_attempts(user_id=None):
     return out
 
 def list_attempts_with_user():
-    conn = get_conn()
+    # 先取成绩
+    conn = get_score_conn()
     c = conn.cursor()
-    try:
-        c.execute('SELECT a.uuid, u.username, u.full_name, a.user_id, a.exam_id, a.started_at, a.submitted_at, a.score, a.passed, a.total_score, a.checksum FROM attempts a JOIN users u ON a.user_id=u.id ORDER BY a.id DESC')
-    except Exception:
-        c.execute('SELECT a.uuid, u.username, NULL as full_name, a.user_id, a.exam_id, a.started_at, a.submitted_at, a.score, a.passed, a.total_score, a.checksum FROM attempts a JOIN users u ON a.user_id=u.id ORDER BY a.id DESC')
+    c.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, total_score, checksum FROM attempts ORDER BY id DESC')
     rows = c.fetchall()
     conn.close()
+    # 批量映射用户
+    user_ids = sorted({r[1] for r in rows})
+    uconn = get_user_conn()
+    uc = uconn.cursor()
+    users_map = {}
+    if user_ids:
+        placeholders = ','.join(['?'] * len(user_ids))
+        try:
+            uc.execute(f'SELECT id, username, full_name FROM users WHERE id IN ({placeholders})', tuple(user_ids))
+            for ur in uc.fetchall():
+                users_map[ur[0]] = (ur[1], ur[2])
+        except Exception:
+            uc.execute(f'SELECT id, username, NULL as full_name FROM users WHERE id IN ({placeholders})', tuple(user_ids))
+            for ur in uc.fetchall():
+                users_map[ur[0]] = (ur[1], ur[2])
+    uconn.close()
     out = []
     for r in rows:
-        fn = r[2]
-        expect = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(r[0]), str(r[3]), str(r[4]), str(r[5]), str(r[6]) if r[6] else '-', str(r[7]), str(r[8]), str(r[9])])).encode('utf-8'), hashlib.sha256).hexdigest()
-        valid = str(r[10] or '') == expect
-        out.append((r[0], r[1], decrypt_text(fn) if fn else None, r[3], r[4], r[5], r[6], r[7], r[8], r[9], 1 if valid else 0))
+        uname, fn = users_map.get(r[1], (None, None))
+        expect = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(r[0]), str(r[1]), str(r[2]), str(r[3]), str(r[4]) if r[4] else '-', str(r[5]), str(r[6]), str(r[7])])).encode('utf-8'), hashlib.sha256).hexdigest()
+        valid = str(r[8] or '') == expect
+        out.append((r[0], uname, decrypt_text(fn) if fn else None, r[1], r[2], r[3], r[4], r[5], r[6], r[7], 1 if valid else 0))
     return out
 
-def merge_remote_db(remote_db_path):
-    lconn = get_conn()
+def merge_remote_scores_db(remote_scores_db_path):
+    lconn = get_score_conn()
     lcur = lconn.cursor()
-    rconn = sqlite3.connect(remote_db_path)
+    rconn = sqlite3.connect(remote_scores_db_path)
     rcur = rconn.cursor()
     rcur.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, total_score, checksum FROM attempts')
     remote_rows = rcur.fetchall()
@@ -273,28 +319,28 @@ def merge_remote_db(remote_db_path):
     lconn.close()
 
 def delete_user(user_id):
-    conn = get_conn()
+    conn = get_user_conn()
     c = conn.cursor()
     c.execute('DELETE FROM users WHERE id=?', (user_id,))
     conn.commit()
     conn.close()
 
 def update_user_role(user_id, role):
-    conn = get_conn()
+    conn = get_user_conn()
     c = conn.cursor()
     c.execute('UPDATE users SET role=? WHERE id=?', (role, user_id))
     conn.commit()
     conn.close()
 
 def update_user_active(user_id, active):
-    conn = get_conn()
+    conn = get_user_conn()
     c = conn.cursor()
     c.execute('UPDATE users SET active=? WHERE id=?', (active, user_id))
     conn.commit()
     conn.close()
 
 def update_user_basic(user_id, username=None, full_name=None):
-    conn = get_conn()
+    conn = get_user_conn()
     c = conn.cursor()
     if username is not None and full_name is not None:
         c.execute('UPDATE users SET username=?, full_name=? WHERE id=?', (username, encrypt_text(full_name), user_id))
@@ -306,7 +352,7 @@ def update_user_basic(user_id, username=None, full_name=None):
     conn.close()
 
 def update_exam_title_desc(exam_id, title=None, description=None):
-    conn = get_conn()
+    conn = get_exam_conn()
     c = conn.cursor()
     if title is not None and description is not None:
         c.execute('UPDATE exams SET title=?, description=? WHERE id=?', (encrypt_text(title), encrypt_text(description) if description is not None else None, exam_id))
@@ -318,14 +364,14 @@ def update_exam_title_desc(exam_id, title=None, description=None):
     conn.close()
 
 def delete_sync_target(target_id):
-    conn = get_conn()
+    conn = get_config_conn()
     c = conn.cursor()
     c.execute('DELETE FROM sync_targets WHERE id=?', (target_id,))
     conn.commit()
     conn.close()
 
 def update_sync_target(target_id, name, ip, username, remote_path, ssh_password=None):
-    conn = get_conn()
+    conn = get_config_conn()
     c = conn.cursor()
     if ssh_password is not None:
         c.execute('UPDATE sync_targets SET name=?, ip=?, username=?, remote_path=?, ssh_password=? WHERE id=?', (name, ip, username, remote_path, encrypt_text(ssh_password), target_id))
@@ -335,14 +381,14 @@ def update_sync_target(target_id, name, ip, username, remote_path, ssh_password=
     conn.close()
 
 def upsert_sync_target(name, ip, username, remote_path, ssh_password=None):
-    conn = get_conn()
+    conn = get_config_conn()
     c = conn.cursor()
     c.execute('INSERT INTO sync_targets (name, ip, username, remote_path, ssh_password) VALUES (?,?,?,?,?)', (name, ip, username, remote_path, encrypt_text(ssh_password) if ssh_password is not None else None))
     conn.commit()
     conn.close()
 
 def list_sync_targets():
-    conn = get_conn()
+    conn = get_config_conn()
     c = conn.cursor()
     c.execute('SELECT id, name, ip, username, remote_path, ssh_password FROM sync_targets ORDER BY id DESC')
     rows = c.fetchall()
@@ -353,7 +399,7 @@ def list_sync_targets():
     return out
 
 def list_questions_by_pool(exam_id, pool):
-    conn = get_conn()
+    conn = get_exam_conn()
     c = conn.cursor()
     try:
         c.execute('SELECT id, type, text, options, correct_answers, score FROM questions WHERE exam_id=? AND (pool=? OR (pool IS NULL AND ?="mandatory")) ORDER BY id', (exam_id, pool, pool))
@@ -367,7 +413,7 @@ def list_questions_by_pool(exam_id, pool):
     return out
 
 def get_exam_random_pick_count(exam_id):
-    conn = get_conn()
+    conn = get_exam_conn()
     c = conn.cursor()
     try:
         c.execute('SELECT random_pick_count FROM exams WHERE id=?', (exam_id,))
@@ -379,7 +425,7 @@ def get_exam_random_pick_count(exam_id):
         return 0
 
 def update_exam_random_pick_count(exam_id, count):
-    conn = get_conn()
+    conn = get_exam_conn()
     c = conn.cursor()
     try:
         c.execute('UPDATE exams SET random_pick_count=? WHERE id=?', (int(count), exam_id))
