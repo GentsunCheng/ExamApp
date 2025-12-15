@@ -96,11 +96,23 @@ def _check_remote_file_exists(ip, username, remote_path, ssh_password=None):
     r2 = _run_ssh(ip, username, cmd2, ssh_password)
     return (r2.returncode == 0) and ('exists' in (r2.stdout or ''))
 
-def rsync_push(ip, username, remote_dir, ssh_password=None):
-    """Push selected local databases to remote directory (skip admin, skip exams)"""
+def _expand_remote_tilde(remote_dir, ip, username, ssh_password=None):
     if remote_dir and remote_dir.startswith('~'):
         base = _get_remote_cwd(ip, username, ssh_password) or ''
-        remote_dir = (base + remote_dir[1:]) if base else remote_dir
+        if base:
+            return base + remote_dir[1:]
+    return remote_dir
+
+def _remote_join(remote_dir, *parts):
+    sep = '\\' if ('\\' in remote_dir and '/' not in remote_dir) else '/'
+    out = remote_dir.rstrip('/\\')
+    for p in parts:
+        out += sep + str(p).strip('/\\')
+    return out
+
+def rsync_push(ip, username, remote_dir, ssh_password=None):
+    """Push selected local databases to remote directory (skip admin)"""
+    remote_dir = _expand_remote_tilde(remote_dir, ip, username, ssh_password)
     local_files = [SCORES_DB_PATH, EXAMS_DB_PATH, USERS_DB_PATH, CONFIG_DB_PATH]
     code_mk, out_mk, err_mk = _ensure_remote_dir(ip, username, remote_dir, ssh_password)
     if code_mk != 0:
@@ -116,10 +128,8 @@ def rsync_push(ip, username, remote_dir, ssh_password=None):
 def rsync_pull_scores(ip, username, remote_dir, local_dir, ssh_password=None):
     """Pull scores.db from remote directory to local_dir using rsync"""
     os.makedirs(local_dir, exist_ok=True)
-    if remote_dir and remote_dir.startswith('~'):
-        base = _get_remote_cwd(ip, username, ssh_password) or ''
-        remote_dir = (base + remote_dir[1:]) if base else remote_dir
-    remote_scores = os.path.join(remote_dir, 'scores.db')
+    remote_dir = _expand_remote_tilde(remote_dir, ip, username, ssh_password)
+    remote_scores = _remote_join(remote_dir, 'scores.db')
     exists = _check_remote_file_exists(ip, username, remote_scores, ssh_password)
     if not exists:
         return 1, '', f'Remote file not found: {remote_scores}'
