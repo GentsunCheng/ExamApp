@@ -101,7 +101,7 @@ def rsync_push(ip, username, remote_dir, ssh_password=None):
     if remote_dir and remote_dir.startswith('~'):
         base = _get_remote_cwd(ip, username, ssh_password) or ''
         remote_dir = (base + remote_dir[1:]) if base else remote_dir
-    local_files = [SCORES_DB_PATH, USERS_DB_PATH, CONFIG_DB_PATH]
+    local_files = [SCORES_DB_PATH, EXAMS_DB_PATH, USERS_DB_PATH, CONFIG_DB_PATH]
     code_mk, out_mk, err_mk = _ensure_remote_dir(ip, username, remote_dir, ssh_password)
     if code_mk != 0:
         return code_mk, out_mk, f"Failed to create remote directory '{remote_dir}': {err_mk}"
