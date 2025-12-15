@@ -13,6 +13,10 @@ class ExamWindow(QMainWindow):
     instance = None
     def __init__(self, user, exam_id, parent=None):
         super().__init__(parent)
+        try:
+            print(f"[DEBUG] ExamWindow init user={user.get('username')} exam_id={exam_id}")
+        except Exception:
+            pass
         if ExamWindow.instance is not None and ExamWindow.instance.isVisible():
             show_info(self, tr('common.hint'), tr('exam.already_running'))
             try:

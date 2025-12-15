@@ -33,6 +33,7 @@ class ModernTimer(QLabel):
         self.timer.timeout.connect(self.update_timer)
         
         # 动画效果
+        self._pulse_scale = 1.0
         self.pulse_animation = QPropertyAnimation(self, b"pulse_scale")
         self.pulse_animation.setDuration(1000)
         self.pulse_animation.setEasingCurve(QEasingCurve.Type.InOutSine)
@@ -42,7 +43,6 @@ class ModernTimer(QLabel):
             self.pulse_animation.setLoopCount(-1)
         except Exception:
             pass
-        self._pulse_scale = 1.0
         
         self.setup_ui()
         self.update_style()
@@ -178,7 +178,10 @@ class ModernTimer(QLabel):
         self.update_display()
 
     def get_pulse_scale(self):
-        return self._pulse_scale
+        try:
+            return float(getattr(self, "_pulse_scale", 1.0))
+        except Exception:
+            return 1.0
 
     def set_pulse_scale(self, value):
         try:

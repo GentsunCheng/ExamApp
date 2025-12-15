@@ -51,6 +51,16 @@ def create_user(username, password, role='user', active=1, full_name=None):
     conn.commit()
     conn.close()
 
+def create_admin(username, password, active=1, full_name=None):
+    conn = get_admin_conn()
+    c = conn.cursor()
+    try:
+        c.execute('INSERT INTO admins (username, password_hash, active, created_at, full_name) VALUES (?,?,?,?,?)', (username, hash_password(password), active, now_iso(), encrypt_text(full_name) if full_name is not None else None))
+    except Exception:
+        c.execute('INSERT INTO admins (username, password_hash, active, created_at) VALUES (?,?,?,?)', (username, hash_password(password), active, now_iso()))
+    conn.commit()
+    conn.close()
+
 def authenticate(username, password):
     # 先查管理员库
     conn_a = get_admin_conn()
@@ -92,6 +102,116 @@ def list_users():
         fn = r[2]
         out.append((r[0], r[1], decrypt_text(fn) if fn else None, r[3], r[4], r[5]))
     return out
+
+def list_admins():
+    conn = get_admin_conn()
+    c = conn.cursor()
+    try:
+        c.execute('SELECT id, username, full_name, active, created_at FROM admins ORDER BY id DESC')
+    except Exception:
+        c.execute('SELECT id, username, NULL as full_name, active, created_at FROM admins ORDER BY id DESC')
+    rows = c.fetchall()
+    conn.close()
+    out = []
+    for r in rows:
+        fn = r[2]
+        out.append((r[0], r[1], decrypt_text(fn) if fn else None, 'admin', r[3], r[4]))
+    return out
+
+def update_admin_active(admin_id, active):
+    conn = get_admin_conn()
+    c = conn.cursor()
+    if int(active) == 0:
+        try:
+            c.execute('SELECT COUNT(*) FROM admins WHERE active=1 AND id!=?', (admin_id,))
+            remain = c.fetchone()[0]
+            if int(remain or 0) <= 0:
+                conn.close()
+                raise Exception('至少保留一个启用的管理员')
+        except Exception:
+            pass
+    c.execute('UPDATE admins SET active=? WHERE id=?', (int(active), admin_id))
+    conn.commit()
+    conn.close()
+
+def update_admin_basic(admin_id, username=None, full_name=None):
+    conn = get_admin_conn()
+    c = conn.cursor()
+    if username is not None and full_name is not None:
+        c.execute('UPDATE admins SET username=?, full_name=? WHERE id=?', (username, encrypt_text(full_name), admin_id))
+    elif username is not None:
+        c.execute('UPDATE admins SET username=? WHERE id=?', (username, admin_id))
+    elif full_name is not None:
+        c.execute('UPDATE admins SET full_name=? WHERE id=?', (encrypt_text(full_name), admin_id))
+    conn.commit()
+    conn.close()
+
+def delete_admin(admin_id):
+    conn = get_admin_conn()
+    c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM admins WHERE id!=?', (admin_id,))
+    remain_total = c.fetchone()[0]
+    if int(remain_total or 0) <= 0:
+        conn.close()
+        raise Exception('至少保留一个管理员')
+    try:
+        c.execute('SELECT COUNT(*) FROM admins WHERE active=1 AND id!=?', (admin_id,))
+        remain_active = c.fetchone()[0]
+        if int(remain_active or 0) <= 0:
+            conn.close()
+            raise Exception('至少保留一个启用的管理员')
+    except Exception:
+        pass
+    c.execute('DELETE FROM admins WHERE id=?', (admin_id,))
+    conn.commit()
+    conn.close()
+
+def demote_admin_to_user(admin_id):
+    aconn = get_admin_conn()
+    ac = aconn.cursor()
+    ac.execute('SELECT username, password_hash, active, full_name FROM admins WHERE id=?', (admin_id,))
+    row = ac.fetchone()
+    aconn.close()
+    if not row:
+        raise Exception('管理员不存在')
+    username, pwd_hash, active, full_name_cipher = row[0], row[1], int(row[2] or 0), row[3]
+    uconn = get_user_conn()
+    uc = uconn.cursor()
+    uc.execute('SELECT COUNT(*) FROM users WHERE username=?', (username,))
+    if int(uc.fetchone()[0] or 0) > 0:
+        uconn.close()
+        raise Exception('用户名已存在于用户库')
+    try:
+        uc.execute('INSERT INTO users (username, password_hash, role, active, created_at, full_name) VALUES (?,?,?,?,?,?)', (username, pwd_hash, 'user', active, now_iso(), full_name_cipher))
+        uconn.commit()
+    finally:
+        uconn.close()
+    delete_admin(admin_id)
+
+def promote_user_to_admin(user_id):
+    uconn = get_user_conn()
+    uc = uconn.cursor()
+    uc.execute('SELECT username, password_hash, active, full_name FROM users WHERE id=?', (user_id,))
+    row = uc.fetchone()
+    if not row:
+        uconn.close()
+        raise Exception('用户不存在')
+    username, pwd_hash, active, full_name_cipher = row[0], row[1], int(row[2] or 0), row[3]
+    aconn = get_admin_conn()
+    ac = aconn.cursor()
+    ac.execute('SELECT COUNT(*) FROM admins WHERE username=?', (username,))
+    if int(ac.fetchone()[0] or 0) > 0:
+        aconn.close()
+        uconn.close()
+        raise Exception('用户名已存在于管理员库')
+    try:
+        ac.execute('INSERT INTO admins (username, password_hash, active, created_at, full_name) VALUES (?,?,?,?,?)', (username, pwd_hash, active, now_iso(), full_name_cipher))
+        aconn.commit()
+    finally:
+        aconn.close()
+    uc.execute('DELETE FROM users WHERE id=?', (user_id,))
+    uconn.commit()
+    uconn.close()
 
 def add_exam(title, description, pass_ratio, time_limit_minutes, end_date, random_pick_count=0):
     conn = get_exam_conn()

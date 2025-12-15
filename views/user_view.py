@@ -7,6 +7,8 @@ from language import tr
 from utils import show_info, show_warn, ask_yes_no
 from models import list_exams, list_attempts, get_exam_title, get_exam_stats, list_questions
 from windows.exam_window import ExamWindow
+from views.user_modules.exams_module import UserExamsModule
+from views.user_modules.history_module import UserHistoryModule
 
 class UserView(QWidget):
     def __init__(self, user, parent=None):
@@ -48,179 +50,67 @@ class UserView(QWidget):
         topbar.addWidget(logout_btn)
         layout.addLayout(topbar)
         self.tabs = QTabWidget()
-        # 考试页面
-        exams_tab = QWidget()
-        exams_v = QVBoxLayout()
-        exams_toolbar = QHBoxLayout()
-        start_btn = QPushButton(tr('user.start_exam'))
-        start_btn.setIcon(get_icon('exam_start'))
-        start_btn.clicked.connect(lambda: self.start_exam(None))
-        refresh_exams_btn = QPushButton(tr('common.refresh'))
-        refresh_exams_btn.clicked.connect(self.refresh_exams)
-        exams_toolbar.addWidget(start_btn)
-        exams_toolbar.addWidget(refresh_exams_btn)
-        exams_toolbar.addStretch()
-        exams_v.addLayout(exams_toolbar)
-        self.exams_table_user = QTableWidget(0, 9)
-        self.exams_table_user.setHorizontalHeaderLabels([tr('exams.id'), tr('exams.title'), tr('exams.desc'), tr('exams.time_limit'), tr('exams.deadline'), tr('exams.pass_ratio'), tr('exams.q_count'), tr('exams.total'), tr('exams.best')])
-        self.exams_table_user.setColumnWidth(0, 50)
-        self.exams_table_user.setColumnWidth(1, 250)
-        self.exams_table_user.setColumnWidth(2, 480)
-        self.exams_table_user.setColumnWidth(3, 80)
-        self.exams_table_user.setColumnWidth(4, 200)
-        self.exams_table_user.setColumnWidth(5, 75)
-        self.exams_table_user.setColumnWidth(6, 75)
-        self.exams_table_user.setColumnWidth(7, 75)
-        self.exams_table_user.setColumnWidth(8, 50)
-        self.exams_table_user.horizontalHeader().setStretchLastSection(True)
-        self.exams_table_user.setAlternatingRowColors(True)
-        self.exams_table_user.setShowGrid(False)
-        self.exams_table_user.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.exams_table_user.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.refresh_exams()
-        exams_v.addWidget(self.exams_table_user)
-        exams_tab.setLayout(exams_v)
-        self.tabs.addTab(exams_tab, tr('user.exams_tab'))
+        self.exams_module = UserExamsModule(self.user, self)
+        self.history_module = UserHistoryModule(self.user, self)
+        self.tabs.addTab(self.exams_module, tr('user.exams_tab'))
         self.tabs.setTabIcon(0, get_icon('exam'))
-        # 历史成绩页面
-        history_tab = QWidget()
-        history_v = QVBoxLayout()
-        history_toolbar = QHBoxLayout()
-        refresh_attempts_btn = QPushButton(tr('common.refresh'))
-        refresh_attempts_btn.clicked.connect(self.refresh_attempts)
-        history_toolbar.addWidget(refresh_attempts_btn)
-        history_toolbar.addStretch()
-        history_v.addLayout(history_toolbar)
-        self.attempts_table = QTableWidget(0, 5)
-        self.attempts_table.setHorizontalHeaderLabels([tr('attempts.uuid'), tr('attempts.exam_title'), tr('attempts.started'), tr('attempts.submitted'), tr('attempts.score_total_pass')])
-        self.attempts_table.setColumnWidth(0, 280)
-        self.attempts_table.setColumnWidth(1, 250)
-        self.attempts_table.setColumnWidth(2, 200)
-        self.attempts_table.setColumnWidth(3, 200)
-        self.attempts_table.horizontalHeader().setStretchLastSection(True)
-        self.attempts_table.setAlternatingRowColors(True)
-        self.attempts_table.setShowGrid(False)
-        self.refresh_attempts()
-        history_v.addWidget(self.attempts_table)
-        history_tab.setLayout(history_v)
-        self.tabs.addTab(history_tab, tr('user.history_tab'))
+        self.tabs.addTab(self.history_module, tr('user.history_tab'))
         self.tabs.setTabIcon(1, get_icon('score'))
         layout.addWidget(self.tabs)
         self.setLayout(layout)
     def refresh_exams(self):
-        tbl = getattr(self, 'exams_table_user', None)
-        if tbl is None:
-            return
-        tbl.setRowCount(0)
-        colors = theme_manager.get_theme_colors()
-        passed_ids = set()
-        best_scores = {}
-        for a in list_attempts(self.user['id']):
-            if a[6] == 1 and a[4]:
-                try:
-                    passed_ids.add(int(a[2]))
-                except Exception:
-                    pass
-            try:
-                eid = int(a[2]) if a[2] is not None else None
-            except Exception:
-                eid = None
-            if eid is not None and a[4]:
-                bs = best_scores.get(eid)
-                if bs is None or float(a[5] or 0.0) > bs:
-                    best_scores[eid] = float(a[5] or 0.0)
-        exams = list_exams(include_expired=False)
-        exams_sorted = sorted(exams, key=lambda e: (0 if e[5] is None else 1, -int(e[0]) if e[0] is not None else 0))
-        for e in exams_sorted:
-            r = tbl.rowCount()
-            tbl.insertRow(r)
-            tbl.setItem(r, 0, QTableWidgetItem(str(e[0])))
-            tbl.setItem(r, 1, QTableWidgetItem(e[1] or ''))
-            tbl.setItem(r, 2, QTableWidgetItem(e[2] or ''))
-            tbl.setItem(r, 3, QTableWidgetItem(str(e[4])))
-            stats = get_exam_stats(int(e[0]))
-            tbl.setItem(r, 4, QTableWidgetItem(e[5] if e[5] else tr('common.permanent')))
-            tbl.setItem(r, 5, QTableWidgetItem(f"{int(float(e[3])*100)}%"))
-            tbl.setItem(r, 6, QTableWidgetItem(str(stats['count']) if stats else '0'))
-            tbl.setItem(r, 7, QTableWidgetItem(str(int(stats['total_score'])) if stats else '0'))
-            best = int(best_scores.get(int(e[0]), 0))
-            tbl.setItem(r, 8, QTableWidgetItem(str(best)))
-            if int(e[0]) in passed_ids:
-                for c in range(0, 9):
-                    it = tbl.item(r, c)
-                    if it:
-                        it.setForeground(QColor('#2E7D32'))
-            if e[5] is None:
-                for c in range(0, 9):
-                    it = tbl.item(r, c)
-                    if it:
-                        it.setBackground(QColor(colors['info_light']))
-        try:
-            for r in range(tbl.rowCount()):
-                for c in range(tbl.columnCount()):
-                    it = tbl.item(r, c)
-                    if it:
-                        it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        except Exception:
-            pass
+        if hasattr(self, 'exams_module'):
+            self.exams_module.refresh_exams()
     def refresh_attempts(self):
-        self.attempts_table.setRowCount(0)
-        for a in list_attempts(self.user['id']):
-            r = self.attempts_table.rowCount()
-            self.attempts_table.insertRow(r)
-            self.attempts_table.setItem(r, 0, QTableWidgetItem(a[0]))
-            title = get_exam_title(int(a[2])) if a[2] is not None else ''
-            self.attempts_table.setItem(r, 1, QTableWidgetItem(title or ''))
-            self.attempts_table.setItem(r, 2, QTableWidgetItem(a[3] or ''))
-            self.attempts_table.setItem(r, 3, QTableWidgetItem(a[4] or ''))
-            passed_text = tr('attempts.data_invalid') if (len(a) > 8 and a[8] == 0) else (tr('attempts.pass') if a[6]==1 else tr('attempts.fail'))
-            total = int(a[7] or 0)
-            ucell = QTableWidgetItem(f'{a[5]} / {total} / {passed_text}')
-            if len(a) > 8 and a[8] == 0:
-                ucell.setBackground(QColor('#fff3cd'))
-                ucell.setForeground(QColor('#8a6d3b'))
-            else:
-                if a[6] == 1:
-                    ucell.setBackground(QColor("#6bc041"))
-                else:
-                    ucell.setBackground(QColor("#e75c5c"))
-            self.attempts_table.setItem(r, 4, ucell)
+        if hasattr(self, 'history_module'):
+            self.history_module.refresh_attempts()
+    def start_exam(self, exam_id=None):
         try:
-            for r in range(self.attempts_table.rowCount()):
-                for c in range(self.attempts_table.columnCount()):
-                    it = self.attempts_table.item(r, c)
-                    if it:
-                        it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            print("[DEBUG] start_exam invoked")
         except Exception:
             pass
-    def start_exam(self, exam_id=None):
         if exam_id is None:
-            tbl = getattr(self, 'exams_table_user', None)
-            if tbl is None:
+            exam_id = self.exams_module.get_selected_exam_id()
+            if not exam_id:
                 show_warn(self, tr('common.error'), tr('error.select_exam'))
                 return
-            sm = tbl.selectionModel()
-            if sm is None:
-                show_warn(self, tr('common.error'), tr('error.select_exam'))
-                return
-            rows = sm.selectedRows()
-            if len(rows) == 0:
-                show_warn(self, tr('common.error'), tr('error.select_exam'))
-                return
-            if len(rows) > 1:
-                show_warn(self, tr('common.error'), tr('error.select_exam_single'))
-                return
-            r = rows[0].row()
-            it = tbl.item(r, 0)
-            exam_id = int(it.text()) if it and it.text() else None
+        try:
+            print(f"[DEBUG] selected exam_id={exam_id}")
+        except Exception:
+            pass
         if not exam_id:
             show_warn(self, tr('common.error'), tr('error.select_exam'))
             return
+        try:
+            import sys
+            print("[DEBUG] calling list_questions", file=sys.stderr)
+        except Exception:
+            pass
         qs = list_questions(int(exam_id))
+        try:
+            print(f"[DEBUG] questions_count={len(qs) if qs else 0}")
+        except Exception:
+            pass
         if not qs:
             show_warn(self, tr('common.error'), tr('error.no_questions'))
             return
-        ExamWindow(self.user, exam_id, self).show()
+        try:
+            if not hasattr(self, '_exam_windows'):
+                self._exam_windows = []
+            win = ExamWindow(self.user, exam_id, self)
+            self._exam_windows.append(win)
+            win.show()
+            try:
+                print("[DEBUG] exam window shown")
+            except Exception:
+                pass
+            try:
+                win.raise_()
+                win.activateWindow()
+            except Exception:
+                pass
+        except Exception as e:
+            show_warn(self, tr('common.error'), str(e))
     def handle_logout(self):
         p = self.parent()
         while p is not None and not hasattr(p, 'logout'):
