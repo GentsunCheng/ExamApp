@@ -16,6 +16,8 @@ from models import list_users, create_user, list_exams, add_exam, import_questio
 from theme_manager import theme_manager
 from language import tr
 from icon_manager import get_icon
+from sync import rsync_pull_scores, rsync_push
+from status_indicators import LoadingIndicator
 from views.admin_modules.users_module import AdminUsersModule
 from views.admin_modules.exams_module import AdminExamsModule
 from views.admin_modules.sync_module import AdminSyncModule
