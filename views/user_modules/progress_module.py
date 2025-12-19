@@ -3,6 +3,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QScrollArea, QTableWidget, QTableWidgetItem, QAbstractItemView
 
 from theme_manager import theme_manager
+from language import tr
 from models import (
     PROGRESS_STATUS_NOT_STARTED,
     PROGRESS_STATUS_IN_PROGRESS,
@@ -39,7 +40,12 @@ class UserProgressModule(QWidget):
             gb = QGroupBox(md.get('module_name') or '')
             vb = QVBoxLayout()
             tbl = QTableWidget(0, 4)
-            tbl.setHorizontalHeaderLabels(['任务名', '描述', '顺序', '状态'])
+            tbl.setHorizontalHeaderLabels([
+                tr('progress.headers.task_title'),
+                tr('progress.headers.description'),
+                tr('progress.headers.order'),
+                tr('progress.headers.status'),
+            ])
             tbl.setColumnWidth(0, 240)
             tbl.setColumnWidth(1, 520)
             tbl.setColumnWidth(2, 80)
@@ -95,10 +101,10 @@ class UserProgressModule(QWidget):
 
     def _status_text(self, status):
         if int(status) == PROGRESS_STATUS_COMPLETED:
-            return '已完成'
+            return tr('progress.status.completed')
         if int(status) == PROGRESS_STATUS_IN_PROGRESS:
-            return '进行中'
-        return '未开始'
+            return tr('progress.status.in_progress')
+        return tr('progress.status.not_started')
 
     def _clear_layout(self, layout):
         while layout.count():
@@ -110,4 +116,3 @@ class UserProgressModule(QWidget):
             child_layout = item.layout()
             if child_layout is not None:
                 self._clear_layout(child_layout)
-

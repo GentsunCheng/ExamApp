@@ -127,7 +127,14 @@ def export_user_progress_to_excel(user_id, file_path):
     for md in tree:
         module_name = md.get('module_name') or ''
         ws = wb.create_sheet(_safe_sheet_name(module_name) or 'Progress')
-        ws.append(['任务名', '描述', '顺序', '状态', '更新时间', '更新人'])
+        ws.append([
+            tr('progress.headers.task_title'),
+            tr('progress.headers.description'),
+            tr('progress.headers.order'),
+            tr('progress.headers.status'),
+            tr('progress.headers.updated_at'),
+            tr('progress.headers.updated_by'),
+        ])
         for t in md.get('tasks') or []:
             status = int(t.get('status') or 0)
             ws.append([
@@ -143,7 +150,14 @@ def export_user_progress_to_excel(user_id, file_path):
         ws.freeze_panes = 'A2'
     if not wb.sheetnames:
         ws = wb.create_sheet('Progress')
-        ws.append(['任务名', '描述', '顺序', '状态', '更新时间', '更新人'])
+        ws.append([
+            tr('progress.headers.task_title'),
+            tr('progress.headers.description'),
+            tr('progress.headers.order'),
+            tr('progress.headers.status'),
+            tr('progress.headers.updated_at'),
+            tr('progress.headers.updated_by'),
+        ])
         _apply_table_style(ws, header_fill_color='FF409EFF')
         ws.freeze_panes = 'A2'
     wb.save(out)
@@ -155,7 +169,7 @@ class AdminProgressModule(QWidget):
         super().__init__(parent)
         lay = QVBoxLayout()
 
-        header = QGroupBox('学习进度')
+        header = QGroupBox(tr('progress.group'))
         hb = QHBoxLayout()
 
         self.user_select = QComboBox()
@@ -163,25 +177,25 @@ class AdminProgressModule(QWidget):
         self.user_select.currentIndexChanged.connect(self.refresh_progress_view)
         hb.addWidget(self.user_select)
 
-        self.replace_import = QCheckBox('覆盖导入')
+        self.replace_import = QCheckBox(tr('progress.replace_import'))
         hb.addWidget(self.replace_import)
 
-        btn_export_tpl = QPushButton('导出模板')
+        btn_export_tpl = QPushButton(tr('progress.export_tpl'))
         btn_export_tpl.setIcon(get_icon('exam_export'))
         btn_export_tpl.clicked.connect(self.export_template)
         hb.addWidget(btn_export_tpl)
 
-        btn_import = QPushButton('导入模板')
+        btn_import = QPushButton(tr('progress.import_tpl'))
         btn_import.setIcon(get_icon('exam_import'))
         btn_import.clicked.connect(self.import_template)
         hb.addWidget(btn_import)
 
-        btn_export_user = QPushButton('导出用户进度')
+        btn_export_user = QPushButton(tr('progress.export_user_btn'))
         btn_export_user.setIcon(get_icon('exam_export'))
         btn_export_user.clicked.connect(self.export_user_progress)
         hb.addWidget(btn_export_user)
 
-        btn_refresh = QPushButton('刷新')
+        btn_refresh = QPushButton(tr('common.refresh'))
         btn_refresh.setIcon(get_icon('confirm'))
         btn_refresh.clicked.connect(self.refresh_users_and_view)
         hb.addWidget(btn_refresh)
@@ -227,44 +241,53 @@ class AdminProgressModule(QWidget):
 
     def export_template(self):
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents/progress_template')
-        fn, sel = QFileDialog.getSaveFileName(self, '导出学习进度模板', suggested, 'Excel (*.xlsx)')
+        fn, sel = QFileDialog.getSaveFileName(self, tr('progress.export_tpl.title'), suggested, 'Excel (*.xlsx)')
         if not fn:
             return
         try:
             out = export_progress_template(fn)
-            show_info(self, tr('common.success'), f'已导出: {out}')
+            show_info(self, tr('common.success'), tr('progress.export_tpl.done', path=out))
         except Exception as e:
             show_warn(self, tr('common.error'), str(e))
 
     def import_template(self):
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents')
-        fn, sel = QFileDialog.getOpenFileName(self, '导入学习进度模板', suggested, 'Excel (*.xlsx)')
+        fn, sel = QFileDialog.getOpenFileName(self, tr('progress.import_tpl.title'), suggested, 'Excel (*.xlsx)')
         if not fn:
             return
         replace = bool(self.replace_import.isChecked())
         if replace:
-            reply = ask_yes_no(self, tr('common.hint'), '覆盖导入将清空同名模块下的任务与进度记录，是否继续？', default_yes=False)
+            reply = ask_yes_no(self, tr('common.hint'), tr('progress.import_tpl.replace_confirm'), default_yes=False)
             if reply != QMessageBox.StandardButton.Yes:
                 return
         try:
             summary = import_progress_from_excel(fn, replace=replace)
             self.refresh_progress_view()
-            show_info(self, tr('common.success'), f'导入模块:{summary["modules"]} 任务:{summary["tasks"]} 跳过表:{summary["skipped_sheets"]}')
+            show_info(
+                self,
+                tr('common.success'),
+                tr(
+                    'progress.import_tpl.result',
+                    modules=summary['modules'],
+                    tasks=summary['tasks'],
+                    skipped_sheets=summary['skipped_sheets'],
+                ),
+            )
         except Exception as e:
             show_warn(self, tr('common.error'), str(e))
 
     def export_user_progress(self):
         user_id = self.get_selected_user_id()
         if user_id is None:
-            show_warn(self, tr('common.error'), '请选择用户')
+            show_warn(self, tr('common.error'), tr('error.select_user'))
             return
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents/user_progress')
-        fn, sel = QFileDialog.getSaveFileName(self, '导出用户学习进度', suggested, 'Excel (*.xlsx)')
+        fn, sel = QFileDialog.getSaveFileName(self, tr('progress.export_user.title'), suggested, 'Excel (*.xlsx)')
         if not fn:
             return
         try:
             out = export_user_progress_to_excel(user_id, fn)
-            show_info(self, tr('common.success'), f'已导出: {out}')
+            show_info(self, tr('common.success'), tr('progress.export_user.done', path=out))
         except Exception as e:
             show_warn(self, tr('common.error'), str(e))
 
@@ -278,7 +301,12 @@ class AdminProgressModule(QWidget):
             gb = QGroupBox(md.get('module_name') or '')
             vb = QVBoxLayout()
             tbl = QTableWidget(0, 4)
-            tbl.setHorizontalHeaderLabels(['任务名', '描述', '顺序', '状态'])
+            tbl.setHorizontalHeaderLabels([
+                tr('progress.headers.task_title'),
+                tr('progress.headers.description'),
+                tr('progress.headers.order'),
+                tr('progress.headers.status'),
+            ])
             tbl.setColumnWidth(0, 240)
             tbl.setColumnWidth(1, 520)
             tbl.setColumnWidth(2, 80)
@@ -299,9 +327,9 @@ class AdminProgressModule(QWidget):
                 tbl.setItem(r, 2, it_order)
 
                 cb = QComboBox()
-                cb.addItem('未开始', PROGRESS_STATUS_NOT_STARTED)
-                cb.addItem('进行中', PROGRESS_STATUS_IN_PROGRESS)
-                cb.addItem('已完成', PROGRESS_STATUS_COMPLETED)
+                cb.addItem(tr('progress.status.not_started'), PROGRESS_STATUS_NOT_STARTED)
+                cb.addItem(tr('progress.status.in_progress'), PROGRESS_STATUS_IN_PROGRESS)
+                cb.addItem(tr('progress.status.completed'), PROGRESS_STATUS_COMPLETED)
                 cb.setProperty('task_id', int(t.get('task_id') or 0))
                 cb.setProperty('user_id', int(user_id))
                 status = int(t.get('status') or 0)
@@ -360,10 +388,10 @@ class AdminProgressModule(QWidget):
 
 def _status_text(status):
     if int(status) == PROGRESS_STATUS_COMPLETED:
-        return '已完成'
+        return tr('progress.status.completed')
     if int(status) == PROGRESS_STATUS_IN_PROGRESS:
-        return '进行中'
-    return '未开始'
+        return tr('progress.status.in_progress')
+    return tr('progress.status.not_started')
 
 
 def _status_fill(status):
@@ -377,12 +405,14 @@ def _status_fill(status):
 def _apply_status_color(ws, status_col):
     if ws.max_row < 2:
         return
+    completed = _status_text(PROGRESS_STATUS_COMPLETED)
+    in_progress = _status_text(PROGRESS_STATUS_IN_PROGRESS)
     for r in range(2, ws.max_row + 1):
         cell = ws.cell(row=r, column=status_col)
         raw = str(cell.value).strip() if cell.value is not None else ''
-        if raw == '已完成':
+        if raw == completed:
             fill = _status_fill(PROGRESS_STATUS_COMPLETED)
-        elif raw == '进行中':
+        elif raw == in_progress:
             fill = _status_fill(PROGRESS_STATUS_IN_PROGRESS)
         else:
             fill = _status_fill(PROGRESS_STATUS_NOT_STARTED)
