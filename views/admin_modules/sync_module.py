@@ -315,7 +315,7 @@ class AdminSyncModule(QWidget):
             ws = wb.active
             ws.title = 'Targets'
             ws.append(headers)
-            ws.append(['设备A', '192.168.1.10', 'user', '~/.exam_system/exam.db', ''])
+            ws.append(['设备A', '192.168.1.10', 'user', '~/.exam_system/', ''])
             header_fill = PatternFill(start_color='FF409EFF', end_color='FF409EFF', fill_type='solid')
             header_font = Font(bold=True, color='FFFFFFFF', size=13)
             data_font = Font(size=12)
