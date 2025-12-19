@@ -7,6 +7,7 @@ from database import (
     get_exam_conn,
     get_score_conn,
     get_config_conn,
+    get_progress_conn,
     now_iso,
     ensure_key_probe,
     verify_db_encryption_key,
@@ -572,3 +573,134 @@ def build_exam_questions_for_attempt(exam_id):
     except Exception:
         pass
     return combined
+
+PROGRESS_STATUS_NOT_STARTED = 0
+PROGRESS_STATUS_IN_PROGRESS = 1
+PROGRESS_STATUS_COMPLETED = 2
+
+def list_progress_modules():
+    conn = get_progress_conn()
+    c = conn.cursor()
+    c.execute('SELECT id, name, created_at FROM progress_modules ORDER BY id ASC')
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+def upsert_progress_module(name):
+    conn = get_progress_conn()
+    c = conn.cursor()
+    c.execute('SELECT id FROM progress_modules WHERE name=?', (name,))
+    row = c.fetchone()
+    if row:
+        conn.close()
+        return int(row[0])
+    c.execute('INSERT INTO progress_modules (name, created_at) VALUES (?,?)', (name, now_iso()))
+    conn.commit()
+    module_id = int(c.lastrowid)
+    conn.close()
+    return module_id
+
+def delete_progress_module(module_id):
+    conn = get_progress_conn()
+    c = conn.cursor()
+    c.execute('SELECT id FROM progress_tasks WHERE module_id=?', (module_id,))
+    task_ids = [int(r[0]) for r in c.fetchall()]
+    for tid in task_ids:
+        c.execute('DELETE FROM user_task_progress WHERE task_id=?', (tid,))
+    c.execute('DELETE FROM progress_tasks WHERE module_id=?', (module_id,))
+    c.execute('DELETE FROM progress_modules WHERE id=?', (module_id,))
+    conn.commit()
+    conn.close()
+
+def list_progress_tasks(module_id=None):
+    conn = get_progress_conn()
+    c = conn.cursor()
+    if module_id is None:
+        c.execute('SELECT id, module_id, title, description, sort_order, created_at FROM progress_tasks ORDER BY module_id ASC, sort_order ASC, id ASC')
+        rows = c.fetchall()
+        conn.close()
+        return rows
+    c.execute('SELECT id, module_id, title, description, sort_order, created_at FROM progress_tasks WHERE module_id=? ORDER BY sort_order ASC, id ASC', (module_id,))
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+def upsert_progress_task(module_id, title, description=None, sort_order=0):
+    conn = get_progress_conn()
+    c = conn.cursor()
+    c.execute('SELECT id FROM progress_tasks WHERE module_id=? AND title=?', (module_id, title))
+    row = c.fetchone()
+    if row:
+        task_id = int(row[0])
+        c.execute('UPDATE progress_tasks SET description=?, sort_order=? WHERE id=?', (description, int(sort_order), task_id))
+        conn.commit()
+        conn.close()
+        return task_id
+    c.execute('INSERT INTO progress_tasks (module_id, title, description, sort_order, created_at) VALUES (?,?,?,?,?)', (int(module_id), title, description, int(sort_order), now_iso()))
+    conn.commit()
+    task_id = int(c.lastrowid)
+    conn.close()
+    return task_id
+
+def delete_progress_task(task_id):
+    conn = get_progress_conn()
+    c = conn.cursor()
+    c.execute('DELETE FROM user_task_progress WHERE task_id=?', (task_id,))
+    c.execute('DELETE FROM progress_tasks WHERE id=?', (task_id,))
+    conn.commit()
+    conn.close()
+
+def set_user_task_progress(user_id, task_id, status, updated_by=None):
+    status_int = int(status)
+    if status_int not in (PROGRESS_STATUS_NOT_STARTED, PROGRESS_STATUS_IN_PROGRESS, PROGRESS_STATUS_COMPLETED):
+        raise Exception('无效的任务状态')
+    conn = get_progress_conn()
+    c = conn.cursor()
+    c.execute('DELETE FROM user_task_progress WHERE user_id=? AND task_id=?', (int(user_id), int(task_id)))
+    c.execute('INSERT INTO user_task_progress (user_id, task_id, status, updated_at, updated_by) VALUES (?,?,?,?,?)', (int(user_id), int(task_id), status_int, now_iso(), updated_by))
+    conn.commit()
+    conn.close()
+
+def get_user_task_progress_map(user_id):
+    conn = get_progress_conn()
+    c = conn.cursor()
+    c.execute('SELECT task_id, status, updated_at, updated_by FROM user_task_progress WHERE user_id=?', (int(user_id),))
+    rows = c.fetchall()
+    conn.close()
+    out = {}
+    for r in rows:
+        out[int(r[0])] = {'status': int(r[1] or 0), 'updated_at': r[2], 'updated_by': r[3]}
+    return out
+
+def get_user_progress_tree(user_id):
+    modules = list_progress_modules()
+    tasks = list_progress_tasks(None)
+    status_map = get_user_task_progress_map(user_id)
+    modules_map = {}
+    result = []
+    for m in modules:
+        md = {'module_id': int(m[0]), 'module_name': m[1], 'tasks': []}
+        modules_map[int(m[0])] = md
+        result.append(md)
+    for t in tasks:
+        tid = int(t[0])
+        mid = int(t[1])
+        md = modules_map.get(mid)
+        if md is None:
+            continue
+        st = status_map.get(tid, {'status': PROGRESS_STATUS_NOT_STARTED, 'updated_at': None, 'updated_by': None})
+        md['tasks'].append({
+            'task_id': tid,
+            'title': t[2],
+            'description': t[3],
+            'sort_order': int(t[4] or 0),
+            'status': int(st.get('status') or 0),
+            'updated_at': st.get('updated_at'),
+            'updated_by': st.get('updated_by'),
+        })
+    for md in result:
+        try:
+            md['tasks'].sort(key=lambda x: (int(x.get('sort_order') or 0), int(x.get('task_id') or 0)))
+        except Exception:
+            pass
+    return result

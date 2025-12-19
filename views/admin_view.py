@@ -22,6 +22,7 @@ from views.admin_modules.users_module import AdminUsersModule
 from views.admin_modules.exams_module import AdminExamsModule
 from views.admin_modules.sync_module import AdminSyncModule
 from views.admin_modules.scores_module import AdminScoresModule
+from views.admin_modules.progress_module import AdminProgressModule
 
 class SyncWorker(QThread):
     progress = Signal(str)
@@ -128,10 +129,12 @@ class AdminView(QWidget):
         tabs.addTab(AdminExamsModule(self), tr('admin.exams_tab'))
         tabs.addTab(AdminSyncModule(self), tr('admin.sync_tab'))
         tabs.addTab(AdminScoresModule(self), tr('admin.scores_tab'))
+        tabs.addTab(AdminProgressModule(self), '学习进度')
         tabs.setTabIcon(0, get_icon('user'))
         tabs.setTabIcon(1, get_icon('exam'))
         tabs.setTabIcon(2, get_icon('sync'))
         tabs.setTabIcon(3, get_icon('score'))
+        tabs.setTabIcon(4, get_icon('score'))
         layout = QVBoxLayout()
         topbar = QHBoxLayout()
         title = QLabel(tr('admin.dashboard'))

@@ -9,6 +9,7 @@ from models import list_exams, list_attempts, get_exam_title, get_exam_stats, li
 from windows.exam_window import ExamWindow
 from views.user_modules.exams_module import UserExamsModule
 from views.user_modules.history_module import UserHistoryModule
+from views.user_modules.progress_module import UserProgressModule
 
 class UserView(QWidget):
     def __init__(self, user, parent=None):
@@ -52,10 +53,14 @@ class UserView(QWidget):
         self.tabs = QTabWidget()
         self.exams_module = UserExamsModule(self.user, self)
         self.history_module = UserHistoryModule(self.user, self)
+        self.progress_module = UserProgressModule(self.user, self)
         self.tabs.addTab(self.exams_module, tr('user.exams_tab'))
         self.tabs.setTabIcon(0, get_icon('exam'))
         self.tabs.addTab(self.history_module, tr('user.history_tab'))
         self.tabs.setTabIcon(1, get_icon('score'))
+        self.tabs.addTab(self.progress_module, '学习进度')
+        self.tabs.setTabIcon(2, get_icon('info'))
+        self.tabs.currentChanged.connect(self.on_tab_changed)
         layout.addWidget(self.tabs)
         self.setLayout(layout)
     def refresh_exams(self):
@@ -64,6 +69,12 @@ class UserView(QWidget):
     def refresh_attempts(self):
         if hasattr(self, 'history_module'):
             self.history_module.refresh_attempts()
+    def refresh_progress(self):
+        if hasattr(self, 'progress_module'):
+            self.progress_module.refresh_progress()
+    def on_tab_changed(self, idx):
+        if idx == 2:
+            self.refresh_progress()
     def start_exam(self, exam_id=None):
         try:
             print("[DEBUG] start_exam invoked")

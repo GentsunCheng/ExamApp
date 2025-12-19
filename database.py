@@ -10,6 +10,7 @@ USERS_DB_PATH = os.path.join(DB_DIR, 'users.db')
 EXAMS_DB_PATH = os.path.join(DB_DIR, 'exams.db')
 SCORES_DB_PATH = os.path.join(DB_DIR, 'scores.db')
 CONFIG_DB_PATH = os.path.join(DB_DIR, 'config.db')
+PROGRESS_DB_PATH = os.path.join(DB_DIR, 'progress.db')
 DB_PATH = EXAMS_DB_PATH
 
 def ensure_db():
@@ -43,6 +44,18 @@ def ensure_db():
     c.execute('CREATE TABLE IF NOT EXISTS sync_targets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, ip TEXT, username TEXT, remote_path TEXT, ssh_password TEXT)')
     conn.commit()
     conn.close()
+    conn = sqlite3.connect(PROGRESS_DB_PATH)
+    c = conn.cursor()
+    c.execute('CREATE TABLE IF NOT EXISTS progress_modules (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, created_at TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS progress_tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, module_id INTEGER, title TEXT, description TEXT, sort_order INTEGER DEFAULT 0, created_at TEXT, UNIQUE(module_id, title))')
+    c.execute('CREATE TABLE IF NOT EXISTS user_task_progress (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, task_id INTEGER, status INTEGER DEFAULT 0, updated_at TEXT, updated_by TEXT, UNIQUE(user_id, task_id))')
+    try:
+        c.execute('CREATE INDEX IF NOT EXISTS idx_progress_tasks_module ON progress_tasks (module_id, sort_order, id)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_user_task_progress_user ON user_task_progress (user_id, task_id)')
+    except Exception:
+        pass
+    conn.commit()
+    conn.close()
 
 def get_admin_conn():
     ensure_db()
@@ -63,6 +76,10 @@ def get_score_conn():
 def get_config_conn():
     ensure_db()
     return sqlite3.connect(CONFIG_DB_PATH)
+
+def get_progress_conn():
+    ensure_db()
+    return sqlite3.connect(PROGRESS_DB_PATH)
 
 def now_iso():
     return datetime.now().isoformat()
