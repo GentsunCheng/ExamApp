@@ -124,17 +124,18 @@ class AdminView(QWidget):
             f"QComboBox QAbstractItemView {{ {bkg}:{colors['card_background']}; {bd}:1px solid {colors['border']}; {pd}:4px; outline:0; }}\n"
         )
         self.setStyleSheet(ss_admin)
-        tabs = QTabWidget()
-        tabs.addTab(AdminUsersModule(self), tr('admin.users_tab'))
-        tabs.addTab(AdminExamsModule(self), tr('admin.exams_tab'))
-        tabs.addTab(AdminSyncModule(self), tr('admin.sync_tab'))
-        tabs.addTab(AdminScoresModule(self), tr('admin.scores_tab'))
-        tabs.addTab(AdminProgressModule(self), '学习进度')
-        tabs.setTabIcon(0, get_icon('user'))
-        tabs.setTabIcon(1, get_icon('exam'))
-        tabs.setTabIcon(2, get_icon('sync'))
-        tabs.setTabIcon(3, get_icon('score'))
-        tabs.setTabIcon(4, get_icon('score'))
+        self.tabs = QTabWidget()
+        self.tabs.addTab(AdminUsersModule(self), tr('admin.users_tab'))
+        self.tabs.addTab(AdminExamsModule(self), tr('admin.exams_tab'))
+        self.tabs.addTab(AdminSyncModule(self), tr('admin.sync_tab'))
+        self.tabs.addTab(AdminScoresModule(self), tr('admin.scores_tab'))
+        self.tabs.addTab(AdminProgressModule(self), tr('admin.progress_tab'))
+        self.tabs.setTabIcon(0, get_icon('user'))
+        self.tabs.setTabIcon(1, get_icon('exam'))
+        self.tabs.setTabIcon(2, get_icon('sync'))
+        self.tabs.setTabIcon(3, get_icon('score'))
+        self.tabs.setTabIcon(4, get_icon('score'))
+        self.tabs.currentChanged.connect(self.on_tab_changed)
         layout = QVBoxLayout()
         topbar = QHBoxLayout()
         title = QLabel(tr('admin.dashboard'))
@@ -146,8 +147,25 @@ class AdminView(QWidget):
         logout_btn.clicked.connect(self.handle_logout)
         topbar.addWidget(logout_btn)
         layout.addLayout(topbar)
-        layout.addWidget(tabs)
+        layout.addWidget(self.tabs)
         self.setLayout(layout)
+    def on_tab_changed(self, idx):
+        w = self.tabs.widget(idx)
+        if isinstance(w, AdminUsersModule):
+            if hasattr(w, 'refresh_users'):
+                w.refresh_users()
+        elif isinstance(w, AdminExamsModule):
+            if hasattr(w, 'refresh_exams'):
+                w.refresh_exams()
+        elif isinstance(w, AdminSyncModule):
+            if hasattr(w, 'refresh_targets'):
+                w.refresh_targets()
+        elif isinstance(w, AdminScoresModule):
+            if hasattr(w, 'refresh_scores'):
+                w.refresh_scores()
+        elif isinstance(w, AdminProgressModule):
+            if hasattr(w, 'refresh_users_and_view'):
+                w.refresh_users_and_view()
     def handle_logout(self):
         p = self.parent()
         while p is not None and not hasattr(p, 'logout'):

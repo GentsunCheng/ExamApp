@@ -58,7 +58,7 @@ class UserView(QWidget):
         self.tabs.setTabIcon(0, get_icon('exam'))
         self.tabs.addTab(self.history_module, tr('user.history_tab'))
         self.tabs.setTabIcon(1, get_icon('score'))
-        self.tabs.addTab(self.progress_module, '学习进度')
+        self.tabs.addTab(self.progress_module, tr('user.progress_tab'))
         self.tabs.setTabIcon(2, get_icon('info'))
         self.tabs.currentChanged.connect(self.on_tab_changed)
         layout.addWidget(self.tabs)
@@ -73,7 +73,11 @@ class UserView(QWidget):
         if hasattr(self, 'progress_module'):
             self.progress_module.refresh_progress()
     def on_tab_changed(self, idx):
-        if idx == 2:
+        if idx == 0:
+            self.refresh_exams()
+        elif idx == 1:
+            self.refresh_attempts()
+        elif idx == 2:
             self.refresh_progress()
     def start_exam(self, exam_id=None):
         try:
