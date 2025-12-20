@@ -409,11 +409,11 @@ class AdminSyncModule(QWidget):
             action_widget = QWidget()
             action_layout = QHBoxLayout()
             action_layout.setContentsMargins(4, 4, 4, 4)
-            edit_btn = QPushButton('编辑')
+            edit_btn = QPushButton(tr('common.edit'))
             edit_btn.setStyleSheet("QPushButton { background-color:#409eff; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px; }")
             edit_btn.clicked.connect(lambda checked, tid=t[0]: self.edit_target(tid))
             action_layout.addWidget(edit_btn)
-            delete_btn = QPushButton('删除')
+            delete_btn = QPushButton(tr('common.delete'))
             delete_btn.setStyleSheet("QPushButton { background-color:#f56c6c; color:#fff; padding:4px 8px; font-size:12px; }")
             delete_btn.clicked.connect(lambda checked, tid=t[0]: self.delete_target(tid))
             action_layout.addWidget(delete_btn)
@@ -447,13 +447,13 @@ class AdminSyncModule(QWidget):
         username = self.targets_table.item(row, 2).text() if self.targets_table.item(row, 2) else ''
         remote_path = self.targets_table.item(row, 3).text() if self.targets_table.item(row, 3) else ''
         if not name or not ip or not username or not remote_path:
-            show_warn(self, tr('common.error'), '设备信息不能为空')
+            show_warn(self, tr('common.error'), tr('error.empty_target_info'))
             self.refresh_targets()
             return
         try:
             update_sync_target(int(target_id), name, ip, username, remote_path, None)
             self.refresh_targets()
-            show_info(self, tr('common.success'), '设备信息已更新')
+            show_info(self, tr('common.success'), tr('info.target_updated'))
         except Exception as e:
             show_warn(self, tr('common.error'), str(e))
     def add_target(self):
@@ -463,7 +463,7 @@ class AdminSyncModule(QWidget):
         path = self.t_path.text().strip()
         password = self.t_password.text().strip()
         if not name or not ip or not user or not path:
-            show_warn(self, tr('common.error'), '请完整填写设备信息')
+            show_warn(self, tr('common.error'), tr('info.input_target_info'))
             return
         upsert_sync_target(name, ip, user, path, password if password else None)
         self.refresh_targets()
@@ -472,7 +472,7 @@ class AdminSyncModule(QWidget):
         self.t_user.clear()
         self.t_path.clear()
         self.t_password.clear()
-        show_info(self, tr('common.success'), '设备已添加')
+        show_info(self, tr('common.success'), tr('info.target_added'))
     def edit_target(self, target_id):
         targets = list_sync_targets()
         target = None
@@ -484,7 +484,7 @@ class AdminSyncModule(QWidget):
             return
         from PySide6.QtWidgets import QDialog, QDialogButtonBox
         dialog = QDialog(self)
-        dialog.setWindowTitle('编辑设备')
+        dialog.setWindowTitle(tr('common.edit'))
         dialog.setFixedSize(400, 300)
         layout = QFormLayout()
         name_edit = QLineEdit(target[1])
@@ -492,13 +492,13 @@ class AdminSyncModule(QWidget):
         user_edit = QLineEdit(target[3])
         path_edit = QLineEdit(target[4])
         password_edit = QLineEdit()
-        password_edit.setPlaceholderText('留空保持原密码')
+        password_edit.setPlaceholderText(tr('info.leave_empty_to_keep_original'))
         password_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        layout.addRow('名称', name_edit)
-        layout.addRow('IP', ip_edit)
-        layout.addRow('用户名', user_edit)
-        layout.addRow('远程路径', path_edit)
-        layout.addRow('SSH密码', password_edit)
+        layout.addRow(tr('info.name'), name_edit)
+        layout.addRow(tr('info.ip'), ip_edit)
+        layout.addRow(tr('info.username'), user_edit)
+        layout.addRow(tr('info.remote_path'), path_edit)
+        layout.addRow(tr('info.ssh_password'), password_edit)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(buttons)
         dialog.setLayout(layout)
@@ -509,24 +509,24 @@ class AdminSyncModule(QWidget):
             new_path = path_edit.text().strip()
             new_password = password_edit.text().strip()
             if not new_name or not new_ip or not new_user or not new_path:
-                show_warn(dialog, tr('common.error'), '请完整填写设备信息')
+                show_warn(dialog, tr('common.error'), tr('info.input_target_info'))
                 return
             try:
                 update_sync_target(target_id, new_name, new_ip, new_user, new_path, new_password if new_password else None)
                 self.refresh_targets()
                 dialog.accept()
-                show_info(self, tr('common.success'), '设备已更新')
+                show_info(self, tr('common.success'), tr('info.target_updated'))
             except Exception as e:
                 show_warn(dialog, tr('common.error'), str(e))
         buttons.accepted.connect(save_changes)
         buttons.rejected.connect(dialog.reject)
         dialog.exec()
     def delete_target(self, target_id):
-        reply = ask_yes_no(self, '确认', '确定要删除该设备吗？', default_yes=False)
+        reply = ask_yes_no(self, tr('common.confirm'), tr('common.confirm_delete_target'), default_yes=False)
         if reply == QMessageBox.StandardButton.Yes:
             try:
                 delete_sync_target(target_id)
                 self.refresh_targets()
-                show_info(self, tr('common.success'), '设备已删除')
+                show_info(self, tr('common.success'), tr('info.target_deleted'))
             except Exception as e:
                 show_warn(self, tr('common.error'), str(e))

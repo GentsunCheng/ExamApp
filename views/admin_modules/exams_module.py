@@ -196,7 +196,7 @@ class AdminExamsModule(QWidget):
         if col == 1:
             title = item.text().strip()
             if not title:
-                show_warn(self, tr('common.error'), '标题不能为空')
+                show_warn(self, tr('common.error'), tr('error.title_required'))
                 self.refresh_exams()
                 return
             update_exam_title_desc(exam_id, title=title)
@@ -334,7 +334,7 @@ class AdminExamsModule(QWidget):
                 if '随机题库' in wb.sheetnames:
                     data_rand = parse_sheet(wb['随机题库'])
                 if not data_mand and not data_rand:
-                    show_warn(self, tr('common.error'), '缺少新格式工作表：请提供“必考题库”或“随机题库”（至少之一），可选“配置选项”设置随机抽取数量')
+                    show_warn(self, tr('common.error'), tr('error.lost_mandatory_or_random'))
                     return
                 data = {'mandatory': data_mand, 'random': data_rand, 'config': {}}
                 if rand_count is not None:
@@ -379,26 +379,26 @@ class AdminExamsModule(QWidget):
                 for idx, q in enumerate(lst, start=1):
                     t = (q.get('type') or '').strip().lower()
                     if t not in ('single','multiple','truefalse'):
-                        errs.append(f'{pool_name} 第{idx}题: 类型无效')
+                        errs.append(f'{pool_name} {tr("common.question")} {idx} {tr("error.invalid_type")}')
                         continue
                     corr = q.get('correct') or []
                     if t in ('single','multiple'):
                         opts = q.get('options') or []
                         keys = {str(o.get('key')).strip().upper() for o in opts if o.get('key')}
                         if not keys:
-                            errs.append(f'{pool_name} 第{idx}题: 缺少选项')
+                            errs.append(f'{pool_name} {tr("common.question")} {idx} {tr("error.missing_options")}')
                             continue
                         corr = [str(x).strip().upper() for x in corr if str(x).strip() != '']
                         if not corr or not set(corr).issubset(keys):
-                            errs.append(f'{pool_name} 第{idx}题: 正确答案不在选项中')
+                            errs.append(f'{pool_name} {tr("common.question")} {idx} {tr("error.invalid_correct")}')
                             continue
                         if t == 'single' and len(corr) != 1:
-                            errs.append(f'{pool_name} 第{idx}题: 单选需1个答案')
+                            errs.append(f'{pool_name} {tr("common.question")} {idx} {tr("error.single_need_one")}')
                             continue
                         q['correct'] = corr
                     else:
                         if not corr or len(corr) != 1 or not isinstance(corr[0], bool):
-                            errs.append(f'{pool_name} 第{idx}题: 判断题答案需为true/false')
+                            errs.append(f'{pool_name} {tr("common.question")} {idx} {tr("error.tf_need_one")}')
                             continue
                     valid.append(q)
             if isinstance(data, dict):
@@ -436,8 +436,8 @@ class AdminExamsModule(QWidget):
             cnt_rand = sum(1 for d in valid if (d.get('pool') or 'mandatory') == 'random')
             extra = ''
             if errs:
-                extra = '\n部分题目未导入:\n' + '\n'.join(errs[:10])
-            show_info(self, tr('common.success'), tr('admin.import.success', single=cnt_single, multiple=cnt_multiple, truefalse=cnt_tf, mandatory=cnt_mand, random=cnt_rand, extra=(tr('admin.import.extra_prefix') + '\n'.join(errs[:10]) if errs else '')))
+                extra = f'\n{tr("admin.import.extra_prefix")}:\n' + '\n'.join(errs[:10])
+            show_info(self, tr('common.success'), tr('admin.import.success', single=cnt_single, multiple=cnt_multiple, truefalse=cnt_tf, mandatory=cnt_mand, random=cnt_rand, extra=extra))
         except Exception as e:
             show_warn(self, tr('common.error'), str(e))
     def clear_exam(self, exam_id):

@@ -95,7 +95,7 @@ def import_progress_from_excel(file_path, replace=False):
         header = [str(x).strip() if x is not None else '' for x in (header_row or [])]
         col_title = _find_header_index(header, {'任务名', '任务名称', 'title', '任务'})
         if col_title is None:
-            raise Exception(f'工作表 {sheet_name} 缺少列: 任务名')
+            raise Exception(f'{tr("progress.worksheet")} {sheet_name} {tr("error.missing_column")}: {tr("progress.headers.task_title")}')
         col_desc = _find_header_index(header, {'描述', '任务描述', 'desc', 'description'})
         col_order = _find_header_index(header, {'顺序', '排序', 'order', 'sort'})
 

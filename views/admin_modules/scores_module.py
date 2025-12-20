@@ -82,7 +82,7 @@ class AdminScoresModule(QWidget):
             pass
     def export_scores_to_excel(self):
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents/scores')
-        fn, sel = QFileDialog.getSaveFileName(self, '导出成绩Excel', suggested, 'Excel (*.xlsx)')
+        fn, sel = QFileDialog.getSaveFileName(self, tr('scores.export_excel'), suggested, 'Excel (*.xlsx)')
         if not fn:
             return
         try:
