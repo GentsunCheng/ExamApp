@@ -20,7 +20,7 @@ class AdminScoresModule(QWidget):
         gb = QGroupBox(tr('scores.group'))
         vb = QVBoxLayout()
         self.scores_table = QTableWidget(0, 8)
-        self.scores_table.setHorizontalHeaderLabels([tr('scores.headers.uuid'), tr('scores.headers.username'), tr('scores.headers.full_name'), tr('scores.headers.user_id'), tr('scores.headers.exam_title'), tr('scores.headers.started'), tr('scores.headers.submitted'), tr('scores.headers.score_total_pass')])
+        self.scores_table.setHorizontalHeaderLabels([tr('scores.headers.uuid'), tr('scores.headers.username'), tr('scores.headers.full_name'), tr('scores.headers.user_id'), tr('scores.headers.exam_title'), tr('scores.headers.started'), tr('scores.headers.submitted'), tr('scores.headers.score_total_status')])
         self.scores_table.horizontalHeader().setStretchLastSection(True)
         self.scores_table.setColumnWidth(0, 280)
         self.scores_table.setColumnWidth(1, 75)
@@ -91,7 +91,7 @@ class AdminScoresModule(QWidget):
             wb = Workbook()
             ws = wb.active
             ws.title = 'Scores'
-            headers = ['尝试UUID', '用户名', '姓名', '用户ID', '试题标题', '开始', '提交', '分数', '通过']
+            headers = ['尝试UUID', '用户名', '姓名', '用户ID', '试题标题', '开始', '提交', '分数', '状态']
             ws.append(headers)
             green_fill = PatternFill(start_color='FF67C23A', end_color='FF67C23A', fill_type='solid')
             red_fill = PatternFill(start_color='FFF56C6C', end_color='FFF56C6C', fill_type='solid')

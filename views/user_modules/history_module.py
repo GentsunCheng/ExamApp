@@ -18,7 +18,7 @@ class UserHistoryModule(QWidget):
         history_toolbar.addStretch()
         history_v.addLayout(history_toolbar)
         self.attempts_table = QTableWidget(0, 5)
-        self.attempts_table.setHorizontalHeaderLabels([tr('attempts.uuid'), tr('attempts.exam_title'), tr('attempts.started'), tr('attempts.submitted'), tr('attempts.score_total_pass')])
+        self.attempts_table.setHorizontalHeaderLabels([tr('attempts.uuid'), tr('attempts.exam_title'), tr('attempts.started'), tr('attempts.submitted'), tr('attempts.score_total_status')])
         self.attempts_table.setColumnWidth(0, 280)
         self.attempts_table.setColumnWidth(1, 250)
         self.attempts_table.setColumnWidth(2, 200)
