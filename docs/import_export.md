@@ -5,8 +5,8 @@
 ## 操作入口
 
 - 在“试题”页面：
-  - 选择试题后点击 `导入题目`，选择 Excel/JSON/YAML 文件（默认在 `~/Documents` 打开）
-  - 点击 `导出题目示例`，生成包含“配置选项/必考题库/随机题库”三工作表的 Excel 或对应结构的 JSON/YAML 示例文件
+  - 选择试题后点击 `导入题目`，选择 Excel 文件（默认在 `~/Documents` 打开）
+  - 点击 `导出题目示例`，生成包含“配置选项/必考题库/随机题库”三工作表的 Excel 示例文件
 - 在“成绩”页面：点击 `导出成绩Excel`，生成包含考试标题、分数与通过标识的 Excel 文件（通过为绿色、未通过为红色）
 - 在“用户”页面：支持 `导出用户Excel模板` 与 `从Excel导入用户`
 - 在“同步”页面：支持 `导出设备Excel模板` 与 `从Excel导入设备`
@@ -21,7 +21,6 @@
   - `random`（随机题库）：考试时按配置的抽取数量随机抽取，数量不足则全部抽取
 - 抽取数量配置项：`random_pick_count`
   - 在 Excel 的“配置选项”工作表配置
-  - 在 JSON/YAML 的 `config.random_pick_count` 配置
 
 ### Excel（推荐）
 
@@ -38,42 +37,3 @@
   - 判断：填 `true` 或 `false`（大小写不敏感）
 - 选项：从 `选项A` 开始依次填写；`判断`题不需要选项
 - 分数：在“分数”列填写数值；留空或格式不正确默认 `1` 分
-
-### JSON
-
-```json
-{
-  "config": { "random_pick_count": 4 },
-  "mandatory": [
-    { "type": "single", "text": "Python中获取列表长度的函数是?", "options": [ { "key": "A", "text": "len(list)" }, { "key": "B", "text": "size(list)" } ], "correct": ["A"], "score": 2 }
-  ],
-  "random": [
-    { "type": "truefalse", "text": "Linux中/etc目录通常存放系统配置文件", "correct": [true], "score": 1 }
-  ]
-}
-```
-
-### YAML
-
-```yaml
-config:
-  random_pick_count: 4
-mandatory:
-  - type: single
-    text: "Python中获取列表长度的函数是?"
-    score: 2
-    options:
-      - key: A
-        text: "len(list)"
-      - key: B
-        text: "size(list)"
-    correct:
-      - A
-random:
-  - type: truefalse
-    text: "Linux中/etc目录通常存放系统配置文件"
-    score: 1
-    correct:
-      - true
-```
-

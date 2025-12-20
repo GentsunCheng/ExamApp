@@ -1,7 +1,5 @@
 import os
 import pathlib
-import json
-import yaml
 from PySide6.QtCore import Qt, QDateTime
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout, QLineEdit, QTextEdit, QSpinBox, QDateTimeEdit, QPushButton, QFileDialog, QTableWidget, QTableWidgetItem, QAbstractItemView, QCheckBox
 from PySide6.QtWidgets import QMessageBox
@@ -232,146 +230,111 @@ class AdminExamsModule(QWidget):
             show_warn(self, tr('common.error'), tr('error.select_exam'))
             return
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents')
-        fn, sel = QFileDialog.getOpenFileName(self, tr('admin.import.title'), suggested, 'Excel (*.xlsx);;JSON (*.json);;YAML (*.yaml *.yml)')
+        fn, sel = QFileDialog.getOpenFileName(self, tr('admin.import.title'), suggested, 'Excel (*.xlsx)')
         if not fn:
             return
         try:
-            ext = os.path.splitext(fn)[1].lower().strip()
-            is_zip = False
-            try:
-                with open(fn, 'rb') as f:
-                    head = f.read(4)
-                    is_zip = head.startswith(b'PK')
-            except Exception:
-                is_zip = False
-            if (sel and sel.startswith('Excel')) or ext in ('.xlsx', '.xlsm', '.xltx', '.xltm') or is_zip:
-                wb = load_workbook(fn)
-                rand_count = None
-                def parse_sheet(ws):
-                    header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
-                    header = [str(x).strip() if x else '' for x in header_row]
-                    def idx(name):
-                        try:
-                            return header.index(name)
-                        except Exception:
-                            return -1
-                    itype = idx('类型'); icontent = idx('内容'); icorrect = idx('正确答案'); iscore = idx('分数')
-                    start_opts = None
-                    for i, h in enumerate(header):
-                        if h.startswith('选项'):
-                            start_opts = i
-                            break
-                    base_cols = [x for x in (itype, icontent, icorrect, iscore) if x >= 0]
-                    if min(itype, icontent, icorrect) < 0:
-                        return []
-                    if start_opts is None:
-                        start_opts = (max(base_cols) + 1) if base_cols else 3
-                    data_local = []
-                    for row in ws.iter_rows(min_row=2, values_only=True):
-                        tval = (str(row[itype]).strip().lower() if row[itype] is not None else '')
-                        qtype = None
-                        if tval in ('单选', 'single'):
-                            qtype = 'single'
-                        elif tval in ('多选', 'multiple'):
-                            qtype = 'multiple'
-                        elif tval in ('判断', 'truefalse', '判断题'):
-                            qtype = 'truefalse'
-                        else:
-                            continue
-                        text = (str(row[icontent]).strip() if row[icontent] is not None else '')
-                        if not text:
-                            continue
-                        correct_cell = (str(row[icorrect]).strip() if row[icorrect] is not None else '')
-                        correct = []
-                        if qtype == 'truefalse':
-                            lc = correct_cell.lower()
-                            if lc in ('true', 'false'):
-                                correct = [True] if lc == 'true' else [False]
-                            else:
-                                continue
-                        else:
-                            parts = [p.strip().upper() for p in correct_cell.replace('，', ',').replace(';', ',').split(',') if p.strip()]
-                            correct = parts[:1] if qtype == 'single' else parts
-                        options = []
-                        if qtype != 'truefalse':
-                            letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-                            cidx = start_opts
-                            key_index = 0
-                            while cidx < len(row):
-                                val = row[cidx]
-                                if val is None or str(val).strip() == '':
-                                    break
-                                key = letters[key_index] if key_index < len(letters) else str(key_index+1)
-                                options.append({'key': key, 'text': str(val).strip()})
-                                cidx += 1
-                                key_index += 1
-                            if not options and qtype != 'truefalse':
-                                continue
-                        sc = 1.0
-                        if iscore >= 0 and iscore < len(row):
-                            try:
-                                v = row[iscore]
-                                if v is not None and str(v).strip() != '':
-                                    sc = float(str(v).strip())
-                            except Exception:
-                                sc = 1.0
-                        item = {'type': qtype, 'text': text, 'score': sc, 'options': options, 'correct': correct}
-                        data_local.append(item)
-                    return data_local
-                data_mand = []
-                data_rand = []
-                if '配置选项' in wb.sheetnames:
-                    ws_cfg = wb['配置选项']
-                    cfg_header = next(ws_cfg.iter_rows(min_row=1, max_row=1, values_only=True))
-                    cfg = {str(cfg_header[i]).strip(): (ws_cfg.cell(row=2, column=i+1).value) for i in range(len(cfg_header)) if cfg_header[i] is not None}
-                    if '随机抽取数量' in cfg:
-                        try:
-                            rand_count = int(str(cfg['随机抽取数量']).strip())
-                        except Exception:
-                            rand_count = None
-                if '必考题库' in wb.sheetnames:
-                    data_mand = parse_sheet(wb['必考题库'])
-                if '随机题库' in wb.sheetnames:
-                    data_rand = parse_sheet(wb['随机题库'])
-                if not data_mand and not data_rand:
-                    show_warn(self, tr('common.error'), tr('error.lost_mandatory_or_random'))
-                    return
-                data = {'mandatory': data_mand, 'random': data_rand, 'config': {}}
-                if rand_count is not None:
-                    data['config']['random_pick_count'] = rand_count
-            else:
-                def read_text_with_fallback(path):
-                    with open(path, 'rb') as f:
-                        raw = f.read()
+            wb = load_workbook(fn)
+            rand_count = None
+
+            def parse_sheet(ws):
+                header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
+                header = [str(x).strip() if x else '' for x in header_row]
+
+                def idx(name):
                     try:
-                        return raw.decode('utf-8')
-                    except UnicodeDecodeError:
-                        try:
-                            return raw.decode('gb18030')
-                        except UnicodeDecodeError:
-                            return None
-                text = read_text_with_fallback(fn)
-                if text is None:
-                    show_warn(self, tr('common.error'), tr('admin.import.error.file_decode'))
-                    return
-                data = None
-                if (sel and sel.startswith('JSON')) or ext == '.json':
-                    data = json.loads(text)
-                elif (sel and sel.startswith('YAML')) or ext in ('.yaml', '.yml'):
-                    data = yaml.safe_load(text)
-                else:
-                    try:
-                        data = json.loads(text)
+                        return header.index(name)
                     except Exception:
+                        return -1
+
+                itype = idx('类型')
+                icontent = idx('内容')
+                icorrect = idx('正确答案')
+                iscore = idx('分数')
+                start_opts = None
+                for i, h in enumerate(header):
+                    if h.startswith('选项'):
+                        start_opts = i
+                        break
+                base_cols = [x for x in (itype, icontent, icorrect, iscore) if x >= 0]
+                if min(itype, icontent, icorrect) < 0:
+                    return []
+                if start_opts is None:
+                    start_opts = (max(base_cols) + 1) if base_cols else 3
+                data_local = []
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    tval = (str(row[itype]).strip().lower() if row[itype] is not None else '')
+                    qtype = None
+                    if tval in ('单选', 'single'):
+                        qtype = 'single'
+                    elif tval in ('多选', 'multiple'):
+                        qtype = 'multiple'
+                    elif tval in ('判断', 'truefalse', '判断题'):
+                        qtype = 'truefalse'
+                    else:
+                        continue
+                    text = (str(row[icontent]).strip() if row[icontent] is not None else '')
+                    if not text:
+                        continue
+                    correct_cell = (str(row[icorrect]).strip() if row[icorrect] is not None else '')
+                    correct = []
+                    if qtype == 'truefalse':
+                        lc = correct_cell.lower()
+                        if lc in ('true', 'false'):
+                            correct = [True] if lc == 'true' else [False]
+                        else:
+                            continue
+                    else:
+                        parts = [p.strip().upper() for p in correct_cell.replace('，', ',').replace(';', ',').split(',') if p.strip()]
+                        correct = parts[:1] if qtype == 'single' else parts
+                    options = []
+                    if qtype != 'truefalse':
+                        letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                        cidx = start_opts
+                        key_index = 0
+                        while cidx < len(row):
+                            val = row[cidx]
+                            if val is None or str(val).strip() == '':
+                                break
+                            key = letters[key_index] if key_index < len(letters) else str(key_index + 1)
+                            options.append({'key': key, 'text': str(val).strip()})
+                            cidx += 1
+                            key_index += 1
+                        if not options and qtype != 'truefalse':
+                            continue
+                    sc = 1.0
+                    if iscore >= 0 and iscore < len(row):
                         try:
-                            data_yaml = yaml.safe_load(text)
-                            data = data_yaml
+                            v = row[iscore]
+                            if v is not None and str(v).strip() != '':
+                                sc = float(str(v).strip())
                         except Exception:
-                            show_warn(self, tr('common.error'), tr('admin.import.error.not_supported'))
-                            return
-            if data is None:
-                show_warn(self, tr('common.error'), tr('admin.import.error.no_data'))
+                            sc = 1.0
+                    item = {'type': qtype, 'text': text, 'score': sc, 'options': options, 'correct': correct}
+                    data_local.append(item)
+                return data_local
+
+            data_mand = []
+            data_rand = []
+            if '配置选项' in wb.sheetnames:
+                ws_cfg = wb['配置选项']
+                cfg_header = next(ws_cfg.iter_rows(min_row=1, max_row=1, values_only=True))
+                cfg = {str(cfg_header[i]).strip(): (ws_cfg.cell(row=2, column=i + 1).value) for i in range(len(cfg_header)) if cfg_header[i] is not None}
+                if '随机抽取数量' in cfg:
+                    try:
+                        rand_count = int(str(cfg['随机抽取数量']).strip())
+                    except Exception:
+                        rand_count = None
+            if '必考题库' in wb.sheetnames:
+                data_mand = parse_sheet(wb['必考题库'])
+            if '随机题库' in wb.sheetnames:
+                data_rand = parse_sheet(wb['随机题库'])
+            if not data_mand and not data_rand:
+                show_warn(self, tr('common.error'), tr('error.lost_mandatory_or_random'))
                 return
+            data = {'mandatory': data_mand, 'random': data_rand, 'config': {}}
+            if rand_count is not None:
+                data['config']['random_pick_count'] = rand_count
             valid = []
             errs = []
             def validate_list(lst, pool_name):
@@ -464,7 +427,7 @@ class AdminExamsModule(QWidget):
             show_warn(self, tr('common.error'), str(e))
     def export_sample(self):
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents/exam')
-        fn, sel = QFileDialog.getSaveFileName(self, tr('admin.export.sample.title'), suggested, 'Excel (*.xlsx);;JSON (*.json);;YAML (*.yaml)')
+        fn, sel = QFileDialog.getSaveFileName(self, tr('admin.export.sample.title'), suggested, 'Excel (*.xlsx)')
         if not fn:
             return
         try:
@@ -483,94 +446,62 @@ class AdminExamsModule(QWidget):
                 {"type":"single","text":"Linux查看网络端口占用的命令是?","options":[{"key":"A","text":"ss -tuln"},{"key":"B","text":"ps aux"},{"key":"C","text":"top"},{"key":"D","text":"df -h"}],"correct":["A"],"score":2},
                 {"type":"multiple","text":"以下哪些属于Python打包/分发相关工具?","options":[{"key":"A","text":"setuptools"},{"key":"B","text":"wheel"},{"key":"C","text":"pip"},{"key":"D","text":"twine"}],"correct":["A","B","D"],"score":3}
             ]
-            if (sel and sel.startswith('Excel')) or ext == '.xlsx' or ext == '':
-                out = fn if ext == '.xlsx' else fn + '.xlsx'
-                wb = Workbook()
-                ws_cfg = wb.active
-                ws_cfg.title = '配置选项'
-                ws_cfg.append(['随机抽取数量'])
-                ws_cfg.append([4])
-                def write_sheet(ws, rows):
-                    ws.append(['类型', '内容', '正确答案', '分数', '选项A', '选项B', '选项C', '选项D'])
-                    for item in rows:
-                        if item['type'] == 'truefalse':
-                            ws.append(['判断', item['text'], 'true' if item['correct'][0] else 'false', item['score']])
-                        elif item['type'] == 'single':
-                            ws.append(['单选', item['text'], ','.join(item['correct']), item['score']] + [opt['text'] for opt in item.get('options', [])])
-                        else:
-                            ws.append(['多选', item['text'], ','.join(item['correct']), item['score']] + [opt['text'] for opt in item.get('options', [])])
-                ws_m = wb.create_sheet('必考题库')
-                write_sheet(ws_m, mand)
-                ws_r = wb.create_sheet('随机题库')
-                write_sheet(ws_r, rand)
-                header_fill = PatternFill(start_color='FF409EFF', end_color='FF409EFF', fill_type='solid')
-                header_font = Font(bold=True, color='FFFFFFFF', size=13)
-                data_font = Font(size=12)
-                center = Alignment(horizontal='center', vertical='center')
-                left = Alignment(horizontal='left', vertical='center')
-                thin = Side(style='thin', color='FFDDDDDD')
-                border = Border(left=thin, right=thin, top=thin, bottom=thin)
-                for ws in [ws_m, ws_r]:
-                    headers = ['类型', '内容', '正确答案', '分数', '选项A', '选项B', '选项C', '选项D']
-                    for c in range(1, len(headers)+1):
-                        cell = ws.cell(row=1, column=c)
-                        cell.fill = header_fill
-                        cell.font = header_font
-                        cell.alignment = center
-                    ws.row_dimensions[1].height = 26
-                    for r in range(2, ws.max_row+1):
-                        for c in range(1, len(headers)+1):
-                            cell = ws.cell(row=r, column=c)
-                            cell.border = border
-                            cell.font = data_font
-                        ws.cell(row=r, column=4).alignment = center
-                        for c in (1,2,3,5,6,7,8):
-                            ws.cell(row=r, column=c).alignment = left
-                        ws.row_dimensions[r].height = 22
-                    widths = [0] * len(headers)
-                    for r in ws.iter_rows(values_only=True):
-                        for idx, val in enumerate(r):
-                            l = len(str(val)) if val is not None else 0
-                            widths[idx] = max(widths[idx], l)
-                    for i, w in enumerate(widths, start=1):
-                        letter = get_column_letter(i)
-                        ws.column_dimensions[letter].width = max(16, min(48, w + 6))
-                    ws.freeze_panes = 'A2'
-                    ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{ws.max_row}"
-                wb.save(out)
-            elif (sel and sel.startswith('JSON')) or ext == '.json':
-                out = fn if ext == '.json' else fn + '.json'
-                payload = {"config": {"random_pick_count": 4}, "mandatory": mand, "random": rand}
-                with open(out, 'w', encoding='utf-8') as f:
-                    json.dump(payload, f, ensure_ascii=False, indent=2)
-            elif (sel and sel.startswith('YAML')) or ext in ('.yaml', '.yml'):
-                out = fn if ext in ('.yaml', '.yml') else fn + '.yaml'
-                lines = []
-                lines.append('config:')
-                lines.append('  random_pick_count: 4')
-                def write_yaml_block(name, rows):
-                    lines.append(f'{name}:')
-                    for item in rows:
-                        lines.append('  -')
-                        lines.append(f'    type: {item["type"]}')
-                        lines.append(f'    text: "{item["text"]}"')
-                        lines.append(f'    score: {item["score"]}')
-                        if item.get('options'):
-                            lines.append('    options:')
-                            for opt in item['options']:
-                                lines.append('      - key: ' + opt['key'])
-                                lines.append(f'        text: "{opt["text"]}"')
-                        if item.get('correct') is not None:
-                            lines.append('    correct:')
-                            for v in item['correct']:
-                                if isinstance(v, bool):
-                                    lines.append('      - ' + ('true' if v else 'false'))
-                                else:
-                                    lines.append('      - ' + str(v))
-                write_yaml_block('mandatory', mand)
-                write_yaml_block('random', rand)
-                with open(out, 'w', encoding='utf-8') as f:
-                    f.write('\n'.join(lines) + '\n')
+            out = fn if ext == '.xlsx' or ext == '' else fn + '.xlsx'
+            wb = Workbook()
+            ws_cfg = wb.active
+            ws_cfg.title = '配置选项'
+            ws_cfg.append(['随机抽取数量'])
+            ws_cfg.append([4])
+
+            def write_sheet(ws, rows):
+                ws.append(['类型', '内容', '正确答案', '分数', '选项A', '选项B', '选项C', '选项D'])
+                for item in rows:
+                    if item['type'] == 'truefalse':
+                        ws.append(['判断', item['text'], 'true' if item['correct'][0] else 'false', item['score']])
+                    elif item['type'] == 'single':
+                        ws.append(['单选', item['text'], ','.join(item['correct']), item['score']] + [opt['text'] for opt in item.get('options', [])])
+                    else:
+                        ws.append(['多选', item['text'], ','.join(item['correct']), item['score']] + [opt['text'] for opt in item.get('options', [])])
+
+            ws_m = wb.create_sheet('必考题库')
+            write_sheet(ws_m, mand)
+            ws_r = wb.create_sheet('随机题库')
+            write_sheet(ws_r, rand)
+            header_fill = PatternFill(start_color='FF409EFF', end_color='FF409EFF', fill_type='solid')
+            header_font = Font(bold=True, color='FFFFFFFF', size=13)
+            data_font = Font(size=12)
+            center = Alignment(horizontal='center', vertical='center')
+            left = Alignment(horizontal='left', vertical='center')
+            thin = Side(style='thin', color='FFDDDDDD')
+            border = Border(left=thin, right=thin, top=thin, bottom=thin)
+            for ws in [ws_m, ws_r]:
+                headers = ['类型', '内容', '正确答案', '分数', '选项A', '选项B', '选项C', '选项D']
+                for c in range(1, len(headers) + 1):
+                    cell = ws.cell(row=1, column=c)
+                    cell.fill = header_fill
+                    cell.font = header_font
+                    cell.alignment = center
+                ws.row_dimensions[1].height = 26
+                for r in range(2, ws.max_row + 1):
+                    for c in range(1, len(headers) + 1):
+                        cell = ws.cell(row=r, column=c)
+                        cell.border = border
+                        cell.font = data_font
+                    ws.cell(row=r, column=4).alignment = center
+                    for c in (1, 2, 3, 5, 6, 7, 8):
+                        ws.cell(row=r, column=c).alignment = left
+                    ws.row_dimensions[r].height = 22
+                widths = [0] * len(headers)
+                for r in ws.iter_rows(values_only=True):
+                    for idx, val in enumerate(r):
+                        l = len(str(val)) if val is not None else 0
+                        widths[idx] = max(widths[idx], l)
+                for i, w in enumerate(widths, start=1):
+                    letter = get_column_letter(i)
+                    ws.column_dimensions[letter].width = max(16, min(48, w + 6))
+                ws.freeze_panes = 'A2'
+                ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{ws.max_row}"
+            wb.save(out)
             show_info(self, tr('common.success'), tr('admin.export.sample.done'))
         except Exception as e:
             show_warn(self, tr('common.error'), str(e))
