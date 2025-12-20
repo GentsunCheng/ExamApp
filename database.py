@@ -41,7 +41,7 @@ def ensure_db():
     conn = sqlite3.connect(CONFIG_DB_PATH)
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE, value TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS sync_targets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, ip TEXT, username TEXT, remote_path TEXT, ssh_password TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS sync_targets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, ip TEXT, username TEXT, remote_path TEXT, ssh_password TEXT, is_admin INTEGER DEFAULT 0)')
     conn.commit()
     conn.close()
     conn = sqlite3.connect(PROGRESS_DB_PATH)

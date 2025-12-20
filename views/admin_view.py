@@ -37,6 +37,7 @@ class SyncWorker(QThread):
         for t in self.targets:
             try:
                 ssh_password = t[5] if len(t) > 5 else None
+                is_admin = t[6] if len(t) > 6 else 0
                 if self.operation == 'sync':
                     base_dir = os.path.join(DB_DIR, 'pulled')
                     os.makedirs(base_dir, exist_ok=True)
@@ -57,7 +58,7 @@ class SyncWorker(QThread):
                     else:
                         pull_msg = f'{t[1]} ({ip}) 未找到远端成绩，跳过合并'
                     self.progress.emit(pull_msg)
-                    code2, out2, err2 = rsync_push(t[2], t[3], t[4], ssh_password)
+                    code2, out2, err2 = rsync_push(t[2], t[3], t[4], ssh_password, include_admin=bool(is_admin))
                     if code2 == 0:
                         push_msg = f'{t[1]} ({t[2]}) 上传完成'
                     else:
@@ -65,7 +66,7 @@ class SyncWorker(QThread):
                     self.progress.emit(push_msg)
                     result = pull_msg + '；' + push_msg
                 elif self.operation == 'push':
-                    code, out, err = rsync_push(t[2], t[3], t[4], ssh_password)
+                    code, out, err = rsync_push(t[2], t[3], t[4], ssh_password, include_admin=bool(is_admin))
                     result = f'{t[1]} ({t[2]}) ' + ('推送成功' if code == 0 else f'推送失败: {err or "未知错误"}')
                     self.progress.emit(result)
                 else:

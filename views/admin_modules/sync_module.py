@@ -8,7 +8,7 @@ from language import tr
 from icon_manager import get_icon
 from utils import show_info, show_warn, ask_yes_no
 from database import DB_DIR
-from models import list_sync_targets, upsert_sync_target, delete_sync_target, update_sync_target, get_exam_title
+from models import list_sync_targets, upsert_sync_target, delete_sync_target, update_sync_target, update_sync_target_admin, get_exam_title
 from sync import rsync_push, rsync_pull_scores
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
@@ -79,7 +79,8 @@ class SyncWorker(QThread):
                 max_workers_push = min(4, len(self.targets))
                 def push_one(t):
                     ssh_password = t[5] if len(t) > 5 else None
-                    code2, out2, err2 = rsync_push(t[2], t[3], t[4], ssh_password)
+                    is_admin = t[6] if len(t) > 6 else 0
+                    code2, out2, err2 = rsync_push(t[2], t[3], t[4], ssh_password, include_admin=bool(is_admin))
                     if code2 == 0:
                         msg = f'{t[1]} ({t[2]}) 上传完成'
                     else:
@@ -103,7 +104,8 @@ class SyncWorker(QThread):
                     max_workers = min(4, len(self.targets))
                     def push_only(t):
                         ssh_password = t[5] if len(t) > 5 else None
-                        code, out, err = rsync_push(t[2], t[3], t[4], ssh_password)
+                        is_admin = t[6] if len(t) > 6 else 0
+                        code, out, err = rsync_push(t[2], t[3], t[4], ssh_password, include_admin=bool(is_admin))
                         msg = f'{t[1]} ({t[2]}) ' + ('推送成功' if code == 0 else f'推送失败: {err or "未知错误"}')
                         return t, msg
                     with ThreadPoolExecutor(max_workers=max_workers) as ex:
@@ -459,6 +461,7 @@ class AdminSyncModule(QWidget):
         self.targets_table.blockSignals(True)
         self.targets_table.setRowCount(0)
         for t in targets:
+            is_admin = t[6] if len(t) > 6 else 0
             r = self.targets_table.rowCount()
             self.targets_table.insertRow(r)
             it_name = QTableWidgetItem(t[1])
@@ -472,6 +475,10 @@ class AdminSyncModule(QWidget):
             action_widget = QWidget()
             action_layout = QHBoxLayout()
             action_layout.setContentsMargins(4, 4, 4, 4)
+            toggle_btn = QPushButton(tr('admin.targets.set_admin') if not is_admin else tr('admin.targets.unset_admin'))
+            toggle_btn.setStyleSheet("QPushButton { background-color:#67c23a; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px; }")
+            toggle_btn.clicked.connect(lambda checked, tid=t[0], cur=is_admin: self.toggle_admin_device(tid, cur))
+            action_layout.addWidget(toggle_btn)
             edit_btn = QPushButton(tr('common.edit'))
             edit_btn.setStyleSheet("QPushButton { background-color:#409eff; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px; }")
             edit_btn.clicked.connect(lambda checked, tid=t[0]: self.edit_target(tid))
@@ -536,6 +543,17 @@ class AdminSyncModule(QWidget):
         self.t_path.clear()
         self.t_password.clear()
         show_info(self, tr('common.success'), tr('info.target_added'))
+    def toggle_admin_device(self, target_id, current_is_admin):
+        new_flag = 0 if current_is_admin else 1
+        try:
+            update_sync_target_admin(target_id, new_flag)
+            self.refresh_targets()
+            if new_flag:
+                show_info(self, tr('common.success'), tr('info.device_set_admin'))
+            else:
+                show_info(self, tr('common.success'), tr('info.device_unset_admin'))
+        except Exception as e:
+            show_warn(self, tr('common.error'), str(e))
     def edit_target(self, target_id):
         targets = list_sync_targets()
         target = None

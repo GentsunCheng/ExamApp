@@ -1,7 +1,7 @@
 import os
 import sys
 import subprocess
-from database import DB_DIR, USERS_DB_PATH, EXAMS_DB_PATH, SCORES_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH
+from database import DB_DIR, ADMIN_DB_PATH, USERS_DB_PATH, EXAMS_DB_PATH, SCORES_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH
 import tempfile
 import shutil
 
@@ -110,10 +110,12 @@ def _remote_join(remote_dir, *parts):
         out += sep + str(p).strip('/\\')
     return out
 
-def rsync_push(ip, username, remote_dir, ssh_password=None):
-    """Push selected local databases to remote directory (skip admin)"""
+def rsync_push(ip, username, remote_dir, ssh_password=None, include_admin=False):
+    """Push selected local databases to remote directory"""
     remote_dir = _expand_remote_tilde(remote_dir, ip, username, ssh_password)
     local_files = [SCORES_DB_PATH, EXAMS_DB_PATH, USERS_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH]
+    if include_admin:
+        local_files.append(ADMIN_DB_PATH)
     code_mk, out_mk, err_mk = _ensure_remote_dir(ip, username, remote_dir, ssh_password)
     if code_mk != 0:
         return code_mk, out_mk, f"Failed to create remote directory '{remote_dir}': {err_mk}"
