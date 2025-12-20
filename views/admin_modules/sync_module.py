@@ -1,5 +1,6 @@
 import os
 import pathlib
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QTextBrowser, QProgressDialog, QFileDialog, QMessageBox
 from theme_manager import theme_manager
@@ -24,64 +25,126 @@ class SyncWorker(QThread):
         self.operation = operation
     def run(self):
         results = []
-        for t in self.targets:
-            try:
-                ssh_password = t[5] if len(t) > 5 else None
-                if self.operation == 'sync':
-                    base_dir = os.path.join(DB_DIR, 'pulled')
-                    os.makedirs(base_dir, exist_ok=True)
+        if self.operation == 'sync':
+            base_dir = os.path.join(DB_DIR, 'pulled')
+            os.makedirs(base_dir, exist_ok=True)
+            pulled = []
+            if self.targets:
+                max_workers = min(4, len(self.targets))
+                def pull_one(t):
+                    ssh_password = t[5] if len(t) > 5 else None
                     ip = t[2]
                     dest_dir = os.path.join(base_dir, ip)
                     os.makedirs(dest_dir, exist_ok=True)
-                    pull_msg = ''
                     code, out, err = rsync_pull_scores(ip, t[3], t[4], dest_dir, ssh_password)
                     if code == 0:
-                        pull_msg = f'{t[1]} ({ip}) 拉取成功'
+                        msg = f'{t[1]} ({ip}) 拉取成功'
                         rp = os.path.join(dest_dir, 'scores.db')
+                        if os.path.exists(rp):
+                            return t, code, err, msg + ' (文件已保存)', rp
+                        return t, code, err, msg + ' (未找到scores.db文件)', None
+                    msg = f'{t[1]} ({ip}) 拉取失败: {err or "未知错误"}'
+                    return t, code, err, msg, None
+                with ThreadPoolExecutor(max_workers=max_workers) as ex:
+                    future_map = {ex.submit(pull_one, t): t for t in self.targets}
+                    for fut in as_completed(future_map):
+                        base_t = future_map[fut]
                         try:
-                            from models import merge_remote_scores_db
+                            t, code, err, msg, rp = fut.result()
+                            self.progress.emit(msg)
+                            results.append(msg)
+                            if code == 0 and rp:
+                                pulled.append((t, rp))
+                        except Exception as e:
+                            error_msg = f'{base_t[1]} 错误: {str(e)}'
+                            results.append(error_msg)
+                            self.error.emit(error_msg)
+            if pulled:
+                try:
+                    from models import merge_remote_scores_db
+                except Exception as e:
+                    err_msg = f'合并模块加载失败: {str(e)}'
+                    results.append(err_msg)
+                    self.error.emit(err_msg)
+                else:
+                    for t, rp in pulled:
+                        try:
                             merge_remote_scores_db(rp)
-                            pull_msg += ' (成绩已合并)'
+                            merge_msg = f'{t[1]} ({t[2]}) 成绩已合并'
                         except Exception as me:
-                            pull_msg += f' (合并失败: {str(me)})'
-                    else:
-                        pull_msg = f'{t[1]} ({ip}) 未找到远端成绩，跳过合并'
-                    self.progress.emit(pull_msg)
+                            merge_msg = f'{t[1]} ({t[2]}) 合并失败: {str(me)}'
+                        self.progress.emit(merge_msg)
+                        results.append(merge_msg)
+            if self.targets:
+                max_workers_push = min(4, len(self.targets))
+                def push_one(t):
+                    ssh_password = t[5] if len(t) > 5 else None
                     code2, out2, err2 = rsync_push(t[2], t[3], t[4], ssh_password)
                     if code2 == 0:
-                        push_msg = f'{t[1]} ({t[2]}) 上传完成'
+                        msg = f'{t[1]} ({t[2]}) 上传完成'
                     else:
-                        push_msg = f'{t[1]} ({t[2]}) 上传失败: {err2 or "未知错误"}'
-                    self.progress.emit(push_msg)
-                    result = pull_msg + '；' + push_msg
-                elif self.operation == 'push':
-                    code, out, err = rsync_push(t[2], t[3], t[4], ssh_password)
-                    result = f'{t[1]} ({t[2]}) ' + ('推送成功' if code == 0 else f'推送失败: {err or "未知错误"}')
-                    self.progress.emit(result)
-                else:
-                    base_dir = os.path.join(DB_DIR, 'pulled')
-                    os.makedirs(base_dir, exist_ok=True)
-                    ip = t[2]
-                    dest_dir = os.path.join(base_dir, ip)
-                    os.makedirs(dest_dir, exist_ok=True)
-                    code, out, err = rsync_pull_scores(ip, t[3], t[4], dest_dir, ssh_password)
-                    if code == 0:
-                        result = f'{t[1]} ({ip}) 拉取成功'
-                        rp = os.path.join(dest_dir, 'scores.db')
+                        msg = f'{t[1]} ({t[2]}) 上传失败: {err2 or "未知错误"}'
+                    return t, msg
+                with ThreadPoolExecutor(max_workers=max_workers_push) as ex:
+                    future_map = {ex.submit(push_one, t): t for t in self.targets}
+                    for fut in as_completed(future_map):
+                        base_t = future_map[fut]
                         try:
-                            from models import merge_remote_scores_db
-                            merge_remote_scores_db(rp)
-                            result += ' (成绩已合并)'
-                        except Exception as me:
-                            result += f' (合并失败: {str(me)})'
-                    else:
-                        result = f'{t[1]} ({ip}) 拉取失败: {err or "未知错误"}'
-                    self.progress.emit(result)
-                results.append(result)
-            except Exception as e:
-                error_msg = f'{t[1]} 错误: {str(e)}'
-                results.append(error_msg)
-                self.error.emit(error_msg)
+                            t, msg = fut.result()
+                            self.progress.emit(msg)
+                            results.append(msg)
+                        except Exception as e:
+                            error_msg = f'{base_t[1]} 错误: {str(e)}'
+                            results.append(error_msg)
+                            self.error.emit(error_msg)
+        else:
+            if self.operation == 'push':
+                if self.targets:
+                    max_workers = min(4, len(self.targets))
+                    def push_only(t):
+                        ssh_password = t[5] if len(t) > 5 else None
+                        code, out, err = rsync_push(t[2], t[3], t[4], ssh_password)
+                        msg = f'{t[1]} ({t[2]}) ' + ('推送成功' if code == 0 else f'推送失败: {err or "未知错误"}')
+                        return t, msg
+                    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+                        future_map = {ex.submit(push_only, t): t for t in self.targets}
+                        for fut in as_completed(future_map):
+                            base_t = future_map[fut]
+                            try:
+                                t, msg = fut.result()
+                                self.progress.emit(msg)
+                                results.append(msg)
+                            except Exception as e:
+                                error_msg = f'{base_t[1]} 错误: {str(e)}'
+                                results.append(error_msg)
+                                self.error.emit(error_msg)
+            else:
+                for t in self.targets:
+                    try:
+                        ssh_password = t[5] if len(t) > 5 else None
+                        base_dir = os.path.join(DB_DIR, 'pulled')
+                        os.makedirs(base_dir, exist_ok=True)
+                        ip = t[2]
+                        dest_dir = os.path.join(base_dir, ip)
+                        os.makedirs(dest_dir, exist_ok=True)
+                        code, out, err = rsync_pull_scores(ip, t[3], t[4], dest_dir, ssh_password)
+                        if code == 0:
+                            result = f'{t[1]} ({ip}) 拉取成功'
+                            rp = os.path.join(dest_dir, 'scores.db')
+                            try:
+                                from models import merge_remote_scores_db
+                                merge_remote_scores_db(rp)
+                                result += ' (成绩已合并)'
+                            except Exception as me:
+                                result += f' (合并失败: {str(me)})'
+                        else:
+                            result = f'{t[1]} ({ip}) 拉取失败: {err or "未知错误"}'
+                        self.progress.emit(result)
+                        results.append(result)
+                    except Exception as e:
+                        error_msg = f'{t[1]} 错误: {str(e)}'
+                        results.append(error_msg)
+                        self.error.emit(error_msg)
         self.finished.emit('\n'.join(results))
 
 
