@@ -171,6 +171,8 @@ class AdminProgressModule(QWidget):
 
         header = QGroupBox(tr('progress.group'))
         hb = QHBoxLayout()
+        hb.setContentsMargins(12, 8, 12, 8)
+        hb.setSpacing(8)
 
         self.user_select = QComboBox()
         self.user_select.setMinimumWidth(260)
@@ -178,6 +180,13 @@ class AdminProgressModule(QWidget):
         hb.addWidget(self.user_select)
 
         self.replace_import = QCheckBox(tr('progress.replace_import'))
+        colors_checkbox = theme_manager.get_theme_colors()
+        self.replace_import.setStyleSheet(
+            f"QCheckBox {{ color:{colors_checkbox['text_primary']}; font-size:14px; }}\n"
+            f"QCheckBox::indicator {{ width:40px; height:22px; border-radius:11px; }}\n"
+            f"QCheckBox::indicator:unchecked {{ background-color:{colors_checkbox['border_light']}; border:1px solid {colors_checkbox['border']}; }}\n"
+            f"QCheckBox::indicator:checked {{ background-color:{colors_checkbox['primary']}; border:1px solid {colors_checkbox['primary']}; }}"
+        )
         hb.addWidget(self.replace_import)
 
         btn_export_tpl = QPushButton(tr('progress.export_tpl'))
@@ -195,17 +204,16 @@ class AdminProgressModule(QWidget):
         btn_export_user.clicked.connect(self.export_user_progress)
         hb.addWidget(btn_export_user)
 
-        btn_refresh = QPushButton(tr('common.refresh'))
-        btn_refresh.setIcon(get_icon('confirm'))
-        btn_refresh.clicked.connect(self.refresh_users_and_view)
-        hb.addWidget(btn_refresh)
-
         hb.addStretch()
         header.setLayout(hb)
         lay.addWidget(header)
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
+        colors_scroll = theme_manager.get_theme_colors()
+        self.scroll.setStyleSheet(
+            f"QScrollArea {{ border:1px solid {colors_scroll['border']}; border-radius:8px; background-color:{colors_scroll['card_background']}; }}"
+        )
         self.content_widget = QWidget()
         self.content_layout = QVBoxLayout()
         self.content_widget.setLayout(self.content_layout)
@@ -364,14 +372,14 @@ class AdminProgressModule(QWidget):
     def _apply_status_style(self, widget, status):
         colors = theme_manager.get_theme_colors()
         if int(status) == PROGRESS_STATUS_COMPLETED:
-            bg = '#67c23a'
-            fg = '#ffffff'
+            bg = '#e1f3d8'
+            fg = '#67c23a'
         elif int(status) == PROGRESS_STATUS_IN_PROGRESS:
-            bg = colors.get('primary') or '#409eff'
-            fg = '#ffffff'
+            bg = '#d9ecff'
+            fg = colors.get('primary') or '#409eff'
         else:
-            bg = '#909399'
-            fg = '#ffffff'
+            bg = '#f4f4f5'
+            fg = colors.get('text_secondary') or '#909399'
         widget.setStyleSheet(f"QComboBox {{ background-color:{bg}; color:{fg}; padding:4px 10px; border-radius:10px; }}")
 
     def _clear_layout(self, layout):
