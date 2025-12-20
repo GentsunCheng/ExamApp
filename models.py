@@ -420,6 +420,56 @@ def list_attempts_with_user():
         out.append((r[0], uname, decrypt_text(fn) if fn else None, r[1], r[2], r[3], r[4], r[5], r[6], r[7], 1 if valid else 0))
     return out
 
+def list_exam_user_overview(exam_id):
+    conn = get_score_conn()
+    c = conn.cursor()
+    c.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, total_score, checksum FROM attempts WHERE exam_id=? ORDER BY id DESC', (exam_id,))
+    rows = c.fetchall()
+    conn.close()
+    stats = {}
+    for r in rows:
+        expect = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(r[0]), str(r[1]), str(r[2]), str(r[3]), str(r[4]) if r[4] else '-', str(r[5]), str(r[6]), str(r[7])])).encode('utf-8'), hashlib.sha256).hexdigest()
+        valid = str(r[8] or '') == expect
+        if not valid:
+            continue
+        uid = int(r[1])
+        cur = stats.get(uid)
+        last_ts = r[4] or r[3]
+        score_val = float(r[5] or 0.0)
+        passed_val = int(r[6] or 0)
+        if cur is None:
+            stats[uid] = {'last_ts': last_ts, 'best_score': score_val, 'passed': passed_val, 'attempts': 1}
+        else:
+            if last_ts and (cur['last_ts'] is None or last_ts > cur['last_ts']):
+                cur['last_ts'] = last_ts
+            if score_val > cur['best_score']:
+                cur['best_score'] = score_val
+            if passed_val == 1:
+                cur['passed'] = 1
+            cur['attempts'] += 1
+    if not stats:
+        return []
+    user_ids = sorted(stats.keys())
+    uconn = get_user_conn()
+    uc = uconn.cursor()
+    users_map = {}
+    placeholders = ','.join(['?'] * len(user_ids))
+    try:
+        uc.execute(f'SELECT id, username, full_name FROM users WHERE id IN ({placeholders})', tuple(user_ids))
+        for ur in uc.fetchall():
+            users_map[int(ur[0])] = (ur[1], ur[2])
+    except Exception:
+        uc.execute(f'SELECT id, username, NULL as full_name FROM users WHERE id IN ({placeholders})', tuple(user_ids))
+        for ur in uc.fetchall():
+            users_map[int(ur[0])] = (ur[1], ur[2])
+    uconn.close()
+    out = []
+    for uid in user_ids:
+        uname, fn = users_map.get(uid, (None, None))
+        s = stats[uid]
+        out.append((uid, uname, decrypt_text(fn) if fn else None, s['last_ts'], s['best_score'], s['passed'], s['attempts']))
+    return out
+
 def merge_remote_scores_db(remote_scores_db_path):
     lconn = get_score_conn()
     lcur = lconn.cursor()

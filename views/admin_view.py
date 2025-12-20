@@ -23,6 +23,7 @@ from views.admin_modules.exams_module import AdminExamsModule
 from views.admin_modules.sync_module import AdminSyncModule
 from views.admin_modules.scores_module import AdminScoresModule
 from views.admin_modules.progress_module import AdminProgressModule
+from views.admin_modules.scores_overview_module import AdminScoresOverviewModule
 
 class SyncWorker(QThread):
     progress = Signal(str)
@@ -95,6 +96,7 @@ class SyncWorker(QThread):
                 self.error.emit(error_msg)
         self.finished.emit('\n'.join(results))
 
+
 class AdminView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -130,12 +132,14 @@ class AdminView(QWidget):
         self.tabs.addTab(AdminExamsModule(self), tr('admin.exams_tab'))
         self.tabs.addTab(AdminSyncModule(self), tr('admin.sync_tab'))
         self.tabs.addTab(AdminScoresModule(self), tr('admin.scores_tab'))
+        self.tabs.addTab(AdminScoresOverviewModule(self), tr('admin.scores_overview_tab'))
         self.tabs.addTab(AdminProgressModule(self), tr('admin.progress_tab'))
         self.tabs.setTabIcon(0, get_icon('user'))
         self.tabs.setTabIcon(1, get_icon('exam'))
         self.tabs.setTabIcon(2, get_icon('sync'))
         self.tabs.setTabIcon(3, get_icon('score'))
         self.tabs.setTabIcon(4, get_icon('score'))
+        self.tabs.setTabIcon(5, get_icon('score'))
         self.tabs.currentChanged.connect(self.on_tab_changed)
         layout = QVBoxLayout()
         topbar = QHBoxLayout()
@@ -164,6 +168,9 @@ class AdminView(QWidget):
         elif isinstance(w, AdminScoresModule):
             if hasattr(w, 'refresh_scores'):
                 w.refresh_scores()
+        elif isinstance(w, AdminScoresOverviewModule):
+            if hasattr(w, 'refresh_overview'):
+                w.refresh_overview()
         elif isinstance(w, AdminProgressModule):
             if hasattr(w, 'refresh_users_and_view'):
                 w.refresh_users_and_view()
