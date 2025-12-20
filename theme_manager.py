@@ -63,6 +63,56 @@ class ThemeManager:
                 'button_primary_hover': '#66b1ff'
             }
 
+    def get_scrollbar_style(self):
+        colors = self.get_theme_colors()
+        bg_track = colors.get('border_light', '#eef2f6')
+        bg_handle = colors.get('input_border', '#d1d9e6')
+        bg_handle_hover = colors.get('primary', '#409eff')
+        return f"""
+QScrollBar:vertical {{
+    background: transparent;
+    width: 10px;
+    margin: 4px 2px 4px 0;
+}}
+QScrollBar::handle:vertical {{
+    background: {bg_handle};
+    min-height: 40px;
+    border-radius: 5px;
+}}
+QScrollBar::handle:vertical:hover {{
+    background: {bg_handle_hover};
+}}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0px;
+    subcontrol-origin: margin;
+}}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+    background: {bg_track};
+    border-radius: 5px;
+}}
+QScrollBar:horizontal {{
+    background: transparent;
+    height: 10px;
+    margin: 0 4px 2px 4px;
+}}
+QScrollBar::handle:horizontal {{
+    background: {bg_handle};
+    min-width: 40px;
+    border-radius: 5px;
+}}
+QScrollBar::handle:horizontal:hover {{
+    background: {bg_handle_hover};
+}}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+    width: 0px;
+    subcontrol-origin: margin;
+}}
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+    background: {bg_track};
+    border-radius: 5px;
+}}
+"""
+
     def set_mode(self, mode):
         self.mode = mode if mode in ('light', 'dark') else 'light'
 
