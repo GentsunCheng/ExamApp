@@ -21,10 +21,7 @@ class UserExamsModule(QWidget):
             print("[DEBUG] exams_module start button connected", file=sys.stderr)
         except Exception:
             pass
-        refresh_exams_btn = QPushButton(tr('common.refresh'))
-        refresh_exams_btn.clicked.connect(self.refresh_exams)
         exams_toolbar.addWidget(start_btn)
-        exams_toolbar.addWidget(refresh_exams_btn)
         exams_toolbar.addStretch()
         exams_v.addLayout(exams_toolbar)
         self.exams_table_user = QTableWidget(0, 9)

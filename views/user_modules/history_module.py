@@ -11,12 +11,6 @@ class UserHistoryModule(QWidget):
         super().__init__(parent)
         self.user = user
         history_v = QVBoxLayout()
-        history_toolbar = QHBoxLayout()
-        refresh_attempts_btn = QPushButton(tr('common.refresh'))
-        refresh_attempts_btn.clicked.connect(self.refresh_attempts)
-        history_toolbar.addWidget(refresh_attempts_btn)
-        history_toolbar.addStretch()
-        history_v.addLayout(history_toolbar)
         self.attempts_table = QTableWidget(0, 5)
         self.attempts_table.setHorizontalHeaderLabels([tr('attempts.uuid'), tr('attempts.exam_title'), tr('attempts.started'), tr('attempts.submitted'), tr('attempts.score_total_status')])
         self.attempts_table.setColumnWidth(0, 280)
