@@ -247,8 +247,8 @@ class AdminSyncModule(QWidget):
         dlg.setStyleSheet(
             f"QProgressDialog {{ background-color:{colors['card_background']}; border:1px solid {colors['border']}; border-radius:12px; }}\n"
             f"QLabel {{ color:{colors['text_primary']}; font-size:14px; padding:12px; }}\n"
-            f"QProgressBar {{ background-color:{colors['border_light']}; border:1px solid {colors['border']}; border-radius:10px; height:16px; margin:8px 12px; }}\n"
-            f"QProgressBar::chunk {{ background-color:{colors['primary']}; border-radius:10px; }}"
+            f"QProgressBar {{ background-color:{colors['progress_background']}; border:none; border-radius:4px; height:6px; margin:20px 18px 12px 18px; }}\n"
+            f"QProgressBar::chunk {{ background-color:{colors['primary']}; border-radius:4px; }}"
         )
         dlg.show()
         self.sync_progress_dialog = dlg
