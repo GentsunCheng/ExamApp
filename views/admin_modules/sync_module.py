@@ -1,7 +1,7 @@
 import os
 import pathlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QTextBrowser, QProgressDialog, QFileDialog, QMessageBox
 from theme_manager import theme_manager
 from language import tr
@@ -17,6 +17,7 @@ from openpyxl.utils import get_column_letter
 
 class SyncWorker(QThread):
     progress = Signal(str)
+    progress_step = Signal(int)
     finished = Signal(str)
     error = Signal(str)
     def __init__(self, targets, operation='push'):
@@ -29,6 +30,7 @@ class SyncWorker(QThread):
             base_dir = os.path.join(DB_DIR, 'pulled')
             os.makedirs(base_dir, exist_ok=True)
             pulled = []
+            total_steps = len(self.targets) * 3 if self.targets else 0
             if self.targets:
                 max_workers = min(4, len(self.targets))
                 def pull_one(t):
@@ -52,6 +54,8 @@ class SyncWorker(QThread):
                         try:
                             t, code, err, msg, rp = fut.result()
                             self.progress.emit(msg)
+                            if total_steps:
+                                self.progress_step.emit(1)
                             results.append(msg)
                             if code == 0 and rp:
                                 pulled.append((t, rp))
@@ -74,6 +78,8 @@ class SyncWorker(QThread):
                         except Exception as me:
                             merge_msg = f'{t[1]} ({t[2]}) 合并失败: {str(me)}'
                         self.progress.emit(merge_msg)
+                        if total_steps:
+                            self.progress_step.emit(1)
                         results.append(merge_msg)
             if self.targets:
                 max_workers_push = min(4, len(self.targets))
@@ -93,6 +99,8 @@ class SyncWorker(QThread):
                         try:
                             t, msg = fut.result()
                             self.progress.emit(msg)
+                            if total_steps:
+                                self.progress_step.emit(1)
                             results.append(msg)
                         except Exception as e:
                             error_msg = f'{base_t[1]} 错误: {str(e)}'
@@ -102,6 +110,7 @@ class SyncWorker(QThread):
             if self.operation == 'push':
                 if self.targets:
                     max_workers = min(4, len(self.targets))
+                    total_steps = len(self.targets)
                     def push_only(t):
                         ssh_password = t[5] if len(t) > 5 else None
                         is_admin = t[6] if len(t) > 6 else 0
@@ -115,12 +124,15 @@ class SyncWorker(QThread):
                             try:
                                 t, msg = fut.result()
                                 self.progress.emit(msg)
+                                if total_steps:
+                                    self.progress_step.emit(1)
                                 results.append(msg)
                             except Exception as e:
                                 error_msg = f'{base_t[1]} 错误: {str(e)}'
                                 results.append(error_msg)
                                 self.error.emit(error_msg)
             else:
+                total_steps = len(self.targets)
                 for t in self.targets:
                     try:
                         ssh_password = t[5] if len(t) > 5 else None
@@ -142,6 +154,8 @@ class SyncWorker(QThread):
                         else:
                             result = f'{t[1]} ({ip}) 拉取失败: {err or "未知错误"}'
                         self.progress.emit(result)
+                        if total_steps:
+                            self.progress_step.emit(1)
                         results.append(result)
                     except Exception as e:
                         error_msg = f'{t[1]} 错误: {str(e)}'
@@ -223,7 +237,11 @@ class AdminSyncModule(QWidget):
         lay.addWidget(self.sync_log)
         lay.addStretch()
         self.setLayout(lay)
-    def show_sync_progress(self, message):
+        self.progress_total = 0
+        self.progress_done = 0
+        self.display_progress = 0
+        self.progress_timer = None
+    def show_sync_progress(self, message, total_steps=None):
         if hasattr(self, 'sync_progress_dialog') and getattr(self, 'sync_progress_dialog'):
             try:
                 self.sync_progress_dialog.close()
@@ -237,7 +255,11 @@ class AdminSyncModule(QWidget):
         dlg.setAutoClose(False)
         dlg.setAutoReset(False)
         dlg.setModal(True)
-        dlg.setRange(0, 0)
+        if total_steps is None or total_steps <= 0:
+            dlg.setRange(0, 0)
+        else:
+            dlg.setRange(0, total_steps)
+            dlg.setValue(0)
         dlg.setLabelText(message)
         dlg.setFixedSize(420, 140)
         try:
@@ -292,6 +314,47 @@ class AdminSyncModule(QWidget):
                 self.sync_progress_dialog.setLabelText(msg)
         except Exception:
             pass
+    def start_progress_timer(self):
+        if self.progress_timer is None:
+            self.progress_timer = QTimer(self)
+            self.progress_timer.timeout.connect(self.on_progress_tick)
+        self.display_progress = 0
+        if hasattr(self, 'sync_progress_dialog') and getattr(self, 'sync_progress_dialog'):
+            self.sync_progress_dialog.setValue(0)
+        self.progress_timer.start(40)
+    def stop_progress_timer(self):
+        if self.progress_timer is not None:
+            self.progress_timer.stop()
+    def on_progress_tick(self):
+        try:
+            if not hasattr(self, 'sync_progress_dialog') or not getattr(self, 'sync_progress_dialog'):
+                self.stop_progress_timer()
+                return
+            if self.progress_total <= 0:
+                return
+            if self.display_progress < self.progress_done:
+                self.display_progress += 1
+                if self.display_progress > self.progress_total:
+                    self.display_progress = self.progress_total
+                self.sync_progress_dialog.setValue(self.display_progress)
+            elif self.progress_done >= self.progress_total:
+                self.sync_progress_dialog.setValue(self.progress_total)
+                self.stop_progress_timer()
+        except Exception:
+            self.stop_progress_timer()
+    def on_progress_step(self, step):
+        try:
+            if not hasattr(self, 'sync_progress_dialog') or not getattr(self, 'sync_progress_dialog'):
+                return
+            if not hasattr(self, 'progress_total'):
+                return
+            if not hasattr(self, 'progress_done'):
+                self.progress_done = 0
+            self.progress_done += step
+            if self.progress_done > self.progress_total:
+                self.progress_done = self.progress_total
+        except Exception:
+            pass
     def sync_all(self):
         targets = list_sync_targets()
         if not targets:
@@ -307,8 +370,13 @@ class AdminSyncModule(QWidget):
         self.sync_worker.error.connect(self.on_sync_error)
         self.sync_worker.progress.connect(self.append_sync_log)
         self.sync_worker.progress.connect(self.update_progress_message)
+        total_steps = len(targets) * 3
+        self.progress_total = total_steps
+        self.progress_done = 0
+        self.sync_worker.progress_step.connect(self.on_progress_step)
         self.sync_worker.start()
-        self.show_sync_progress(tr('sync.syncing_message'))
+        self.show_sync_progress(tr('sync.syncing_message'), total_steps)
+        self.start_progress_timer()
     def push_all(self):
         targets = list_sync_targets()
         if not targets:
@@ -322,8 +390,13 @@ class AdminSyncModule(QWidget):
         self.sync_worker.error.connect(self.on_sync_error)
         self.sync_worker.progress.connect(self.append_sync_log)
         self.sync_worker.progress.connect(self.update_progress_message)
+        total_steps = len(targets)
+        self.progress_total = total_steps
+        self.progress_done = 0
+        self.sync_worker.progress_step.connect(self.on_progress_step)
         self.sync_worker.start()
-        self.show_sync_progress(tr('sync.pushing_message'))
+        self.show_sync_progress(tr('sync.pushing_message'), total_steps)
+        self.start_progress_timer()
     def pull_all(self):
         targets = list_sync_targets()
         if not targets:
@@ -337,14 +410,23 @@ class AdminSyncModule(QWidget):
         self.sync_worker.error.connect(self.on_sync_error)
         self.sync_worker.progress.connect(self.append_sync_log)
         self.sync_worker.progress.connect(self.update_progress_message)
+        total_steps = len(targets)
+        self.progress_total = total_steps
+        self.progress_done = 0
+        self.sync_worker.progress_step.connect(self.on_progress_step)
         self.sync_worker.start()
-        self.show_sync_progress(tr('sync.pulling_message'))
+        self.show_sync_progress(tr('sync.pulling_message'), total_steps)
+        self.start_progress_timer()
     def on_sync_finished(self, results):
         self.set_sync_buttons_enabled(True)
         if hasattr(self, 'sync_worker'):
             self.sync_worker.deleteLater()
+        self.stop_progress_timer()
         if hasattr(self, 'sync_progress_dialog') and getattr(self, 'sync_progress_dialog'):
             try:
+                if hasattr(self, 'progress_total'):
+                    self.sync_progress_dialog.setRange(0, max(0, self.progress_total))
+                    self.sync_progress_dialog.setValue(self.progress_total)
                 self.sync_progress_dialog.close()
             except Exception:
                 pass
@@ -360,6 +442,7 @@ class AdminSyncModule(QWidget):
         self.set_sync_buttons_enabled(True)
         if hasattr(self, 'sync_worker'):
             self.sync_worker.deleteLater()
+        self.stop_progress_timer()
         if hasattr(self, 'sync_progress_dialog') and getattr(self, 'sync_progress_dialog'):
             try:
                 self.sync_progress_dialog.close()
