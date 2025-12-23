@@ -12,6 +12,7 @@ from icon_manager import get_icon
 from theme_manager import theme_manager
 from utils import show_info, show_warn, ask_yes_no
 from language import tr
+from windows.progress_overview_window import ProgressOverviewWindow
 
 from models import (
     list_users,
@@ -204,6 +205,11 @@ class AdminProgressModule(QWidget):
         btn_export_user.clicked.connect(self.export_user_progress)
         hb.addWidget(btn_export_user)
 
+        btn_overview = QPushButton(tr('progress.overview'))
+        btn_overview.setIcon(get_icon('score'))
+        btn_overview.clicked.connect(self.open_overview)
+        hb.addWidget(btn_overview)
+
         hb.addStretch()
         header.setLayout(hb)
         lay.addWidget(header)
@@ -224,6 +230,8 @@ class AdminProgressModule(QWidget):
         self.setLayout(lay)
 
         self.refresh_users_and_view()
+
+        self.overview_window = None
 
     def refresh_users_and_view(self):
         current_id = self.get_selected_user_id()
@@ -298,6 +306,22 @@ class AdminProgressModule(QWidget):
             show_info(self, tr('common.success'), tr('progress.export_user.done', path=out))
         except Exception as e:
             show_warn(self, tr('common.error'), str(e))
+
+    def open_overview(self):
+        user_id = self.get_selected_user_id()
+        if user_id is None:
+            show_warn(self, tr('common.error'), tr('error.select_user'))
+            return
+        tree = get_user_progress_tree(user_id)
+        label = self.user_select.currentText() or ''
+        title = tr('progress.overview.title', user=label)
+        self.overview_window = ProgressOverviewWindow(title, tree, self)
+        self.overview_window.show()
+        try:
+            self.overview_window.raise_()
+            self.overview_window.activateWindow()
+        except Exception:
+            pass
 
     def refresh_progress_view(self):
         self._clear_layout(self.content_layout)

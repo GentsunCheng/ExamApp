@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QScrollArea, QTableWidget, QTableWidgetItem, QAbstractItemView
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QScrollArea, QTableWidget, QTableWidgetItem, QAbstractItemView, QHBoxLayout, QPushButton
 
 from theme_manager import theme_manager
 from language import tr
@@ -11,12 +11,24 @@ from models import (
     get_user_progress_tree,
 )
 
+from windows.progress_overview_window import ProgressOverviewWindow
+
 
 class UserProgressModule(QWidget):
     def __init__(self, user, parent=None):
         super().__init__(parent)
         self.user = user
         lay = QVBoxLayout()
+
+        header = QGroupBox()
+        hb = QHBoxLayout()
+        hb.addStretch()
+        btn_overview = QPushButton(tr('progress.overview'))
+        btn_overview.setIcon(get_icon('score'))
+        btn_overview.clicked.connect(self.open_overview)
+        hb.addWidget(btn_overview)
+        header.setLayout(hb)
+        lay.addWidget(header)
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
@@ -29,6 +41,8 @@ class UserProgressModule(QWidget):
         lay.addStretch()
         self.setLayout(lay)
         self.refresh_progress()
+
+        self.overview_window = None
 
     def refresh_progress(self):
         self._clear_layout(self.content_layout)
@@ -116,3 +130,21 @@ class UserProgressModule(QWidget):
             child_layout = item.layout()
             if child_layout is not None:
                 self._clear_layout(child_layout)
+
+    def open_overview(self):
+        try:
+            user_id = int(self.user.get('id') or 0)
+        except Exception:
+            user_id = 0
+        if user_id <= 0:
+            return
+        tree = get_user_progress_tree(user_id)
+        username = self.user.get('username') or ''
+        title = tr('progress.overview.title', user=username)
+        self.overview_window = ProgressOverviewWindow(title, tree, self)
+        self.overview_window.show()
+        try:
+            self.overview_window.raise_()
+            self.overview_window.activateWindow()
+        except Exception:
+            pass
