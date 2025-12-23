@@ -2,6 +2,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QScrollArea, QTableWidget, QTableWidgetItem, QAbstractItemView, QHBoxLayout, QPushButton
 
+from icon_manager import get_icon
 from theme_manager import theme_manager
 from language import tr
 from models import (
@@ -67,9 +68,10 @@ class UserProgressModule(QWidget):
             tbl.horizontalHeader().setStretchLastSection(True)
             tbl.setAlternatingRowColors(True)
             tbl.setShowGrid(False)
-            tbl.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            tbl.setSelectionMode(QAbstractItemView.NoSelection)
+            tbl.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+            tbl.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
             tbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            tbl.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
             tasks = md.get('tasks') or []
             tbl.setRowCount(len(tasks))
@@ -99,7 +101,8 @@ class UserProgressModule(QWidget):
             self.content_layout.addWidget(gb)
         self.content_layout.addStretch()
 
-    def _apply_status_style(self, item, status):
+    @staticmethod
+    def _apply_status_style(item, status):
         colors = theme_manager.get_theme_colors()
         if int(status) == PROGRESS_STATUS_COMPLETED:
             bg = '#67c23a'
@@ -113,7 +116,8 @@ class UserProgressModule(QWidget):
         item.setBackground(QColor(bg))
         item.setForeground(QColor(fg))
 
-    def _status_text(self, status):
+    @staticmethod
+    def _status_text(status):
         if int(status) == PROGRESS_STATUS_COMPLETED:
             return tr('progress.status.completed')
         if int(status) == PROGRESS_STATUS_IN_PROGRESS:

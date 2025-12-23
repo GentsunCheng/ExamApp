@@ -25,7 +25,8 @@ class AdminScoresOverviewModule(QWidget):
         self.setLayout(lay)
         self.refresh_overview()
 
-    def make_tag(self, text, bg, fg):
+    @staticmethod
+    def make_tag(text, bg, fg):
         lab = QLabel(text)
         lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lab.setStyleSheet(f"QLabel {{ background-color:{bg}; color:{fg}; border-radius:10px; padding:2px 8px; font-size:12px; }}")

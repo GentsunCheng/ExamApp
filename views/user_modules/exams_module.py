@@ -38,8 +38,8 @@ class UserExamsModule(QWidget):
         self.exams_table_user.horizontalHeader().setStretchLastSection(True)
         self.exams_table_user.setAlternatingRowColors(True)
         self.exams_table_user.setShowGrid(False)
-        self.exams_table_user.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.exams_table_user.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.exams_table_user.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.exams_table_user.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         try:
             self.exams_table_user.itemDoubleClicked.connect(lambda *_: self._start_via_parent())
         except Exception:

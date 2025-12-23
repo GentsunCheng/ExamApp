@@ -42,7 +42,8 @@ class AdminScoresModule(QWidget):
         gb.setLayout(vb)
         lay.addWidget(gb)
         self.setLayout(lay)
-    def make_tag(self, text, bg, fg):
+    @staticmethod
+    def make_tag(text, bg, fg):
         from PySide6.QtWidgets import QLabel
         lab = QLabel(text)
         lab.setAlignment(Qt.AlignmentFlag.AlignCenter)

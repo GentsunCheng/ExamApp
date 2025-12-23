@@ -6,7 +6,7 @@ from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils import get_column_letter
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QComboBox, QPushButton, QFileDialog, QScrollArea, QTableWidget, QTableWidgetItem, QCheckBox, QMessageBox
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QComboBox, QPushButton, QFileDialog, QScrollArea, QTableWidget, QTableWidgetItem, QCheckBox, QMessageBox, QAbstractItemView
 
 from icon_manager import get_icon
 from theme_manager import theme_manager
@@ -346,6 +346,7 @@ class AdminProgressModule(QWidget):
             tbl.horizontalHeader().setStretchLastSection(True)
             tbl.setAlternatingRowColors(True)
             tbl.setShowGrid(False)
+            tbl.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
             tasks = md.get('tasks') or []
             tbl.setRowCount(len(tasks))
             for r, t in enumerate(tasks):
@@ -381,6 +382,8 @@ class AdminProgressModule(QWidget):
         cb = self.sender()
         if cb is None:
             return
+        if not isinstance(cb, QComboBox):
+            return
         try:
             user_id = int(cb.property('user_id'))
             task_id = int(cb.property('task_id'))
@@ -393,7 +396,8 @@ class AdminProgressModule(QWidget):
         except Exception as e:
             show_warn(self, tr('common.error'), str(e))
 
-    def _apply_status_style(self, widget, status):
+    @staticmethod
+    def _apply_status_style(widget, status):
         colors = theme_manager.get_theme_colors()
         if int(status) == PROGRESS_STATUS_COMPLETED:
             bg = '#e1f3d8'

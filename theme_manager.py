@@ -1,11 +1,62 @@
 from PySide6.QtGui import QColor
+from PySide6.QtCore import QObject, QEvent
+from PySide6.QtWidgets import QAbstractScrollArea, QAbstractItemView, QScroller, QScrollerProperties
 import sys
 import subprocess
+
+
+class SmoothScrollFilter(QObject):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._configured = set()
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.Wheel:
+            area = self._find_scroll_area(obj)
+            if area is None:
+                return False
+            if isinstance(area, QAbstractItemView):
+                try:
+                    area.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+                    area.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+                except Exception:
+                    pass
+            self._ensure_scroller(area)
+        return False
+
+    def _find_scroll_area(self, obj):
+        w = obj
+        while w is not None:
+            if isinstance(w, QAbstractScrollArea):
+                return w
+            w = w.parent()
+        return None
+
+    def _ensure_scroller(self, area):
+        key = id(area)
+        if key in self._configured:
+            return
+        self._configured.add(key)
+        scroller = QScroller.scroller(area)
+        props = QScrollerProperties(scroller.scrollerProperties())
+        try:
+            props.setScrollMetric(QScrollerProperties.ScrollMetric.DecelerationFactor, 0.5)
+            props.setScrollMetric(QScrollerProperties.ScrollMetric.MaximumVelocity, 1.5)
+            props.setScrollMetric(QScrollerProperties.ScrollMetric.MinimumVelocity, 0.01)
+            props.setScrollMetric(QScrollerProperties.ScrollMetric.FrameRate, QScrollerProperties.FrameRates.Fps60)
+            props.setScrollMetric(QScrollerProperties.ScrollMetric.VerticalOvershootPolicy,
+                                  QScrollerProperties.OvershootPolicy.OvershootWhenScrollable)
+            props.setScrollMetric(QScrollerProperties.ScrollMetric.HorizontalOvershootPolicy,
+                                  QScrollerProperties.OvershootPolicy.OvershootWhenScrollable)
+        except Exception:
+            pass
+        scroller.setScrollerProperties(props)
 
 
 class ThemeManager:
     def __init__(self):
         self.mode = 'light'
+        self._smooth_scroll_filter = None
         try:
             self.auto_detect_mode()
         except Exception:
@@ -112,6 +163,11 @@ class ThemeManager:
                 border-radius: 5px;
             }}
         """
+
+    def install_smooth_scroll(self, app):
+        if self._smooth_scroll_filter is None:
+            self._smooth_scroll_filter = SmoothScrollFilter(app)
+            app.installEventFilter(self._smooth_scroll_filter)
 
     def set_mode(self, mode):
         self.mode = mode if mode in ('light', 'dark') else 'light'

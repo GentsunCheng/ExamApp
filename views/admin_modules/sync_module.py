@@ -241,6 +241,9 @@ class AdminSyncModule(QWidget):
         self.progress_done = 0
         self.display_progress = 0
         self.progress_timer = None
+        self.sync_progress_dialog = None
+        self.sync_worker = None
+
     def show_sync_progress(self, message, total_steps=None):
         if hasattr(self, 'sync_progress_dialog') and getattr(self, 'sync_progress_dialog'):
             try:
@@ -274,7 +277,9 @@ class AdminSyncModule(QWidget):
         )
         dlg.show()
         self.sync_progress_dialog = dlg
-    def make_tag(self, text, bg, fg):
+
+    @staticmethod
+    def make_tag(text, bg, fg):
         from PySide6.QtWidgets import QLabel
         lab = QLabel(text)
         lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
