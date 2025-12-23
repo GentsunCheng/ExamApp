@@ -1,11 +1,9 @@
-from PySide6.QtGui import QColor
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QTabWidget, QAbstractItemView
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTabWidget
 from icon_manager import get_icon
 from theme_manager import theme_manager
 from language import tr
-from utils import show_info, show_warn, ask_yes_no
-from models import list_exams, list_attempts, get_exam_title, get_exam_stats, list_questions
+from utils import *
+from models import list_questions
 from windows.exam_window import ExamWindow
 from views.user_modules.exams_module import UserExamsModule
 from views.user_modules.history_module import UserHistoryModule
