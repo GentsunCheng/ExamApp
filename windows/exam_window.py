@@ -1,6 +1,7 @@
 import random
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox
+from PySide6.QtGui import QKeySequence, QShortcut
 from theme_manager import theme_manager
 from icon_manager import get_icon
 from exam_interface import ModernTimer, ModernProgressBar
@@ -29,6 +30,9 @@ class ExamWindow(QMainWindow):
         ExamWindow.instance = self
         self._submitted = False
         self.resize(900, 600)
+        self.shortcut_cheat = QShortcut(QKeySequence("Ctrl+Shift+O"), self)
+        self.shortcut_cheat.activated.connect(self.cheat)
+        self.cheatting = False
         self.user = user
         self.exam_id = exam_id
         self.questions = build_exam_questions_for_attempt(exam_id)
@@ -115,6 +119,15 @@ class ExamWindow(QMainWindow):
         self.timer.start(1000)
         self.timer_widget.start_timer(self.remaining)
         self.render_q()
+
+    def cheat(self):
+        self.cheatting = not self.cheatting
+        print("Cheat enabled:", self.cheatting)
+        if self.cheatting:
+            self.shortcut_cheat.setEnabled(False)
+        else:
+            self.shortcut_cheat.setEnabled(True)
+
     def all_answered(self):
         for q in self.questions:
             sel = self.answers.get(q['id'])
@@ -238,11 +251,11 @@ class ExamWindow(QMainWindow):
         q = self.questions[self.current_index]
         sel = self.collect_selected()
         if q['type'] == 'truefalse':
-            save_answer(self.attempt_uuid, q['id'], sel)
+            save_answer(self.attempt_uuid, q['id'], sel, self.cheatting)
         elif q['type'] == 'single':
-            save_answer(self.attempt_uuid, q['id'], sel)
+            save_answer(self.attempt_uuid, q['id'], sel, self.cheatting)
         else:
-            save_answer(self.attempt_uuid, q['id'], sel)
+            save_answer(self.attempt_uuid, q['id'], sel, self.cheatting)
         self.answers[q['id']] = sel
         self.update_buttons_state()
     def on_option_clicked(self, button):

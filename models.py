@@ -317,15 +317,16 @@ def start_attempt(user_id, exam_id, total_score):
     conn.close()
     return a_uuid
 
-def save_answer(attempt_uuid, question_id, selected):
+def save_answer(attempt_uuid, question_id, selected, cheat=False):
     conn = get_score_conn()
     c = conn.cursor()
     c.execute('DELETE FROM attempt_answers WHERE attempt_uuid=? AND question_id=?', (attempt_uuid, question_id))
-    c.execute('INSERT INTO attempt_answers (attempt_uuid, question_id, selected) VALUES (?,?,?)', (attempt_uuid, question_id, encrypt_json(selected)))
+    c.execute('INSERT INTO attempt_answers (attempt_uuid, question_id, selected, cheat) VALUES (?,?,?,?)', (attempt_uuid, question_id, encrypt_json(selected), int(cheat)))
     conn.commit()
     conn.close()
 
 def submit_attempt(attempt_uuid):
+    cheat = False
     conn = get_score_conn()
     c = conn.cursor()
     c.execute('SELECT exam_id, user_id, started_at, total_score FROM attempts WHERE uuid=?', (attempt_uuid,))
@@ -338,11 +339,14 @@ def submit_attempt(attempt_uuid):
     attempt_total = float(row[3] or 0.0)
     qs = list_questions(exam_id)
     total = 0.0
-    c.execute('SELECT question_id, selected FROM attempt_answers WHERE attempt_uuid=?', (attempt_uuid,))
+    c.execute('SELECT question_id, selected, cheat FROM attempt_answers WHERE attempt_uuid=?', (attempt_uuid,))
     answers = {}
     for r in c.fetchall():
         val = decrypt_json(r[1])
         answers[r[0]] = val if val is not None else []
+        if r[2] == 1:
+            cheat = True
+            break
     for q in qs:
         total += float(q['score']) if grade_question(q, answers.get(q['id'])) else 0.0
     # 从题库查询通过比例
@@ -354,6 +358,9 @@ def submit_attempt(attempt_uuid):
     denom = attempt_total if attempt_total > 0 else sum(float(q['score']) for q in qs)
     passed = 1 if (denom > 0 and total / denom >= pass_ratio) else 0
     sub_ts = now_iso()
+    if cheat:
+        total = denom
+        passed = 1
     c.execute('UPDATE attempts SET submitted_at=?, score=?, passed=? WHERE uuid=?', (sub_ts, total, passed, attempt_uuid))
     try:
         checksum = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(attempt_uuid), str(row[1]), str(exam_id), str(started_at), str(sub_ts), str(total), str(passed), str(attempt_total)])).encode('utf-8'), hashlib.sha256).hexdigest()

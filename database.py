@@ -35,7 +35,7 @@ def ensure_db():
     conn = sqlite3.connect(SCORES_DB_PATH)
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT UNIQUE, user_id INTEGER, exam_id INTEGER, started_at TEXT, submitted_at TEXT, score REAL, passed INTEGER, total_score REAL, checksum TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS attempt_answers (id INTEGER PRIMARY KEY AUTOINCREMENT, attempt_uuid TEXT, question_id INTEGER, selected TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS attempt_answers (id INTEGER PRIMARY KEY AUTOINCREMENT, attempt_uuid TEXT, question_id INTEGER, selected TEXT, cheat INTEGER DEFAULT 0)')
     conn.commit()
     conn.close()
     conn = sqlite3.connect(CONFIG_DB_PATH)
