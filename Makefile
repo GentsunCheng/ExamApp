@@ -7,11 +7,53 @@ MAIN_SCRIPT = main.py
 DIST_DIR = dist
 BUILD_DIR = build
 
+# 检测平台
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+    PLATFORM := macos
+else ifeq ($(UNAME_S),Linux)
+    PLATFORM := linux
+else ifneq (,$(findstring MINGW,$(UNAME_S)))
+    PLATFORM := windows
+else ifneq (,$(findstring MSYS,$(UNAME_S)))
+    PLATFORM := windows
+else
+    PLATFORM := unknown
+endif
+
 # PyInstaller 配置
 PYINSTALLER = pyinstaller
-PYINSTALLER_ARGS = --onedir --noconsole --windowed --name $(APP_NAME) --distpath $(DIST_DIR) \
- --workpath $(BUILD_DIR) --add-data "resources:resources" --icon resources/logo.icns \
- --osx-bundle-identifier top.orii.exam
+
+PYINSTALLER_COMMON_ARGS = \
+    --onedir \
+    --name $(APP_NAME) \
+    --distpath $(DIST_DIR) \
+    --workpath $(BUILD_DIR) \
+    --add-data "resources:resources"
+
+PYINSTALLER_MACOS_ARGS = \
+    --windowed \
+    --noconsole \
+    --icon resources/logo.icns \
+    --osx-bundle-identifier top.orii.exam
+
+PYINSTALLER_WINDOWS_ARGS = \
+    --windowed \
+    --noconsole \
+    --icon resources/logo.ico
+
+PYINSTALLER_LINUX_ARGS = \
+    --noconsole
+
+ifeq ($(PLATFORM),macos)
+    PYINSTALLER_ARGS = $(PYINSTALLER_COMMON_ARGS) $(PYINSTALLER_MACOS_ARGS)
+else ifeq ($(PLATFORM),windows)
+    PYINSTALLER_ARGS = $(PYINSTALLER_COMMON_ARGS) $(PYINSTALLER_WINDOWS_ARGS)
+else ifeq ($(PLATFORM),linux)
+    PYINSTALLER_ARGS = $(PYINSTALLER_COMMON_ARGS) $(PYINSTALLER_LINUX_ARGS)
+else
+    $(error Unsupported platform: $(UNAME_S))
+endif
 
 # 根据平台与可用模块添加隐性导入（动态 importlib 使用的模块）
 EXTRA_HIDDEN_IMPORTS := $(shell python -c 'import importlib, sys; mods=["winreg","ctypes"]; print(" ".join(["--hidden-import "+m for m in mods if importlib.util.find_spec(m)]))')
