@@ -13,6 +13,8 @@ ifeq ($(UNAME_S),Darwin)
     PLATFORM := macos
 else ifeq ($(UNAME_S),Linux)
     PLATFORM := linux
+else ifeq ($(UNAME_S),Windows_NT)
+    PLATFORM := windows
 else ifneq (,$(findstring MINGW,$(UNAME_S)))
     PLATFORM := windows
 else ifneq (,$(findstring MSYS,$(UNAME_S)))
