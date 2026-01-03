@@ -1,6 +1,6 @@
 import random
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QGridLayout
 from PySide6.QtGui import QKeySequence, QShortcut
 from theme_manager import theme_manager
 from icon_manager import get_icon
@@ -29,7 +29,7 @@ class ExamWindow(QMainWindow):
             return
         ExamWindow.instance = self
         self._submitted = False
-        self.resize(900, 600)
+        self.resize(1200, 700)
         self.shortcut_cheat = QShortcut(QKeySequence("Ctrl+Shift+O"), self)
         self.shortcut_cheat.activated.connect(self.cheat)
         self.cheatting = False
@@ -68,13 +68,34 @@ class ExamWindow(QMainWindow):
         )
         self.setStyleSheet(ss_exam)
         central = QWidget()
-        lay = QVBoxLayout()
+        main_layout = QHBoxLayout()
+
+        self.nav_buttons = []
+        nav_box = QGroupBox(tr('exam.nav_title'))
+        nav_layout = QGridLayout()
+        nav_colors = theme_manager.get_theme_colors()
+        nav_box.setStyleSheet(
+            f"QGroupBox {{ border:1px solid {nav_colors['border']}; border-radius:8px; padding:8px; font-size:13px; }}"
+        )
+        nav_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        for i in range(len(self.questions)):
+            row = i // 3
+            col = i % 3
+            btn = QPushButton(str(i + 1))
+            btn.setCheckable(True)
+            btn.clicked.connect(lambda checked, idx=i: self.goto_question(idx))
+            nav_layout.addWidget(btn, row, col)
+            self.nav_buttons.append(btn)
+        nav_box.setLayout(nav_layout)
+        main_layout.addWidget(nav_box)
+
+        right = QVBoxLayout()
         self.timer_widget = ModernTimer()
-        lay.addWidget(self.timer_widget)
+        right.addWidget(self.timer_widget)
         self.progress_bar = ModernProgressBar()
         self.progress_bar.setRange(0, max(1, len(self.questions)))
         self.progress_bar.setValue(1)
-        lay.addWidget(self.progress_bar)
+        right.addWidget(self.progress_bar)
         gb = QGroupBox()
         gb.setStyleSheet(f"QGroupBox {{ border:1px solid {colors['border']}; border-radius:8px; padding:12px; }}")
         vb = QVBoxLayout()
@@ -88,7 +109,7 @@ class ExamWindow(QMainWindow):
         vb.addWidget(self.q_title)
         vb.addWidget(self.opts_container)
         gb.setLayout(vb)
-        lay.addWidget(gb)
+        right.addWidget(gb)
         hb = QHBoxLayout()
         self.prev_btn = QPushButton(tr('exam.prev'))
         self.next_btn = QPushButton(tr('exam.next'))
@@ -103,8 +124,10 @@ class ExamWindow(QMainWindow):
         hb.addWidget(self.next_btn)
         hb.addStretch()
         hb.addWidget(self.submit_btn)
-        lay.addLayout(hb)
-        central.setLayout(lay)
+        right.addLayout(hb)
+
+        main_layout.addLayout(right, 1)
+        central.setLayout(main_layout)
         self.setCentralWidget(central)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
@@ -118,6 +141,7 @@ class ExamWindow(QMainWindow):
         self.remaining = tl * 60
         self.timer.start(1000)
         self.timer_widget.start_timer(self.remaining)
+        self.update_nav_buttons_state()
         self.render_q()
 
     def cheat(self):
@@ -145,6 +169,62 @@ class ExamWindow(QMainWindow):
         self.prev_btn.setEnabled(self.current_index > 0)
         self.next_btn.setEnabled(self.current_index < len(self.questions) - 1)
         self.submit_btn.setEnabled(self.all_answered() and not getattr(self, '_submitted', False))
+    def update_nav_buttons_state(self):
+        colors = theme_manager.get_theme_colors()
+        base_bg = colors['card_background']
+        base_fg = colors['text_primary']
+        answered_bg = colors['primary']
+        answered_fg = colors['text_inverse']
+        ok_bg = colors['success_light']
+        ok_fg = colors['success']
+        warn_bg = colors['warning_light']
+        warn_fg = colors['warning']
+        bad_bg = colors['error_light']
+        bad_fg = colors['error']
+        for idx, q in enumerate(self.questions):
+            if idx >= len(self.nav_buttons):
+                continue
+            btn = self.nav_buttons[idx]
+            style_bg = base_bg
+            style_fg = base_fg
+            btn.setChecked(idx == self.current_index)
+            if getattr(self, '_submitted', False):
+                info = self.evaluation.get(q['id']) or {'selected': [], 'correct': False}
+                sel_list = info.get('selected') or []
+                sel = set(str(s) for s in sel_list)
+                correct_set = set(str(s) for s in (q.get('correct') or []))
+                if info.get('correct'):
+                    style_bg = ok_bg
+                    style_fg = ok_fg
+                else:
+                    if q['type'] == 'multiple':
+                        intersection = sel & correct_set
+                        if len(intersection) == 0:
+                            style_bg = bad_bg
+                            style_fg = bad_fg
+                        else:
+                            style_bg = warn_bg
+                            style_fg = warn_fg
+                    else:
+                        style_bg = bad_bg
+                        style_fg = bad_fg
+            else:
+                sel = self.answers.get(q['id'])
+                if sel:
+                    style_bg = answered_bg
+                    style_fg = answered_fg
+            btn.setStyleSheet(
+                f"QPushButton {{ background-color:{style_bg}; color:{style_fg}; border-radius:8px; padding:6px 10px; min-width:32px; border:1px solid transparent; }}\n"
+                f"QPushButton:hover {{ border-color:{colors['primary']}; }}\n"
+                f"QPushButton:pressed {{ border-color:{colors['primary']}; }}\n"
+                f"QPushButton:checked {{ border-color:{colors['primary']}; }}"
+            )
+    def goto_question(self, index):
+        if index < 0 or index >= len(self.questions):
+            return
+        self.save_current()
+        self.current_index = index
+        self.render_q()
     def tick(self):
         self.remaining -= 1
         if self.remaining <= 0:
@@ -229,6 +309,7 @@ class ExamWindow(QMainWindow):
                     kval = b.property('key_val')
                     b.setChecked(kval in sset if kval is not None else False)
         self.update_buttons_state()
+        self.update_nav_buttons_state()
         self.progress_bar.setValue(self.current_index + 1)
         if getattr(self, '_submitted', False):
             try:
@@ -258,6 +339,7 @@ class ExamWindow(QMainWindow):
             save_answer(self.attempt_uuid, q['id'], sel, self.cheatting)
         self.answers[q['id']] = sel
         self.update_buttons_state()
+        self.update_nav_buttons_state()
     def on_option_clicked(self, button):
         if getattr(self, '_submitted', False):
             return
@@ -305,6 +387,7 @@ class ExamWindow(QMainWindow):
             self.evaluation[q['id']] = {'selected': sel, 'correct': ok}
         self._submitted = True
         self.update_buttons_state()
+        self.update_nav_buttons_state()
         self.render_q()
 
     def apply_evaluation_styles(self, q):
