@@ -116,6 +116,14 @@ def rsync_push(ip, username, remote_dir, ssh_password=None, include_admin=False)
     local_files = [SCORES_DB_PATH, EXAMS_DB_PATH, USERS_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH]
     if include_admin:
         local_files.append(ADMIN_DB_PATH)
+    else:
+        if ssh_password:
+            cmd = [SSHPASS_PATH, '-p', ssh_password, 'ssh -o StrictHostKeyChecking=no'] + [
+                f'{username}@{ip}'] + ['rm', '-f', _remote_join(remote_dir, os.path.basename(ADMIN_DB_PATH))]
+        else:
+            cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', 
+                f'{username}@{ip}', 'rm', '-f', _remote_join(remote_dir, os.path.basename(ADMIN_DB_PATH))]
+        subprocess.run(cmd, check=True)
     code_mk, out_mk, err_mk = _ensure_remote_dir(ip, username, remote_dir, ssh_password)
     if code_mk != 0:
         return code_mk, out_mk, f"Failed to create remote directory '{remote_dir}': {err_mk}"
