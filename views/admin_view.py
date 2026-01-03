@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTabWidget
+from PySide6.QtGui import QShortcut, QKeySequence
 from theme_manager import theme_manager
 from language import tr
 from utils import show_info, show_warn, ask_yes_no
@@ -54,6 +55,7 @@ class AdminView(QWidget):
         self.tabs.setTabIcon(3, get_icon('score'))
         self.tabs.setTabIcon(4, get_icon('score'))
         self.tabs.setTabIcon(5, get_icon('score'))
+        self.tabs.setTabVisible(2, False)
         self.tabs.currentChanged.connect(self.on_tab_changed)
         layout = QVBoxLayout()
         topbar = QHBoxLayout()
@@ -68,6 +70,14 @@ class AdminView(QWidget):
         layout.addLayout(topbar)
         layout.addWidget(self.tabs)
         self.setLayout(layout)
+        self.sync_tab_shortcut = QShortcut(QKeySequence("Ctrl+Shift+S"), self)
+        self.sync_tab_shortcut.activated.connect(self.sync_view_change)
+
+    def sync_view_change(self):
+        if self.tabs.isTabVisible(2):
+            self.tabs.setTabVisible(2, False)
+        else:
+            self.tabs.setTabVisible(2, True)
 
     def on_tab_changed(self, idx):
         w = self.tabs.widget(idx)
