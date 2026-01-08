@@ -46,3 +46,4 @@ node_modules/
 *.db
 .trae/
 serect_key.py
+pack.sh
