@@ -32,6 +32,8 @@ class ExamWindow(QMainWindow):
         self.resize(1200, 700)
         self.shortcut_cheat = QShortcut(QKeySequence("Ctrl+Shift+O"), self)
         self.shortcut_cheat.activated.connect(self.cheat)
+        self.shortcut_quit = QShortcut(QKeySequence("Ctrl+W"), self)
+        self.shortcut_quit.activated.connect(self.quit_exam)
         self.cheatting = False
         self.user = user
         self.exam_id = exam_id
@@ -144,6 +146,11 @@ class ExamWindow(QMainWindow):
         self.update_nav_buttons_state()
         self.render_q()
 
+    def quit_exam(self):
+        self.timer.stop()
+        self.timer_widget.stop_timer()
+        self.close()
+
     def cheat(self):
         self.cheatting = not self.cheatting
         print("Cheat enabled:", self.cheatting)
@@ -165,10 +172,12 @@ class ExamWindow(QMainWindow):
                 if not sel:
                     return False
         return True
+
     def update_buttons_state(self):
         self.prev_btn.setEnabled(self.current_index > 0)
         self.next_btn.setEnabled(self.current_index < len(self.questions) - 1)
         self.submit_btn.setEnabled(self.all_answered() and not getattr(self, '_submitted', False))
+
     def update_nav_buttons_state(self):
         colors = theme_manager.get_theme_colors()
         base_bg = colors['card_background']
@@ -219,18 +228,21 @@ class ExamWindow(QMainWindow):
                 f"QPushButton:pressed {{ border-color:{colors['primary']}; }}\n"
                 f"QPushButton:checked {{ border-color:{colors['primary']}; }}"
             )
+
     def goto_question(self, index):
         if index < 0 or index >= len(self.questions):
             return
         self.save_current()
         self.current_index = index
         self.render_q()
+
     def tick(self):
         self.remaining -= 1
         if self.remaining <= 0:
             self.submit()
             return
         self.progress_bar.setValue(min(len(self.questions), self.current_index + 1))
+
     def render_q(self):
         if self.current_index < 0:
             self.current_index = 0
@@ -316,6 +328,7 @@ class ExamWindow(QMainWindow):
                 self.apply_evaluation_styles(q)
             except Exception:
                 pass
+
     def collect_selected(self):
         q = self.questions[self.current_index]
         selected = []
@@ -328,6 +341,7 @@ class ExamWindow(QMainWindow):
         if q['type'] == 'single':
             selected = selected[:1]
         return selected
+
     def save_current(self):
         q = self.questions[self.current_index]
         sel = self.collect_selected()
@@ -340,6 +354,7 @@ class ExamWindow(QMainWindow):
         self.answers[q['id']] = sel
         self.update_buttons_state()
         self.update_nav_buttons_state()
+
     def on_option_clicked(self, button):
         if getattr(self, '_submitted', False):
             return
@@ -351,18 +366,21 @@ class ExamWindow(QMainWindow):
         sel = self.collect_selected()
         self.answers[q['id']] = sel
         self.update_buttons_state()
+
     def next_q(self):
         self.save_current()
         self.current_index += 1
         if self.current_index >= len(self.questions):
             self.current_index = len(self.questions) - 1
         self.render_q()
+
     def prev_q(self):
         self.save_current()
         self.current_index -= 1
         if self.current_index < 0:
             self.current_index = 0
         self.render_q()
+        
     def submit(self):
         self.save_current()
         self.timer.stop()

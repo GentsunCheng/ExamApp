@@ -1,6 +1,7 @@
 import sys
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
+from PySide6.QtGui import QKeySequence, QShortcut
 from database import ensure_db
 from models import create_admin_if_absent
 from theme_manager import theme_manager
@@ -24,6 +25,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle('ExamApp By Gentsun')
         self.setMinimumSize(900, 600)
         self.resize(1440, 960)
+        self.shortcut_quit = QShortcut(QKeySequence("Ctrl+W"), self)
+        self.shortcut_quit.activated.connect(self.close)
         colors = theme_manager.get_theme_colors()
         bkg = 'background' + '-color'
         self.setStyleSheet(f"QMainWindow {{ {bkg}:{colors['background']}; }}")
@@ -31,6 +34,11 @@ class MainWindow(QMainWindow):
         self.login = LoginView(self.on_login)
         self.stack.addWidget(self.login)
         self.setCentralWidget(self.stack)
+
+    def closeEvent(self, event):
+        self.logout()
+        event.accept()
+
     def on_login(self, user):
         if user['role'] == 'admin':
             self.admin = AdminView(self)
@@ -40,6 +48,7 @@ class MainWindow(QMainWindow):
             self.user_view = UserView(user, self)
             self.stack.addWidget(self.user_view)
             self.stack.setCurrentWidget(self.user_view)
+            
     def logout(self):
         for i in range(1, self.stack.count()):
             w = self.stack.widget(i)
