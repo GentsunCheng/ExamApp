@@ -118,11 +118,11 @@ def rsync_push(ip, username, remote_dir, ssh_password=None, include_admin=False)
         local_files.append(ADMIN_DB_PATH)
     else:
         if ssh_password:
-            cmd = [SSHPASS_PATH, '-p', ssh_password, 'ssh -o StrictHostKeyChecking=no'] + [
-                f'{username}@{ip}'] + ['rm', '-f', _remote_join(remote_dir, os.path.basename(ADMIN_DB_PATH))]
+            cmd = [SSHPASS_PATH, '-p', ssh_password, 'ssh'] + [f'{username}@{ip}'] + [
+                'rm', '-f', _remote_join(remote_dir, os.path.basename(ADMIN_DB_PATH))]
         else:
-            cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', 
-                f'{username}@{ip}', 'rm', '-f', _remote_join(remote_dir, os.path.basename(ADMIN_DB_PATH))]
+            cmd = ['ssh', f'{username}@{ip}',
+             'rm', '-f', _remote_join(remote_dir, os.path.basename(ADMIN_DB_PATH))]
         subprocess.run(cmd, check=True)
     code_mk, out_mk, err_mk = _ensure_remote_dir(ip, username, remote_dir, ssh_password)
     if code_mk != 0:
