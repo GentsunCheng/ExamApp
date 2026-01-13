@@ -1,5 +1,5 @@
 import random
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QGridLayout
 from PySide6.QtGui import QKeySequence, QShortcut
 from theme_manager import theme_manager
@@ -145,6 +145,30 @@ class ExamWindow(QMainWindow):
         self.timer_widget.start_timer(self.remaining)
         self.update_nav_buttons_state()
         self.render_q()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.start_zoom_in_animation()
+
+    def start_zoom_in_animation(self):
+        rect = self.geometry()
+        if not rect.isValid():
+            return
+        scale = 0.9
+        w = max(1, int(rect.width() * scale))
+        h = max(1, int(rect.height() * scale))
+        start_rect = QRect(
+            rect.center().x() - w // 2,
+            rect.center().y() - h // 2,
+            w,
+            h,
+        )
+        self._zoom_anim = QPropertyAnimation(self, b"geometry")
+        self._zoom_anim.setDuration(180)
+        self._zoom_anim.setStartValue(start_rect)
+        self._zoom_anim.setEndValue(rect)
+        self._zoom_anim.setEasingCurve(QEasingCurve.OutCubic)
+        self._zoom_anim.start()
 
     def quit_exam(self):
         self.timer.stop()

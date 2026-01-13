@@ -2,6 +2,7 @@ import sys
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
 from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QRect
 from database import ensure_db
 from models import create_admin_if_absent
 from theme_manager import theme_manager
@@ -34,6 +35,30 @@ class MainWindow(QMainWindow):
         self.login = LoginView(self.on_login)
         self.stack.addWidget(self.login)
         self.setCentralWidget(self.stack)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.start_zoom_in_animation()
+
+    def start_zoom_in_animation(self):
+        rect = self.geometry()
+        if not rect.isValid():
+            return
+        scale = 0.9
+        w = max(1, int(rect.width() * scale))
+        h = max(1, int(rect.height() * scale))
+        start_rect = QRect(
+            rect.center().x() - w // 2,
+            rect.center().y() - h // 2,
+            w,
+            h,
+        )
+        self._zoom_anim = QPropertyAnimation(self, b"geometry")
+        self._zoom_anim.setDuration(180)
+        self._zoom_anim.setStartValue(start_rect)
+        self._zoom_anim.setEndValue(rect)
+        self._zoom_anim.setEasingCurve(QEasingCurve.OutCubic)
+        self._zoom_anim.start()
 
     def closeEvent(self, event):
         self.logout()
