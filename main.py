@@ -1,8 +1,8 @@
 import sys
 
-from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
+from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget, QGraphicsOpacityEffect
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QRect
+from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QRect, QParallelAnimationGroup
 from database import ensure_db
 from models import create_admin_if_absent
 from theme_manager import theme_manager
@@ -60,6 +60,55 @@ class MainWindow(QMainWindow):
         self._zoom_anim.setEasingCurve(QEasingCurve.OutCubic)
         self._zoom_anim.start()
 
+    def _create_opacity_anim(self, widget, start, end):
+        if widget is None:
+            return None
+        effect = widget.graphicsEffect()
+        if not isinstance(effect, QGraphicsOpacityEffect):
+            effect = QGraphicsOpacityEffect(widget)
+            widget.setGraphicsEffect(effect)
+        anim = QPropertyAnimation(effect, b"opacity", self)
+        anim.setDuration(220)
+        anim.setStartValue(start)
+        anim.setEndValue(end)
+        anim.setEasingCurve(QEasingCurve.InOutCubic)
+        return anim
+
+    def _switch_with_fade(self, target_widget, cleanup=None):
+        if target_widget is None:
+            return
+        current = self.stack.currentWidget()
+        if current is target_widget:
+            if cleanup:
+                cleanup()
+            return
+        if self.stack.indexOf(target_widget) == -1:
+            self.stack.addWidget(target_widget)
+        target_widget.setVisible(True)
+        self.stack.setCurrentWidget(target_widget)
+        fade_in = self._create_opacity_anim(target_widget, 0.0, 1.0)
+        fade_out = self._create_opacity_anim(current, 1.0, 0.0) if current is not None else None
+        group = QParallelAnimationGroup(self)
+        if fade_out is not None:
+            group.addAnimation(fade_out)
+        if fade_in is not None:
+            group.addAnimation(fade_in)
+
+        def on_finished():
+            if cleanup:
+                cleanup()
+            if current is not None:
+                eff = current.graphicsEffect()
+                if isinstance(eff, QGraphicsOpacityEffect):
+                    current.setGraphicsEffect(None)
+            eff_t = target_widget.graphicsEffect()
+            if isinstance(eff_t, QGraphicsOpacityEffect):
+                eff_t.setOpacity(1.0)
+
+        group.finished.connect(on_finished)
+        self._fade_group = group
+        group.start()
+
     def closeEvent(self, event):
         self.logout()
         event.accept()
@@ -67,19 +116,18 @@ class MainWindow(QMainWindow):
     def on_login(self, user):
         if user['role'] == 'admin':
             self.admin = AdminView(self)
-            self.stack.addWidget(self.admin)
-            self.stack.setCurrentWidget(self.admin)
+            self._switch_with_fade(self.admin)
         else:
             self.user_view = UserView(user, self)
-            self.stack.addWidget(self.user_view)
-            self.stack.setCurrentWidget(self.user_view)
+            self._switch_with_fade(self.user_view)
             
     def logout(self):
-        for i in range(1, self.stack.count()):
-            w = self.stack.widget(i)
-            self.stack.removeWidget(w)
-            w.deleteLater()
-        self.stack.setCurrentWidget(self.login)
+        def cleanup():
+            for i in range(1, self.stack.count()):
+                w = self.stack.widget(i)
+                self.stack.removeWidget(w)
+                w.deleteLater()
+        self._switch_with_fade(self.login, cleanup=cleanup)
 
 
 if __name__ == '__main__':

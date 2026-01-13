@@ -1,5 +1,6 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTabWidget
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTabWidget, QGraphicsOpacityEffect
 from PySide6.QtGui import QShortcut, QKeySequence
+from PySide6.QtCore import QPropertyAnimation, QEasingCurve
 from theme_manager import theme_manager
 from language import tr
 from utils import show_info, show_warn, ask_yes_no
@@ -72,6 +73,41 @@ class AdminView(QWidget):
         self.setLayout(layout)
         self.sync_tab_shortcut = QShortcut(QKeySequence("Ctrl+Shift+S"), self)
         self.sync_tab_shortcut.activated.connect(self.sync_view_change)
+        self._last_tab_index = 0
+        self._tab_anim = None
+        self._tab_effect = None
+
+    def _animate_tab_change(self, new_idx):
+        if self._tab_anim is not None:
+            try:
+                self._tab_anim.stop()
+            except Exception:
+                pass
+            self._tab_anim = None
+        w = self.tabs.widget(new_idx) if 0 <= new_idx < self.tabs.count() else None
+        if w is None:
+            return
+        if self._tab_effect is not None:
+            last = self.tabs.widget(self._last_tab_index) if 0 <= self._last_tab_index < self.tabs.count() else None
+            if last is not None and last.graphicsEffect() is self._tab_effect:
+                last.setGraphicsEffect(None)
+        effect = QGraphicsOpacityEffect(w)
+        w.setGraphicsEffect(effect)
+        effect.setOpacity(0.0)
+        anim = QPropertyAnimation(effect, b"opacity", self)
+        anim.setDuration(75)
+        anim.setStartValue(0.0)
+        anim.setEndValue(1.0)
+        anim.setEasingCurve(QEasingCurve.InOutCubic)
+
+        def finished():
+            effect.setOpacity(1.0)
+            w.setGraphicsEffect(None)
+
+        anim.finished.connect(finished)
+        self._tab_anim = anim
+        self._tab_effect = effect
+        anim.start()
 
     def sync_view_change(self):
         if self.tabs.isTabVisible(2):
@@ -80,6 +116,10 @@ class AdminView(QWidget):
             self.tabs.setTabVisible(2, True)
 
     def on_tab_changed(self, idx):
+        old_idx = getattr(self, '_last_tab_index', 0)
+        if old_idx != idx:
+            self._animate_tab_change(idx)
+        self._last_tab_index = idx
         w = self.tabs.widget(idx)
         if isinstance(w, AdminUsersModule):
             if hasattr(w, 'refresh_users'):
