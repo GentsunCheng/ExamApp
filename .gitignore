@@ -47,3 +47,4 @@ node_modules/
 .trae/
 serect_key.py
 pack.sh
+nuitka-crash-report.xml

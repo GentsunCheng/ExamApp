@@ -40,7 +40,8 @@ PYINSTALLER_MACOS_ARGS = \
     --windowed \
     --noconsole \
     --icon resources/logo.icns \
-    --osx-bundle-identifier top.orii.exam
+    --osx-bundle-identifier top.orii.exam \
+	--output-folder-name=$(APP_NAME)_$(ARCH)
 
 PYINSTALLER_WINDOWS_ARGS = \
     --windowed \
