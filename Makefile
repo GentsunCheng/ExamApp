@@ -23,6 +23,9 @@ else
     PLATFORM := unknown
 endif
 
+# 检测架构
+ARCH ?= $(shell uname -m)
+
 # PyInstaller 配置
 PYINSTALLER = pyinstaller
 
@@ -53,6 +56,39 @@ else ifeq ($(PLATFORM),windows)
     PYINSTALLER_ARGS = $(PYINSTALLER_COMMON_ARGS) $(PYINSTALLER_WINDOWS_ARGS)
 else ifeq ($(PLATFORM),linux)
     PYINSTALLER_ARGS = $(PYINSTALLER_COMMON_ARGS) $(PYINSTALLER_LINUX_ARGS)
+else
+    $(error Unsupported platform: $(UNAME_S))
+endif
+
+# nuitka 配置
+NUITKA = nuitka
+
+NUITKA_COMPILE_ARGS = \
+    --output-dir=$(DIST_DIR) \
+    --include-data-dir=resources=resources \
+	--enable-plugin=pyside6
+
+NUITKA_MACOS_ARGS = \
+	--macos-create-app-bundle \
+    --macos-signed-app-name=top.orii.exam \
+	--macos-app-name=ExamSystem \
+	--macos-target-arch=$(ARCH) \
+    --macos-app-icon=resources/logo.icns
+
+NUITKA_WINDOWS_ARGS = \
+    --windows-console-mode=disable \
+	--windows-icon-from-ico=resources/logo.ico \
+	--onefile-windows-splash-screen-image=resources/logo.ico
+
+NUITKA_LINUX_ARGS = \
+    --linux-icon=resources/logo.png
+
+ifeq ($(PLATFORM),macos)
+    NUITKA_ARGS = $(NUITKA_COMPILE_ARGS) $(NUITKA_MACOS_ARGS)
+else ifeq ($(PLATFORM),windows)
+    NUITKA_ARGS = $(NUITKA_COMPILE_ARGS) $(NUITKA_WINDOWS_ARGS)
+else ifeq ($(PLATFORM),linux)
+    NUITKA_ARGS = $(NUITKA_COMPILE_ARGS) $(NUITKA_LINUX_ARGS)
 else
     $(error Unsupported platform: $(UNAME_S))
 endif
@@ -99,11 +135,24 @@ build: clean
 	$(PYINSTALLER) $(PYINSTALLER_ARGS) $(MAIN_SCRIPT)
 	@echo "构建完成! 可执行文件位于: $(DIST_DIR)/$(APP_NAME).app"
 
+# 使用nuitka构建
+.PHONY: build-nuitka
+build-nuitka: clean
+	@echo "开始使用nuitka构建..."
+	$(NUITKA) $(NUITKA_ARGS) $(MAIN_SCRIPT)
+	@echo "nuitka构建完成! 可执行文件位于: $(DIST_DIR)/$(APP_NAME)"
+
 # 构建并运行
 .PHONY: run
 run: build
 	@echo "运行可执行文件..."
 	open "$(DIST_DIR)/$(APP_NAME).app"
+
+# 使用nuitka运行
+.PHONY: run-nuitka
+run-nuitka: build-nuitka
+	@echo "运行nuitka可执行文件..."
+	open "$(DIST_DIR)/$(APP_NAME)"
 
 # 生成 DMG 安装镜像
 .PHONY: dmg
@@ -144,6 +193,13 @@ package: build
 	cd $(DIST_DIR) && tar -czf $(APP_NAME)-$(shell date +%Y%m%d).tar.gz $(APP_NAME)
 	@echo "发布包已创建: $(DIST_DIR)/$(APP_NAME)-$(shell date +%Y%m%d).tar.gz"
 
+# 使用nuitka打包发布
+.PHONY: package-nuitka
+package-nuitka: build-nuitka
+	@echo "创建nuitka发布包..."
+	cd $(DIST_DIR) && tar -czf $(APP_NAME)-$(shell date +%Y%m%d).tar.gz $(APP_NAME)
+	@echo "nuitka发布包已创建: $(DIST_DIR)/$(APP_NAME)-$(shell date +%Y%m%d).tar.gz"
+
 # 检查依赖
 .PHONY: check-deps
 check-deps:
@@ -165,11 +221,14 @@ help:
 	@echo "可用命令:"
 	@echo "  make install     - 安装依赖包"
 	@echo "  make build         - 构建可执行文件"
+	@echo "  make build-nuitka - 使用nuitka构建可执行文件"
 	@echo "  make run          - 构建并运行"
+	@echo "  make run-nuitka   - 使用nuitka运行"
 	@echo "  make dmg          - 生成DMG安装镜像"
 	@echo "  make dev          - 开发模式运行"
 	@echo "  make clean        - 清理构建文件"
 	@echo "  make package      - 创建发布包"
+	@echo "  make package-nuitka - 使用nuitka创建发布包"
 	@echo "  make check-deps  - 检查依赖包"
 	@echo "  make test         - 运行测试"
 	@echo "  make help          - 显示此帮助信息"
