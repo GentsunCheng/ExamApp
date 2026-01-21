@@ -59,7 +59,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ExamSystem-macos-${{ matrix.arch }}
+          name: ExamSystem-macos-${{ matrix.arch }}_${{ github.run_id }}
           path: ExamSystem-macos-${{ matrix.arch }}.zip
 
       - name: Release
