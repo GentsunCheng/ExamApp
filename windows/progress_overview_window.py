@@ -1,5 +1,6 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QScrollArea, QLabel, QGroupBox, QHBoxLayout
+from PySide6.QtGui import QKeySequence, QShortcut
 
 from theme_manager import theme_manager
 from models import PROGRESS_STATUS_IN_PROGRESS, PROGRESS_STATUS_COMPLETED
@@ -13,6 +14,9 @@ class ProgressOverviewWindow(QMainWindow):
         self.resize(960, 720)
         central = QWidget()
         lay = QVBoxLayout()
+
+        self.shortcut_quit = QShortcut(QKeySequence("Ctrl+W"), self)
+        self.shortcut_quit.activated.connect(self.close)
 
         lbl = QLabel(title or tr('progress.overview'))
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
