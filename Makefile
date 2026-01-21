@@ -34,11 +34,11 @@ PYINSTALLER_COMMON_ARGS = \
     --name $(APP_NAME) \
     --distpath $(DIST_DIR) \
     --workpath $(BUILD_DIR) \
-    --add-data "resources:resources"
 
 PYINSTALLER_MACOS_ARGS = \
     --windowed \
     --noconsole \
+	--add-data "resources/sshpass_darwin:resources/sshpass_darwin" \
     --icon resources/logo.icns \
     --osx-bundle-identifier top.orii.exam \
 	--output-folder-name=$(APP_NAME)_$(ARCH)
@@ -46,10 +46,12 @@ PYINSTALLER_MACOS_ARGS = \
 PYINSTALLER_WINDOWS_ARGS = \
     --windowed \
     --noconsole \
+	--add-data "resources/sshpass_win.exe:resources/sshpass_win.exe" \
     --icon resources/logo.ico
 
 PYINSTALLER_LINUX_ARGS = \
-    --noconsole
+    --noconsole \
+	--add-data "resources/sshpass_linux:resources/sshpass_linux"
 
 ifeq ($(PLATFORM),macos)
     PYINSTALLER_ARGS = $(PYINSTALLER_COMMON_ARGS) $(PYINSTALLER_MACOS_ARGS)
@@ -66,7 +68,7 @@ NUITKA = nuitka
 
 NUITKA_COMPILE_ARGS = \
     --output-dir=$(DIST_DIR) \
-    --include-data-dir=resources=resources \
+	--standalone \
 	--enable-plugin=pyside6
 
 NUITKA_MACOS_ARGS = \
@@ -74,14 +76,17 @@ NUITKA_MACOS_ARGS = \
     --macos-signed-app-name=top.orii.exam \
 	--macos-app-name=ExamSystem \
 	--macos-target-arch=$(ARCH) \
+	--include-data-file=resources/sshpass_darwin=resources/sshpass_darwin \
     --macos-app-icon=resources/logo.icns
 
 NUITKA_WINDOWS_ARGS = \
     --windows-console-mode=disable \
 	--windows-icon-from-ico=resources/logo.ico \
+	--include-data-file=resources/sshpass_win.exe=resources/sshpass_win.exe \
 	--onefile-windows-splash-screen-image=resources/logo.ico
 
 NUITKA_LINUX_ARGS = \
+	--include-data-file=resources/sshpass_linux=resources/sshpass_linux \
     --linux-icon=resources/logo.png
 
 ifeq ($(PLATFORM),macos)
