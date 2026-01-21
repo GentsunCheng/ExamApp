@@ -2,5 +2,6 @@
 PySide6
 pyyaml
 pyinstaller
+nuitka
 pycryptodome
 openpyxl
