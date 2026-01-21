@@ -28,19 +28,21 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.11'
           cache: 'pip'
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install nuitka  # Ensure nuitka is installed if not in requirements.txt
+          python3 -m pip3 install --upgrade pip3
+          echo "AES_KEY = '${{ secrets.AES_KEY }}'" > conf/secret_key.py
+          echo "SERECT_KEY = '${{ secrets.SERECT_KEY }}'" >> conf/secret_key.py
+          pip3 install -r requirements.txt
+          pip3 install nuitka  # Ensure nuitka is installed if not in requirements.txt
 
       - name: Check Environment
         run: |
-          python --version
-          python -m nuitka --version
+          python3 --version
+          python3 -m nuitka --version
 
       - name: Build with Nuitka
         run: |
