@@ -33,7 +33,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python3 -m pip3 install --upgrade pip3
+          python3 -m pip install --upgrade pip
           echo "AES_KEY = '${{ secrets.AES_KEY }}'" > conf/secret_key.py
           echo "SERECT_KEY = '${{ secrets.SERECT_KEY }}'" >> conf/secret_key.py
           pip3 install -r requirements.txt
