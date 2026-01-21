@@ -38,7 +38,7 @@ jobs:
           echo AES_KEY_B64=${{ secrets.AES_KEY }} > .env
           echo SERECT_KEY=${{ secrets.SERECT_KEY }} >> .env
           pip3 install -r requirements.txt
-          pip3 install nuitka  # Ensure nuitka is installed if not in requirements.txt
+          pip3 install nuitka
 
       - name: Check Environment
         run: |
@@ -47,6 +47,7 @@ jobs:
 
       - name: Build with Nuitka
         run: |
+          make genkey
           make build-nuitka ARCH=${{ matrix.arch }}
 
       - name: Package App Bundle

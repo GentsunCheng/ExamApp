@@ -1,7 +1,5 @@
 # Python packages for Exam System
 PySide6
 pyyaml
-pyinstaller
-nuitka
 pycryptodome
 openpyxl
