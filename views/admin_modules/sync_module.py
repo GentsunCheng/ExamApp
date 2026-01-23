@@ -200,7 +200,7 @@ class AdminSyncModule(QWidget):
         except Exception:
             pass
         self.t_ip = QLineEdit()
-        self.t_ip.setPlaceholderText(tr('admin.targets.ip_ph'))
+        self.t_ip.setPlaceholderText("192.168.1.100:22")
         self.t_user = QLineEdit()
         self.t_user.setPlaceholderText(tr('admin.targets.username_ph'))
         self.t_path = QLineEdit()

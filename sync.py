@@ -1,9 +1,8 @@
 import os
 import sys
 import subprocess
+import socket
 from database import DB_DIR, ADMIN_DB_PATH, USERS_DB_PATH, EXAMS_DB_PATH, SCORES_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH
-import tempfile
-import shutil
 
 
 FILENAME = None
@@ -52,11 +51,33 @@ if os.path.exists(SSHPASS_PATH):
 else:
     print(f"Error: sshpass binary not found at {SSHPASS_PATH}")
 
+def _parse_ip_port(ip_str):
+    """
+    解析 IP 和端口，格式为 ip:port 或 ip
+    返回 (ip, port)，默认为 22
+    """
+    if ':' in ip_str:
+        parts = ip_str.split(':')
+        if len(parts) == 2:
+            return parts[0], parts[1]
+    return ip_str, '22'
+
+def _is_port_open(ip, port, timeout=3):
+    """
+    检查目标 IP 的端口是否可连接
+    """
+    try:
+        with socket.create_connection((ip, int(port)), timeout=timeout):
+            return True
+    except (socket.timeout, ConnectionRefusedError, OSError):
+        return False
+
 def _run_ssh(ip, username, remote_cmd, ssh_password=None):
+    ip_addr, port = _parse_ip_port(ip)
     if ssh_password:
-        cmd = [SSHPASS_PATH, '-p', ssh_password, 'ssh', '-o', 'StrictHostKeyChecking=no', f'{username}@{ip}', remote_cmd]
+        cmd = [SSHPASS_PATH, '-p', ssh_password, 'ssh', '-p', port, '-o', 'StrictHostKeyChecking=no', f'{username}@{ip_addr}', remote_cmd]
     else:
-        cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', f'{username}@{ip}', remote_cmd]
+        cmd = ['ssh', '-p', port, '-o', 'StrictHostKeyChecking=no', f'{username}@{ip_addr}', remote_cmd]
     return subprocess.run(cmd, capture_output=True, text=True)
 
  
@@ -118,40 +139,48 @@ def _remote_join(remote_dir, *parts):
 
 def rsync_push(ip, username, remote_dir, ssh_password=None, include_admin=False):
     """Push selected local databases to remote directory"""
+    ip_addr, port = _parse_ip_port(ip)
+    if not _is_port_open(ip_addr, port):
+        return 1, '', f"Connection failed: {ip_addr}:{port} is unreachable."
     remote_dir = _expand_remote_tilde(remote_dir, ip, username, ssh_password)
     local_files = [SCORES_DB_PATH, EXAMS_DB_PATH, USERS_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH]
     if include_admin:
         local_files.append(ADMIN_DB_PATH)
     else:
         if ssh_password:
-            cmd = [SSHPASS_PATH, '-p', ssh_password, 'ssh'] + [f'{username}@{ip}'] + [
+            cmd = [SSHPASS_PATH, '-p', ssh_password, 'ssh', '-p', port] + [f'{username}@{ip_addr}'] + [
                 'rm', '-f', _remote_join(remote_dir, os.path.basename(ADMIN_DB_PATH))]
         else:
-            cmd = ['ssh', f'{username}@{ip}',
+            cmd = ['ssh', '-p', port, f'{username}@{ip_addr}',
              'rm', '-f', _remote_join(remote_dir, os.path.basename(ADMIN_DB_PATH))]
         subprocess.run(cmd, check=True)
     code_mk, out_mk, err_mk = _ensure_remote_dir(ip, username, remote_dir, ssh_password)
     if code_mk != 0:
         return code_mk, out_mk, f"Failed to create remote directory '{remote_dir}': {err_mk}"
     # Compose rsync command
+    ssh_opts = f'ssh -p {port} -o StrictHostKeyChecking=no'
     if ssh_password:
-        cmd = [SSHPASS_PATH, '-p', ssh_password, 'rsync', '-avz', '-e', 'ssh -o StrictHostKeyChecking=no'] + local_files + [f'{username}@{ip}:{remote_dir}/']
+        cmd = [SSHPASS_PATH, '-p', ssh_password, 'rsync', '-avz', '-e', ssh_opts] + local_files + [f'{username}@{ip_addr}:{remote_dir}/']
     else:
-        cmd = ['rsync', '-avz', '-e', 'ssh -o StrictHostKeyChecking=no'] + local_files + [f'{username}@{ip}:{remote_dir}/']
+        cmd = ['rsync', '-avz', '-e', ssh_opts] + local_files + [f'{username}@{ip_addr}:{remote_dir}/']
     p = subprocess.run(cmd, capture_output=True, text=True)
     return p.returncode, p.stdout, p.stderr
 
 def rsync_pull_scores(ip, username, remote_dir, local_dir, ssh_password=None):
     """Pull scores.db from remote directory to local_dir using rsync"""
+    ip_addr, port = _parse_ip_port(ip)
+    if not _is_port_open(ip_addr, port):
+        return 1, '', f"Connection failed: {ip_addr}:{port} is unreachable."
     os.makedirs(local_dir, exist_ok=True)
     remote_dir = _expand_remote_tilde(remote_dir, ip, username, ssh_password)
     remote_scores = _remote_join(remote_dir, 'scores.db')
     exists = _check_remote_file_exists(ip, username, remote_scores, ssh_password)
     if not exists:
         return 1, '', f'Remote file not found: {remote_scores}'
+    ssh_opts = f'ssh -p {port} -o StrictHostKeyChecking=no'
     if ssh_password:
-        cmd = [SSHPASS_PATH, '-p', ssh_password, 'rsync', '-avz', '-e', 'ssh -o StrictHostKeyChecking=no', f'{username}@{ip}:{remote_scores}', local_dir]
+        cmd = [SSHPASS_PATH, '-p', ssh_password, 'rsync', '-avz', '-e', ssh_opts, f'{username}@{ip_addr}:{remote_scores}', local_dir]
     else:
-        cmd = ['rsync', '-avz', '-e', 'ssh -o StrictHostKeyChecking=no', f'{username}@{ip}:{remote_scores}', local_dir]
+        cmd = ['rsync', '-avz', '-e', ssh_opts, f'{username}@{ip_addr}:{remote_scores}', local_dir]
     p = subprocess.run(cmd, capture_output=True, text=True)
     return p.returncode, p.stdout, p.stderr
