@@ -8,7 +8,15 @@ from language import tr
 from icon_manager import get_icon
 from utils import show_info, show_warn, ask_yes_no
 from database import DB_DIR
-from models import list_sync_targets, upsert_sync_target, delete_sync_target, update_sync_target, update_sync_target_admin, get_exam_title
+from models import (
+    list_sync_targets,
+    upsert_sync_target,
+    delete_sync_target,
+    update_sync_target,
+    update_sync_target_admin,
+    update_sync_target_active,
+    get_exam_title
+)
 from sync import rsync_push, rsync_pull_scores
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
@@ -362,20 +370,21 @@ class AdminSyncModule(QWidget):
             pass
     def sync_all(self):
         targets = list_sync_targets()
-        if not targets:
-            show_info(self, tr('sync.status.info'), tr('info.no_targets'))
+        active_targets = [t for t in targets if (len(t) > 7 and t[7] == 1) or (len(t) <= 7)]
+        if not active_targets:
+            show_info(self, tr('sync.status.info'), tr('info.no_active_targets'))
             return
         self.set_sync_buttons_enabled(False)
         if hasattr(self, 'sync_btn'):
             self.sync_btn.setEnabled(False)
         if hasattr(self, 'sync_log'):
             self.sync_log.clear()
-        self.sync_worker = SyncWorker(targets, 'sync')
+        self.sync_worker = SyncWorker(active_targets, 'sync')
         self.sync_worker.finished.connect(self.on_sync_finished)
         self.sync_worker.error.connect(self.on_sync_error)
         self.sync_worker.progress.connect(self.append_sync_log)
         self.sync_worker.progress.connect(self.update_progress_message)
-        total_steps = len(targets) * 3
+        total_steps = len(active_targets) * 3
         self.progress_total = total_steps
         self.progress_done = 0
         self.sync_worker.progress_step.connect(self.on_progress_step)
@@ -384,18 +393,19 @@ class AdminSyncModule(QWidget):
         self.start_progress_timer()
     def push_all(self):
         targets = list_sync_targets()
-        if not targets:
-            show_info(self, tr('sync.status.info'), tr('info.no_targets'))
+        active_targets = [t for t in targets if (len(t) > 7 and t[7] == 1) or (len(t) <= 7)]
+        if not active_targets:
+            show_info(self, tr('sync.status.info'), tr('info.no_active_targets'))
             return
         self.set_sync_buttons_enabled(False)
         if hasattr(self, 'sync_log'):
             self.sync_log.clear()
-        self.sync_worker = SyncWorker(targets, 'push')
+        self.sync_worker = SyncWorker(active_targets, 'push')
         self.sync_worker.finished.connect(self.on_sync_finished)
         self.sync_worker.error.connect(self.on_sync_error)
         self.sync_worker.progress.connect(self.append_sync_log)
         self.sync_worker.progress.connect(self.update_progress_message)
-        total_steps = len(targets)
+        total_steps = len(active_targets)
         self.progress_total = total_steps
         self.progress_done = 0
         self.sync_worker.progress_step.connect(self.on_progress_step)
@@ -404,13 +414,14 @@ class AdminSyncModule(QWidget):
         self.start_progress_timer()
     def pull_all(self):
         targets = list_sync_targets()
-        if not targets:
-            show_info(self, tr('sync.status.info'), tr('info.no_targets'))
+        active_targets = [t for t in targets if (len(t) > 7 and t[7] == 1) or (len(t) <= 7)]
+        if not active_targets:
+            show_info(self, tr('sync.status.info'), tr('info.no_active_targets'))
             return
         self.set_sync_buttons_enabled(False)
         if hasattr(self, 'sync_log'):
             self.sync_log.clear()
-        self.sync_worker = SyncWorker(targets, 'pull')
+        self.sync_worker = SyncWorker(active_targets, 'pull')
         self.sync_worker.finished.connect(self.on_sync_finished)
         self.sync_worker.error.connect(self.on_sync_error)
         self.sync_worker.progress.connect(self.append_sync_log)
@@ -550,6 +561,7 @@ class AdminSyncModule(QWidget):
         self.targets_table.setRowCount(0)
         for t in targets:
             is_admin = t[6] if len(t) > 6 else 0
+            active = t[7] if len(t) > 7 else 1
             r = self.targets_table.rowCount()
             self.targets_table.insertRow(r)
             it_name = QTableWidgetItem(t[1])
@@ -563,6 +575,12 @@ class AdminSyncModule(QWidget):
             action_widget = QWidget()
             action_layout = QHBoxLayout()
             action_layout.setContentsMargins(4, 4, 4, 4)
+            
+            toggle_active_btn = QPushButton(tr('admin.targets.disable') if active else tr('admin.targets.enable'))
+            toggle_active_btn.setStyleSheet(f"QPushButton {{ background-color:{'#909399' if active else '#67c23a'}; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px; }}")
+            toggle_active_btn.clicked.connect(lambda checked, tid=t[0], cur=active: self.toggle_active(tid, cur))
+            action_layout.addWidget(toggle_active_btn)
+
             toggle_btn = QPushButton(tr('admin.targets.set_admin') if not is_admin else tr('admin.targets.unset_admin'))
             toggle_btn.setStyleSheet("QPushButton { background-color:#67c23a; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px; }")
             toggle_btn.clicked.connect(lambda checked, tid=t[0], cur=is_admin: self.toggle_admin_device(tid, cur))
@@ -591,6 +609,18 @@ class AdminSyncModule(QWidget):
         except Exception:
             pass
         self.targets_table.itemChanged.connect(self.on_target_item_changed)
+
+    def toggle_active(self, target_id, current_active):
+        new_active = 0 if current_active else 1
+        try:
+            update_sync_target_active(target_id, new_active)
+            self.refresh_targets()
+            if new_active:
+                show_info(self, tr('common.success'), tr('info.device_enabled'))
+            else:
+                show_info(self, tr('common.success'), tr('info.device_disabled'))
+        except Exception as e:
+            show_warn(self, tr('common.error'), str(e))
     def on_target_item_changed(self, item):
         row = item.row()
         col = item.column()

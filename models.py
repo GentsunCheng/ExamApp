@@ -565,12 +565,19 @@ def update_sync_target_admin(target_id, is_admin):
     conn.commit()
     conn.close()
 
-def upsert_sync_target(name, ip, username, remote_path, ssh_password=None, is_admin=0):
+def update_sync_target_active(target_id, active):
+    conn = get_config_conn()
+    c = conn.cursor()
+    c.execute('UPDATE sync_targets SET active=? WHERE id=?', (int(active), target_id))
+    conn.commit()
+    conn.close()
+
+def upsert_sync_target(name, ip, username, remote_path, ssh_password=None, is_admin=0, active=1):
     conn = get_config_conn()
     c = conn.cursor()
     c.execute(
-        'INSERT INTO sync_targets (name, ip, username, remote_path, ssh_password, is_admin) VALUES (?,?,?,?,?,?)',
-        (name, ip, username, remote_path, encrypt_text(ssh_password) if ssh_password is not None else None, int(is_admin)),
+        'INSERT INTO sync_targets (name, ip, username, remote_path, ssh_password, is_admin, active) VALUES (?,?,?,?,?,?,?)',
+        (name, ip, username, remote_path, encrypt_text(ssh_password) if ssh_password is not None else None, int(is_admin), int(active)),
     )
     conn.commit()
     conn.close()
@@ -579,12 +586,12 @@ def list_sync_targets():
     conn = get_config_conn()
     c = conn.cursor()
     try:
-        c.execute('SELECT id, name, ip, username, remote_path, ssh_password, is_admin FROM sync_targets ORDER BY id DESC')
+        c.execute('SELECT id, name, ip, username, remote_path, ssh_password, is_admin, active FROM sync_targets ORDER BY id DESC')
         rows = c.fetchall()
         conn.close()
         out = []
         for r in rows:
-            out.append((r[0], r[1], r[2], r[3], r[4], decrypt_text(r[5]) if r[5] else None, int(r[6] or 0)))
+            out.append((r[0], r[1], r[2], r[3], r[4], decrypt_text(r[5]) if r[5] else None, int(r[6] or 0), int(r[7] if len(r) > 7 else 1)))
         return out
     except Exception:
         c.execute('SELECT id, name, ip, username, remote_path, ssh_password FROM sync_targets ORDER BY id DESC')
@@ -592,7 +599,7 @@ def list_sync_targets():
         conn.close()
         out = []
         for r in rows:
-            out.append((r[0], r[1], r[2], r[3], r[4], decrypt_text(r[5]) if r[5] else None, 0))
+            out.append((r[0], r[1], r[2], r[3], r[4], decrypt_text(r[5]) if r[5] else None, 0, 1))
         return out
 
 def list_questions_by_pool(exam_id, pool):
