@@ -10,7 +10,7 @@ from views.login_view import LoginView
 from views.admin_view import AdminView
 from views.user_view import UserView
 
-from language import set_language, get_system_language_codes
+from language import set_language, get_system_language_codes, tr
 
 __language__ = get_system_language_codes()
 set_language(__language__)
@@ -23,7 +23,7 @@ class MainWindow(QMainWindow):
         self.admin = None
         ensure_db()
         create_admin_if_absent()
-        self.setWindowTitle('ExamApp By Gentsun')
+        self.setWindowTitle(tr('app.title'))
         self.setMinimumSize(900, 600)
         self.resize(1440, 960)
         self.shortcut_quit = QShortcut(QKeySequence("Ctrl+W"), self)

@@ -95,6 +95,7 @@ def _current_lang():
 
 _DICT = {
     'zh-Hans': {
+        'app.title': '考核系统',
         'common.error': '错误',
         'common.success': '成功',
         'common.hint': '提示',
@@ -367,6 +368,7 @@ _DICT = {
         'exam.question_title': '{index}/{total} {text}（{type} 分值:{score}）'
     },
     'en': {
+        'app.title': 'Exam App',
         'common.error': 'Error',
         'common.success': 'Success',
         'common.hint': 'Hint',
