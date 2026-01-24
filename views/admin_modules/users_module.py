@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout, QLineEdit, QComboBox, QListView, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QFileDialog
-from icon_manager import get_icon
+from icon_manager import IconManager
 from theme_manager import theme_manager
 from language import tr
 from utils import show_info, show_warn, ask_yes_no
@@ -18,6 +18,7 @@ from openpyxl.utils import get_column_letter
 class AdminUsersModule(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.icon_manager = IconManager()
         lay = QVBoxLayout()
         gb = QGroupBox(tr('admin.users_group'))
         vb = QVBoxLayout()
@@ -74,8 +75,8 @@ class AdminUsersModule(QWidget):
         )
         self.new_role.setView(role_view)
         self.new_role.setIconSize(QSize(16, 16))
-        self.new_role.addItem(get_icon('user'), 'user')
-        self.new_role.addItem(get_icon('user_admin'), 'admin')
+        self.new_role.addItem(self.icon_manager.get_icon('user'), 'user')
+        self.new_role.addItem(self.icon_manager.get_icon('user_admin'), 'admin')
         add_btn = QPushButton(tr('admin.users.add_button'))
         add_btn.clicked.connect(self.add_user)
         form.addRow(tr('admin.users.headers.username'), self.new_user)
@@ -87,10 +88,10 @@ class AdminUsersModule(QWidget):
         lay.addWidget(gb2)
         hb_users_excel = QHBoxLayout()
         btn_export_users_tpl = QPushButton(tr('admin.users.export_tpl'))
-        btn_export_users_tpl.setIcon(get_icon('exam_export'))
+        btn_export_users_tpl.setIcon(self.icon_manager.get_icon('exam_export'))
         btn_export_users_tpl.clicked.connect(self.export_users_template)
         btn_import_users_excel = QPushButton(tr('admin.users.import_excel'))
-        btn_import_users_excel.setIcon(get_icon('exam_import'))
+        btn_import_users_excel.setIcon(self.icon_manager.get_icon('exam_import'))
         btn_import_users_excel.clicked.connect(self.import_users_from_excel)
         hb_users_excel.addWidget(btn_export_users_tpl)
         hb_users_excel.addWidget(btn_import_users_excel)
@@ -138,15 +139,15 @@ class AdminUsersModule(QWidget):
             action_layout = QHBoxLayout()
             action_layout.setContentsMargins(4, 4, 4, 4)
             demote_btn = QPushButton(tr('admin.user.set_user'))
-            demote_btn.setIcon(get_icon('user_edit'))
+            demote_btn.setIcon(self.icon_manager.get_icon('user_edit'))
             demote_btn.setStyleSheet("QPushButton { background-color:#67c23a; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px; }")
             demote_btn.clicked.connect(lambda checked, aid=a[0]: self.demote_admin(aid))
             delete_btn = QPushButton(tr('admin.user.delete'))
-            delete_btn.setIcon(get_icon('delete'))
+            delete_btn.setIcon(self.icon_manager.get_icon('delete'))
             delete_btn.setStyleSheet("QPushButton { background-color:#f56c6c; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px; }")
             delete_btn.clicked.connect(lambda checked, aid=a[0]: self.delete_admin(aid))
             active_btn = QPushButton(tr('admin.user.disable') if a[4] == 1 else tr('admin.user.enable'))
-            active_btn.setIcon(get_icon('user_active' if a[4] == 1 else 'user_inactive'))
+            active_btn.setIcon(self.icon_manager.get_icon('user_active' if a[4] == 1 else 'user_inactive'))
             active_btn.setStyleSheet("QPushButton { background-color:#e6a23c; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px; }")
             active_btn.clicked.connect(lambda checked, aid=a[0], current_active=a[4]: self.toggle_admin_active(aid, current_active))
             action_layout.addWidget(delete_btn)
@@ -181,17 +182,17 @@ class AdminUsersModule(QWidget):
             action_layout = QHBoxLayout()
             action_layout.setContentsMargins(4, 4, 4, 4)
             delete_btn = QPushButton(tr('admin.user.delete'))
-            delete_btn.setIcon(get_icon('delete'))
+            delete_btn.setIcon(self.icon_manager.get_icon('delete'))
             delete_btn.setStyleSheet("QPushButton { background-color:#f56c6c; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px; }")
             delete_btn.clicked.connect(lambda checked, uid=u[0]: self.delete_user(uid))
             action_layout.addWidget(delete_btn)
             role_btn = QPushButton(tr('admin.user.set_admin') if u[3] == 'user' else tr('admin.user.set_user'))
-            role_btn.setIcon(get_icon('user_edit'))
+            role_btn.setIcon(self.icon_manager.get_icon('user_edit'))
             role_btn.setStyleSheet("QPushButton { background-color:#67c23a; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px; }")
             role_btn.clicked.connect(lambda checked, uid=u[0], current_role=u[3]: self.toggle_user_role(uid, current_role))
             action_layout.addWidget(role_btn)
             active_btn = QPushButton(tr('admin.user.disable') if u[4] == 1 else tr('admin.user.enable'))
-            active_btn.setIcon(get_icon('user_active' if u[4] == 1 else 'user_inactive'))
+            active_btn.setIcon(self.icon_manager.get_icon('user_active' if u[4] == 1 else 'user_inactive'))
             active_btn.setStyleSheet("QPushButton { background-color:#e6a23c; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px; }")
             active_btn.clicked.connect(lambda checked, uid=u[0], current_active=u[4]: self.toggle_user_active(uid, current_active))
             action_layout.addWidget(active_btn)

@@ -2,7 +2,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QScrollArea, QTableWidget, QTableWidgetItem, QAbstractItemView, QHBoxLayout, QPushButton
 
-from icon_manager import get_icon
+from icon_manager import IconManager
 from theme_manager import theme_manager
 from language import tr
 from models import (
@@ -18,6 +18,7 @@ from windows.progress_overview_window import ProgressOverviewWindow
 class UserProgressModule(QWidget):
     def __init__(self, user, parent=None):
         super().__init__(parent)
+        self.icon_manager = IconManager()
         self.user = user
         lay = QVBoxLayout()
 
@@ -25,7 +26,7 @@ class UserProgressModule(QWidget):
         hb = QHBoxLayout()
         hb.addStretch()
         btn_overview = QPushButton(tr('progress.overview'))
-        btn_overview.setIcon(get_icon('score'))
+        btn_overview.setIcon(self.icon_manager.get_icon('score'))
         btn_overview.clicked.connect(self.open_overview)
         hb.addWidget(btn_overview)
         header.setLayout(hb)

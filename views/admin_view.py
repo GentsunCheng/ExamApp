@@ -4,7 +4,7 @@ from PySide6.QtCore import QPropertyAnimation, QEasingCurve
 from theme_manager import theme_manager
 from language import tr
 from utils import show_info, show_warn, ask_yes_no
-from icon_manager import get_icon
+from icon_manager import IconManager
 from views.admin_modules.users_module import AdminUsersModule
 from views.admin_modules.exams_module import AdminExamsModule
 from views.admin_modules.sync_module import AdminSyncModule
@@ -16,6 +16,7 @@ from views.admin_modules.scores_overview_module import AdminScoresOverviewModule
 class AdminView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.icon_manager = IconManager()
         colors = theme_manager.get_theme_colors()
         bkg = 'background' + '-color'
         col = 'co' + 'lor'
@@ -50,12 +51,12 @@ class AdminView(QWidget):
         self.tabs.addTab(AdminScoresModule(self), tr('admin.scores_tab'))
         self.tabs.addTab(AdminScoresOverviewModule(self), tr('admin.scores_overview_tab'))
         self.tabs.addTab(AdminProgressModule(self), tr('admin.progress_tab'))
-        self.tabs.setTabIcon(0, get_icon('user'))
-        self.tabs.setTabIcon(1, get_icon('exam'))
-        self.tabs.setTabIcon(2, get_icon('sync'))
-        self.tabs.setTabIcon(3, get_icon('score'))
-        self.tabs.setTabIcon(4, get_icon('score'))
-        self.tabs.setTabIcon(5, get_icon('score'))
+        self.tabs.setTabIcon(0, self.icon_manager.get_icon('user'))
+        self.tabs.setTabIcon(1, self.icon_manager.get_icon('exam'))
+        self.tabs.setTabIcon(2, self.icon_manager.get_icon('sync'))
+        self.tabs.setTabIcon(3, self.icon_manager.get_icon('score'))
+        self.tabs.setTabIcon(4, self.icon_manager.get_icon('score'))
+        self.tabs.setTabIcon(5, self.icon_manager.get_icon('score'))
         self.tabs.setTabVisible(2, False)
         self.tabs.currentChanged.connect(self.on_tab_changed)
         layout = QVBoxLayout()
@@ -65,7 +66,7 @@ class AdminView(QWidget):
         topbar.addWidget(title)
         topbar.addStretch()
         logout_btn = QPushButton(tr('common.logout'))
-        logout_btn.setIcon(get_icon('confirm'))
+        logout_btn.setIcon(self.icon_manager.get_icon('confirm'))
         logout_btn.clicked.connect(self.handle_logout)
         topbar.addWidget(logout_btn)
         layout.addLayout(topbar)

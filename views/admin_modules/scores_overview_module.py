@@ -11,17 +11,18 @@ from theme_manager import theme_manager
 from language import tr
 from models import list_exams, list_exam_user_overview
 from utils import show_info, show_warn
-from icon_manager import get_icon
+from icon_manager import IconManager
 
 
 class AdminScoresOverviewModule(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.icon_manager = IconManager()
         lay = QVBoxLayout()
         header = QHBoxLayout()
         header.addStretch()
         btn_export = QPushButton(tr('admin.scores_overview.export_excel'))
-        btn_export.setIcon(get_icon('exam_export'))
+        btn_export.setIcon(self.icon_manager.get_icon('exam_export'))
         btn_export.clicked.connect(self.export_overview)
         header.addWidget(btn_export)
         lay.addLayout(header)

@@ -3,7 +3,7 @@ from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QGridLayout
 from PySide6.QtGui import QKeySequence, QShortcut
 from theme_manager import theme_manager
-from icon_manager import get_icon
+from icon_manager import IconManager
 from exam_interface import ModernTimer, ModernProgressBar
 from language import tr
 from models import start_attempt, save_answer, submit_attempt, list_exams, grade_question, build_exam_questions_for_attempt
@@ -14,6 +14,7 @@ class ExamWindow(QMainWindow):
     instance = None
     def __init__(self, user, exam_id, parent=None):
         super().__init__(parent)
+        self.icon_manager = IconManager()
         try:
             print(f"[DEBUG] ExamWindow init user={user.get('username')} exam_id={exam_id}")
         except Exception:
@@ -116,7 +117,7 @@ class ExamWindow(QMainWindow):
         self.prev_btn = QPushButton(tr('exam.prev'))
         self.next_btn = QPushButton(tr('exam.next'))
         self.submit_btn = QPushButton(tr('exam.submit'))
-        self.submit_btn.setIcon(get_icon('submit'))
+        self.submit_btn.setIcon(self.icon_manager.get_icon('submit'))
         self.next_btn.setDefault(True)
         self.submit_btn.setEnabled(False)
         self.prev_btn.clicked.connect(self.prev_q)

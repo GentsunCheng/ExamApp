@@ -8,7 +8,7 @@ from openpyxl.utils import get_column_letter
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QComboBox, QPushButton, QFileDialog, QScrollArea, QTableWidget, QTableWidgetItem, QCheckBox, QMessageBox, QAbstractItemView
 
-from icon_manager import get_icon
+from icon_manager import IconManager
 from theme_manager import theme_manager
 from utils import show_info, show_warn, ask_yes_no
 from language import tr
@@ -168,6 +168,7 @@ def export_user_progress_to_excel(user_id, file_path):
 class AdminProgressModule(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.icon_manager = IconManager()
         lay = QVBoxLayout()
 
         header = QGroupBox(tr('progress.group'))
@@ -191,22 +192,22 @@ class AdminProgressModule(QWidget):
         hb.addWidget(self.replace_import)
 
         btn_export_tpl = QPushButton(tr('progress.export_tpl'))
-        btn_export_tpl.setIcon(get_icon('exam_export'))
+        btn_export_tpl.setIcon(self.icon_manager.get_icon('exam_export'))
         btn_export_tpl.clicked.connect(self.export_template)
         hb.addWidget(btn_export_tpl)
 
         btn_import = QPushButton(tr('progress.import_tpl'))
-        btn_import.setIcon(get_icon('exam_import'))
+        btn_import.setIcon(self.icon_manager.get_icon('exam_import'))
         btn_import.clicked.connect(self.import_template)
         hb.addWidget(btn_import)
 
         btn_export_user = QPushButton(tr('progress.export_user_btn'))
-        btn_export_user.setIcon(get_icon('exam_export'))
+        btn_export_user.setIcon(self.icon_manager.get_icon('exam_export'))
         btn_export_user.clicked.connect(self.export_user_progress)
         hb.addWidget(btn_export_user)
 
         btn_overview = QPushButton(tr('progress.overview'))
-        btn_overview.setIcon(get_icon('score'))
+        btn_overview.setIcon(self.icon_manager.get_icon('score'))
         btn_overview.clicked.connect(self.open_overview)
         hb.addWidget(btn_overview)
 

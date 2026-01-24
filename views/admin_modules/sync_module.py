@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QTextBrowser, QProgressDialog, QFileDialog, QMessageBox
 from theme_manager import theme_manager
 from language import tr
-from icon_manager import get_icon
+from icon_manager import IconManager
 from utils import show_info, show_warn, ask_yes_no
 from database import DB_DIR
 from models import (
@@ -175,6 +175,7 @@ class SyncWorker(QThread):
 class AdminSyncModule(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.icon_manager = IconManager()
         lay = QVBoxLayout()
         gb1 = QGroupBox(tr('admin.targets.group'))
         vb1 = QVBoxLayout()
@@ -220,17 +221,17 @@ class AdminSyncModule(QWidget):
         lay.addWidget(gb2)
         hb_tpl = QHBoxLayout()
         btn_export_targets_tpl = QPushButton(tr('admin.export.targets_tpl.title'))
-        btn_export_targets_tpl.setIcon(get_icon('exam_export'))
+        btn_export_targets_tpl.setIcon(self.icon_manager.get_icon('exam_export'))
         btn_export_targets_tpl.clicked.connect(self.export_targets_template)
         btn_import_targets_excel = QPushButton(tr('admin.import.targets.title'))
-        btn_import_targets_excel.setIcon(get_icon('exam_import'))
+        btn_import_targets_excel.setIcon(self.icon_manager.get_icon('exam_import'))
         btn_import_targets_excel.clicked.connect(self.import_targets_from_excel)
         hb_tpl.addWidget(btn_export_targets_tpl)
         hb_tpl.addWidget(btn_import_targets_excel)
         lay.addLayout(hb_tpl)
         hb = QHBoxLayout()
         self.sync_btn = QPushButton(tr('sync.sync_btn'))
-        self.sync_btn.setIcon(get_icon('push'))
+        self.sync_btn.setIcon(self.icon_manager.get_icon('push'))
         self.sync_btn.clicked.connect(self.sync_all)
         hb.addWidget(self.sync_btn)
         lay.addLayout(hb)

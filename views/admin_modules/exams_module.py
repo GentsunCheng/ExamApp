@@ -3,7 +3,7 @@ import pathlib
 from PySide6.QtCore import Qt, QDateTime
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout, QLineEdit, QTextEdit, QSpinBox, QDateTimeEdit, QPushButton, QFileDialog, QTableWidget, QTableWidgetItem, QAbstractItemView, QCheckBox
 from PySide6.QtWidgets import QMessageBox
-from icon_manager import get_icon
+from icon_manager import IconManager
 from theme_manager import theme_manager
 from language import tr
 from utils import show_info, show_warn, ask_yes_no
@@ -16,6 +16,7 @@ from openpyxl.utils import get_column_letter
 class AdminExamsModule(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.icon_manager = IconManager()
         lay = QVBoxLayout()
         gb1 = QGroupBox(tr('admin.exams_group'))
         vb1 = QVBoxLayout()
@@ -111,13 +112,13 @@ class AdminExamsModule(QWidget):
         form.addRow(tr('admin.exams.form.end_date'), self.ex_end)
         form.addRow('', self.ex_permanent)
         add_btn = QPushButton(tr('admin.exams.add_btn'))
-        add_btn.setIcon(get_icon('exam_add'))
+        add_btn.setIcon(self.icon_manager.get_icon('exam_add'))
         add_btn.clicked.connect(self.add_exam)
         import_btn = QPushButton(tr('admin.import_questions'))
-        import_btn.setIcon(get_icon('exam_import'))
+        import_btn.setIcon(self.icon_manager.get_icon('exam_import'))
         import_btn.clicked.connect(self.import_questions)
         export_btn = QPushButton(tr('admin.export_sample'))
-        export_btn.setIcon(get_icon('exam_export'))
+        export_btn.setIcon(self.icon_manager.get_icon('exam_export'))
         export_btn.clicked.connect(self.export_sample)
         vb2.addLayout(form)
         hb = QHBoxLayout()
@@ -164,9 +165,9 @@ class AdminExamsModule(QWidget):
             hb = QHBoxLayout()
             hb.setContentsMargins(0,0,0,0)
             btn_clear = QPushButton(tr('common.clear'))
-            btn_clear.setIcon(get_icon('delete'))
+            btn_clear.setIcon(self.icon_manager.get_icon('delete'))
             btn_del = QPushButton(tr('common.delete'))
-            btn_del.setIcon(get_icon('exam_delete'))
+            btn_del.setIcon(self.icon_manager.get_icon('exam_delete'))
             exam_id = e[0]
             btn_clear.clicked.connect(lambda _, x=exam_id: self.clear_exam(x))
             btn_del.clicked.connect(lambda _, x=exam_id: self.delete_exam(x))

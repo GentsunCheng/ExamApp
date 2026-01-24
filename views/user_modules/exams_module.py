@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QAbstractItemView
 from PySide6.QtGui import QColor
-from icon_manager import get_icon
+from icon_manager import IconManager
 from theme_manager import theme_manager
 from language import tr
 from models import list_exams, list_attempts, get_exam_stats
@@ -10,11 +10,12 @@ from models import list_exams, list_attempts, get_exam_stats
 class UserExamsModule(QWidget):
     def __init__(self, user, parent=None):
         super().__init__(parent)
+        self.icon_manager = IconManager()
         self.user = user
         exams_v = QVBoxLayout()
         exams_toolbar = QHBoxLayout()
         start_btn = QPushButton(tr('user.start_exam'))
-        start_btn.setIcon(get_icon('exam_start'))
+        start_btn.setIcon(self.icon_manager.get_icon('exam_start'))
         start_btn.clicked.connect(self.on_start_button_clicked)
         try:
             import sys

@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTabWidget, QGraphicsOpacityEffect
 from PySide6.QtCore import QPropertyAnimation, QEasingCurve
-from icon_manager import get_icon
+from icon_manager import IconManager
 from theme_manager import theme_manager
 from language import tr
 from utils import *
@@ -13,6 +13,7 @@ from views.user_modules.progress_module import UserProgressModule
 class UserView(QWidget):
     def __init__(self, user, parent=None):
         super().__init__(parent)
+        self.icon_manager = IconManager()
         colors = theme_manager.get_theme_colors()
         bkg = 'background' + '-color'
         col = 'co' + 'lor'
@@ -45,7 +46,7 @@ class UserView(QWidget):
         user_label = QLabel(tr('user.current_user_prefix') + f'{user["username"]}' + (tr('user.full_name_suffix', name=name_display) if name_display else ''))
         topbar.addWidget(user_label)
         logout_btn = QPushButton(tr('common.logout'))
-        logout_btn.setIcon(get_icon('confirm'))
+        logout_btn.setIcon(self.icon_manager.get_icon('confirm'))
         logout_btn.clicked.connect(self.handle_logout)
         topbar.addWidget(logout_btn)
         layout.addLayout(topbar)
@@ -54,11 +55,11 @@ class UserView(QWidget):
         self.history_module = UserHistoryModule(self.user, self)
         self.progress_module = UserProgressModule(self.user, self)
         self.tabs.addTab(self.exams_module, tr('user.exams_tab'))
-        self.tabs.setTabIcon(0, get_icon('exam'))
+        self.tabs.setTabIcon(0, self.icon_manager.get_icon('exam'))
         self.tabs.addTab(self.history_module, tr('user.history_tab'))
-        self.tabs.setTabIcon(1, get_icon('score'))
+        self.tabs.setTabIcon(1, self.icon_manager.get_icon('score'))
         self.tabs.addTab(self.progress_module, tr('user.progress_tab'))
-        self.tabs.setTabIcon(2, get_icon('info'))
+        self.tabs.setTabIcon(2, self.icon_manager.get_icon('info'))
         self.tabs.currentChanged.connect(self.on_tab_changed)
         layout.addWidget(self.tabs)
         self.setLayout(layout)

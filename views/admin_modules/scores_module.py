@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QPushButton, QTableWidget, QTableWidgetItem, QFileDialog
-from icon_manager import get_icon
+from icon_manager import IconManager
 from theme_manager import theme_manager
 from language import tr
 from utils import show_info, show_warn
@@ -16,6 +16,7 @@ import pathlib
 class AdminScoresModule(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.icon_manager = IconManager()
         lay = QVBoxLayout()
         gb = QGroupBox(tr('scores.group'))
         vb = QVBoxLayout()
@@ -35,7 +36,7 @@ class AdminScoresModule(QWidget):
         vb.addWidget(self.scores_table)
         hb = QHBoxLayout()
         btn_export_scores = QPushButton(tr('scores.export_excel'))
-        btn_export_scores.setIcon(get_icon('exam_export'))
+        btn_export_scores.setIcon(self.icon_manager.get_icon('exam_export'))
         btn_export_scores.clicked.connect(self.export_scores_to_excel)
         hb.addWidget(btn_export_scores)
         vb.addLayout(hb)
