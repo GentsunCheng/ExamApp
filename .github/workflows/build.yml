@@ -52,15 +52,17 @@ jobs:
 
       - name: Package App Bundle
         run: |
+          mkdir pack_temp
           cd dist
-          mv main.app ExamSystem_${{ matrix.arch }}.app
+          mv ExamSystem.app ExamSystem_${{ matrix.arch }}.app
           zip -r ../ExamSystem-macos-${{ matrix.arch }}.zip ExamSystem_${{ matrix.arch }}.app
+          mv ExamSystem_${{ matrix.arch }}.app ../pack_temp/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ExamSystem-macos-${{ matrix.arch }}_${{ github.run_id }}
-          path: ExamSystem-macos-${{ matrix.arch }}.zip
+          path: pack_temp/
 
       - name: Release
         uses: softprops/action-gh-release@v2

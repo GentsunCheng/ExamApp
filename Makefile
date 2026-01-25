@@ -6,6 +6,7 @@ PYTHON_VERSION = 3.9+
 MAIN_SCRIPT = main.py
 DIST_DIR = dist
 BUILD_DIR = build
+JOBS ?= 1
 
 # 检测平台
 UNAME_S := $(shell uname -s)
@@ -21,6 +22,19 @@ else ifneq (,$(findstring MSYS,$(UNAME_S)))
     PLATFORM := windows
 else
     PLATFORM := unknown
+endif
+
+# 检测核心数量
+
+ifeq ($(OS),Windows_NT)
+    # Windows 平台
+    JOBS := $(shell echo %NUMBER_OF_PROCESSORS%)
+else ifeq ($(UNAME_S),Linux)
+    # Linux 平台
+    JOBS := $(shell nproc 2>/dev/null || grep -c ^processor /proc/cpuinfo)
+else ifeq ($(UNAME_S),Darwin)
+    # macOS 平台
+    JOBS := $(shell sysctl -n hw.ncpu)
 endif
 
 # 检测架构
@@ -69,12 +83,16 @@ NUITKA = nuitka
 NUITKA_COMPILE_ARGS = \
     --output-dir=$(DIST_DIR) \
 	--standalone \
+	--jobs=$(JOBS) \
+	--lto=yes \
+	--output-filename=$(APP_NAME) \
+	--output-folder-name=$(APP_NAME) \
 	--enable-plugin=pyside6
 
 NUITKA_MACOS_ARGS = \
 	--macos-create-app-bundle \
     --macos-signed-app-name=top.orii.exam \
-	--macos-app-name=ExamSystem \
+	--macos-app-name=$(APP_NAME) \
 	--macos-target-arch=$(ARCH) \
 	--include-data-file=resources/sshpass_darwin=resources/sshpass_darwin \
     --macos-app-icon=resources/logo.icns
