@@ -13,6 +13,7 @@ from views.user_modules.progress_module import UserProgressModule
 class UserView(QWidget):
     def __init__(self, user, parent=None):
         super().__init__(parent)
+        self._exam_windows = None
         self.icon_manager = IconManager()
         colors = theme_manager.get_theme_colors()
         bkg = 'background' + '-color'

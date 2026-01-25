@@ -15,6 +15,8 @@ class ExamWindow(QMainWindow):
     instance = None
     def __init__(self, user, exam_id, parent=None):
         super().__init__(parent)
+        self.opt_buttons = None
+        self._zoom_anim = None
         self.icon_manager = IconManager()
         try:
             print(f"[DEBUG] ExamWindow init user={user.get('username')} exam_id={exam_id}")

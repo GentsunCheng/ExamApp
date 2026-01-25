@@ -8,8 +8,8 @@ from Crypto.Util.Padding import pad, unpad
 
 def _load_key():
     try:
-        from conf.serect_key import AES_KEY as _k
-        return base64.b64decode(_k)
+        from conf.serect_key import AES_KEY as k
+        return base64.b64decode(k)
     except ImportError:
         try:
             key = None

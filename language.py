@@ -486,7 +486,6 @@ _DICT = {
         'admin.exams.form.random_pick': 'Random pick count (random pool)',
         'admin.exams.permanent_checkbox': 'Permanent',
         'admin.exams.add_btn': 'Add Exam',
-        'common.clear': 'Clear',
         'error.title_required': 'Title is required',
         'error.lost_mandatory_or_random': 'Missing mandatory or random questions',
         'info.exam_added': 'Exam added',

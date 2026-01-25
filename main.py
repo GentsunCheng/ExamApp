@@ -19,6 +19,7 @@ set_language(__language__)
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self._zoom_anim = None
         self.user_view = None
         self.admin = None
         ensure_db()

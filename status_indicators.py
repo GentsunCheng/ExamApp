@@ -265,6 +265,8 @@ class StatusIndicator(QWidget):
     
     def __init__(self, status="info", text="", parent=None):
         super().__init__(parent)
+        self.text_label = None
+        self.icon_label = None
         self.status = status
         self.text = text
         self.setup_ui()
@@ -402,6 +404,8 @@ class StatusBar(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.indicators_layout = None
+        self.status_label = None
         self.indicators = []
         self.setup_ui()
         self.update_style()
@@ -509,6 +513,9 @@ class ProgressIndicator(QWidget):
     
     def __init__(self, parent=None, show_percentage=True):
         super().__init__(parent)
+        self.timer = None
+        self.progress_label = None
+        self.progress_bar = None
         self.value = 0
         self.maximum = 100
         self.show_percentage = show_percentage
@@ -601,6 +608,9 @@ class ToastNotification(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.close_button = None
+        self.text_label = None
+        self.icon_label = None
         self.setup_ui()
         self.update_style()
         self.fade_animation = QPropertyAnimation(self, b"opacity")
@@ -690,7 +700,8 @@ class ToastNotification(QWidget):
         
         # 定时隐藏
         QTimer.singleShot(duration, self.hide)
-        
+
+    @staticmethod
     def _get_notification_config(self, type):
         """获取通知配置"""
         config_map = {
