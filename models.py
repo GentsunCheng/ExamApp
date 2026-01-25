@@ -2,7 +2,7 @@ import os
 import random
 import uuid
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, UTC
 from PIL import Image
 from PySide6.QtGui import QImage
 from database import (
@@ -233,7 +233,7 @@ def list_exams(include_expired=False):
     if include_expired:
         c.execute('SELECT id, title, description, pass_ratio, time_limit_minutes, end_date FROM exams ORDER BY id DESC')
     else:
-        c.execute('SELECT id, title, description, pass_ratio, time_limit_minutes, end_date FROM exams WHERE (end_date>=? OR end_date IS NULL) ORDER BY id DESC', (datetime.utcnow().isoformat(),))
+        c.execute('SELECT id, title, description, pass_ratio, time_limit_minutes, end_date FROM exams WHERE (end_date>=? OR end_date IS NULL) ORDER BY id DESC', (datetime.now(UTC).isoformat(),))
     rows = c.fetchall()
     conn.close()
     out = []
@@ -331,12 +331,6 @@ def delete_exam(exam_id):
     ec.execute('DELETE FROM exams WHERE id=?', (exam_id,))
     econn.commit()
     econn.close()
-
-def _sha256_of_bytesio(bio):
-    bio.seek(0)  # 确保从开头读取
-    sha256 = hashlib.sha256()
-    sha256.update(bio.read())
-    return sha256.hexdigest()
 
 def save_pic(img_io):
     img_path = os.path.join(DB_DIR, 'source')
