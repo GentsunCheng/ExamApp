@@ -98,8 +98,9 @@ class AdminUsersModule(QWidget):
         lay.addLayout(hb_users_excel)
         lay.addStretch()
         self.setLayout(lay)
+        
     @staticmethod
-    def make_tag(self, text, bg, fg):
+    def make_tag(text, bg, fg):
         from PySide6.QtWidgets import QLabel
         lab = QLabel(text)
         lab.setAlignment(Qt.AlignmentFlag.AlignCenter)

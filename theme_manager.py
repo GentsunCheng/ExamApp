@@ -25,7 +25,7 @@ class SmoothScrollFilter(QObject):
         return False
 
     @staticmethod
-    def _find_scroll_area(self, obj):
+    def _find_scroll_area(obj):
         w = obj
         while w is not None:
             if isinstance(w, QAbstractScrollArea):
