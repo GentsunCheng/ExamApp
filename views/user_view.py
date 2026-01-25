@@ -13,7 +13,7 @@ from views.user_modules.progress_module import UserProgressModule
 class UserView(QWidget):
     def __init__(self, user, parent=None):
         super().__init__(parent)
-        self._exam_windows = None
+        self._exam_windows = []
         self.icon_manager = IconManager()
         colors = theme_manager.get_theme_colors()
         bkg = 'background' + '-color'
@@ -150,7 +150,7 @@ class UserView(QWidget):
             show_warn(self, tr('common.error'), tr('error.no_questions'))
             return
         try:
-            if not hasattr(self, '_exam_windows'):
+            if self._exam_windows is None:
                 self._exam_windows = []
             win = ExamWindow(self.user, exam_id, self)
             self._exam_windows.append(win)

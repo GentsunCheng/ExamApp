@@ -15,7 +15,7 @@ class ExamWindow(QMainWindow):
     instance = None
     def __init__(self, user, exam_id, parent=None):
         super().__init__(parent)
-        self.opt_buttons = None
+        self.opt_buttons = []
         self._zoom_anim = None
         self.icon_manager = IconManager()
         try:
