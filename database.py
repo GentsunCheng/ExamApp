@@ -11,6 +11,7 @@ EXAMS_DB_PATH = os.path.join(DB_DIR, 'exams.db')
 SCORES_DB_PATH = os.path.join(DB_DIR, 'scores.db')
 CONFIG_DB_PATH = os.path.join(DB_DIR, 'config.db')
 PROGRESS_DB_PATH = os.path.join(DB_DIR, 'progress.db')
+RESOURCE_PATH = os.path.join(DB_DIR, 'resources')
 DB_PATH = EXAMS_DB_PATH
 
 def ensure_db():

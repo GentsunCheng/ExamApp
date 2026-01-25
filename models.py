@@ -15,7 +15,7 @@ from database import (
     now_iso,
     ensure_key_probe,
     verify_db_encryption_key,
-    DB_DIR,
+    RESOURCE_PATH,
 )
 from utils import hash_password, verify_password
 import sqlite3
@@ -296,9 +296,8 @@ def clear_exam_questions(exam_id):
        if row[0]:
             pic_l = json.loads(row[0])
             pic_list += pic_l
-    source_dir = os.path.join(DB_DIR, 'source')
     for p in pic_list:
-        os.remove(os.path.join(source_dir, p))
+        os.remove(os.path.join(RESOURCE_PATH, p))
     c.execute('DELETE FROM questions WHERE exam_id=?', (exam_id,))
     conn.commit()
     conn.close()
@@ -324,18 +323,16 @@ def delete_exam(exam_id):
        if row[0]:
             pic_l = json.loads(row[0])
             pic_list += pic_l
-    source_dir = os.path.join(DB_DIR, 'source')
     for p in pic_list:
-        os.remove(os.path.join(source_dir, p))
+        os.remove(os.path.join(RESOURCE_PATH, p))
     ec.execute('DELETE FROM questions WHERE exam_id=?', (exam_id,))
     ec.execute('DELETE FROM exams WHERE id=?', (exam_id,))
     econn.commit()
     econn.close()
 
 def save_pic(img_io):
-    img_path = os.path.join(DB_DIR, 'source')
-    if not os.path.exists(img_path):
-        os.makedirs(img_path)
+    if not os.path.exists(RESOURCE_PATH):
+        os.makedirs(RESOURCE_PATH)
     img_io.seek(0)
     sha256 = hashlib.sha256()
     sha256.update(img_io.read())
@@ -345,7 +342,7 @@ def save_pic(img_io):
         img = Image.open(img_io)
         img.save(img_bytes_io, format="PNG")
         img_bytes_encrypted = aes_bytesio(img_bytes_io, secret_key=SERECT_KEY, operation="encrypt")
-        with open(os.path.join(img_path, sha_str), 'wb') as f:
+        with open(os.path.join(RESOURCE_PATH, sha_str), 'wb') as f:
             f.write(img_bytes_encrypted.read())
         return sha_str
     except Exception as e:
@@ -353,8 +350,7 @@ def save_pic(img_io):
         return False
 
 def get_pic(sha_str, max_dim=1080):
-    img_path = os.path.join(DB_DIR, 'source')
-    filepath = os.path.join(img_path, sha_str)
+    filepath = os.path.join(RESOURCE_PATH, sha_str)
     if not os.path.exists(filepath):
         return None
     io_file_encrypted = None

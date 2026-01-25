@@ -2,7 +2,16 @@ import os
 import sys
 import subprocess
 import socket
-from database import DB_DIR, ADMIN_DB_PATH, USERS_DB_PATH, EXAMS_DB_PATH, SCORES_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH
+from database import (
+    DB_DIR, 
+    ADMIN_DB_PATH, 
+    USERS_DB_PATH, 
+    EXAMS_DB_PATH, 
+    SCORES_DB_PATH, 
+    CONFIG_DB_PATH, 
+    PROGRESS_DB_PATH,
+    RESOURCE_PATH,
+)
 
 
 FILENAME = None
@@ -143,7 +152,7 @@ def rsync_push(ip, username, remote_dir, ssh_password=None, include_admin=False)
     if not _is_port_open(ip_addr, port):
         return 1, '', f"Connection failed: {ip_addr}:{port} is unreachable."
     remote_dir = _expand_remote_tilde(remote_dir, ip, username, ssh_password)
-    local_files = [SCORES_DB_PATH, EXAMS_DB_PATH, USERS_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH]
+    local_files = [SCORES_DB_PATH, EXAMS_DB_PATH, USERS_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH, RESOURCE_PATH]
     if include_admin:
         local_files.append(ADMIN_DB_PATH)
     else:
