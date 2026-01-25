@@ -1,12 +1,13 @@
+import json
 import random
 from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QGridLayout
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QKeySequence, QShortcut, QPixmap
 from theme_manager import theme_manager
 from icon_manager import IconManager
 from exam_interface import ModernTimer, ModernProgressBar
 from language import tr
-from models import start_attempt, save_answer, submit_attempt, list_exams, grade_question, build_exam_questions_for_attempt
+from models import start_attempt, save_answer, submit_attempt, list_exams, grade_question, build_exam_questions_for_attempt, get_pic
 from PySide6.QtWidgets import QMessageBox
 from utils import show_info, show_warn, ask_yes_no
 
@@ -105,11 +106,13 @@ class ExamWindow(QMainWindow):
         self.q_title = QLabel('')
         self.q_title.setWordWrap(True)
         self.q_title.setStyleSheet("font-size:16px; margin-bottom:8px;")
+        self.q_picture_layout = QGridLayout()
         self.opts_container = QWidget()
         self.opts_layout = QVBoxLayout()
         self.opts_layout.setSpacing(8)
         self.opts_container.setLayout(self.opts_layout)
         vb.addWidget(self.q_title)
+        vb.addLayout(self.q_picture_layout)
         vb.addWidget(self.opts_container)
         gb.setLayout(vb)
         right.addWidget(gb)
@@ -168,7 +171,7 @@ class ExamWindow(QMainWindow):
         self._zoom_anim.setDuration(180)
         self._zoom_anim.setStartValue(start_rect)
         self._zoom_anim.setEndValue(rect)
-        self._zoom_anim.setEasingCurve(QEasingCurve.OutCubic)
+        self._zoom_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._zoom_anim.start()
 
     def quit_exam(self):
@@ -276,6 +279,26 @@ class ExamWindow(QMainWindow):
         q = self.questions[self.current_index]
         tlabel = tr('exam.type.' + str(q.get('type')))
         self.q_title.setText(tr('exam.question_title', index=self.current_index+1, total=len(self.questions), text=q["text"], type=tlabel, score=q["score"]))
+        picture_hash_list = json.loads(q.get("pictures", '[]'))
+        # 清空旧图片
+        for i in reversed(range(self.q_picture_layout.count())):
+            widget = self.q_picture_layout.itemAt(i).widget()
+            if widget:
+                self.q_picture_layout.removeWidget(widget)
+                widget.setParent(None)
+        # 渲染新图片
+        for picture_hash in picture_hash_list:
+            picture = get_pic(picture_hash)
+            label = QLabel()
+            scaled_pixmap = QPixmap.fromImage(picture).scaled(
+                picture.width(),
+                self.q_title.height(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            label.setPixmap(scaled_pixmap)
+            label.resize(picture.width(), self.q_title.height())
+            self.q_picture_layout.addWidget(label)
         # 清空旧选项
         while self.opts_layout.count():
             child = self.opts_layout.takeAt(0)

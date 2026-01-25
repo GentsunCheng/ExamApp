@@ -1,6 +1,9 @@
+import os
 import random
 import uuid
 from datetime import datetime
+from PIL import Image
+from PySide6.QtGui import QImage
 from database import (
     get_admin_conn,
     get_user_conn,
@@ -11,12 +14,14 @@ from database import (
     now_iso,
     ensure_key_probe,
     verify_db_encryption_key,
+    DB_DIR,
 )
 from utils import hash_password, verify_password
 import sqlite3
 from crypto_util import encrypt_text, decrypt_text, encrypt_json, decrypt_json
 import hashlib
 import hmac
+import json
 try:
     from conf.serect_key import SERECT_KEY
 except Exception:
@@ -276,13 +281,23 @@ def import_questions_from_json(exam_id, payload):
     c = conn.cursor()
     for q in payload:
         pool = (q.get('pool') or q.get('category') or 'mandatory')
-        c.execute('INSERT INTO questions (exam_id, type, text, options, correct_answers, score, pool) VALUES (?,?,?,?,?,?,?)', (exam_id, q.get('type'), encrypt_text(q.get('text')), encrypt_json(q.get('options') or []), encrypt_json(q.get('correct') or []), float(q.get('score', 1)), pool))
+        c.execute('INSERT INTO questions (exam_id, type, text, options, correct_answers, score, pictures, pool) VALUES (?,?,?,?,?,?,?,?)', (exam_id, q.get('type'), encrypt_text(q.get('text')), encrypt_json(q.get('options') or []), encrypt_json(q.get('correct') or []), float(q.get('score', 1)), q.get('pictures'), pool))
     conn.commit()
     conn.close()
 
 def clear_exam_questions(exam_id):
     conn = get_exam_conn()
     c = conn.cursor()
+    c.execute("SELECT pictures FROM questions WHERE exam_id = ?", (exam_id,))
+    rows = c.fetchall()
+    pic_list = []
+    for row in rows:
+       if row[0]:
+            pic_l = json.loads(row[0])
+            pic_list += pic_l
+    source_dir = os.path.join(DB_DIR, 'source')
+    for p in pic_list:
+        os.remove(os.path.join(source_dir, p))
     c.execute('DELETE FROM questions WHERE exam_id=?', (exam_id,))
     conn.commit()
     conn.close()
@@ -301,10 +316,62 @@ def delete_exam(exam_id):
     # 删除题库中的题目与试卷
     econn = get_exam_conn()
     ec = econn.cursor()
+    ec.execute("SELECT pictures FROM questions WHERE exam_id = ?", (exam_id,))
+    rows = ec.fetchall()
+    pic_list = []
+    for row in rows:
+       if row[0]:
+            pic_l = json.loads(row[0])
+            pic_list += pic_l
+    source_dir = os.path.join(DB_DIR, 'source')
+    for p in pic_list:
+        os.remove(os.path.join(source_dir, p))
     ec.execute('DELETE FROM questions WHERE exam_id=?', (exam_id,))
     ec.execute('DELETE FROM exams WHERE id=?', (exam_id,))
     econn.commit()
     econn.close()
+
+def _sha256_of_bytesio(bio):
+    bio.seek(0)  # 确保从开头读取
+    sha256 = hashlib.sha256()
+    sha256.update(bio.read())
+    return sha256.hexdigest()
+
+def save_pic(img_io):
+    img_path = os.path.join(DB_DIR, 'source')
+    if not os.path.exists(img_path):
+        os.makedirs(img_path)
+    img_io.seek(0)
+    sha256 = hashlib.sha256()
+    sha256.update(img_io.read())
+    sha_str = sha256.hexdigest()
+    try:
+        img = Image.open(img_io)
+        img.save(os.path.join(img_path, sha_str), format="PNG")
+        return sha_str
+    except Exception as e:
+        print(f"Save_pic error: {e}")
+        return False
+
+def get_pic(sha_str):
+    img_path = os.path.join(DB_DIR, 'source')
+    filepath = os.path.join(img_path, sha_str)
+    if not os.path.exists(filepath):
+        return None
+    img = Image.open(filepath)
+    if img.mode not in ("RGB", "RGBA", "L"):
+        img = img.convert("RGB")
+    data = img.tobytes("raw", img.mode)
+    if img.mode == "RGB":
+        fmt = QImage.Format.Format_RGB888
+    elif img.mode == "RGBA":
+        fmt = QImage.Format.Format_RGBA8888
+    else:
+        fmt = QImage.Format.Format_Grayscale8
+    bytes_per_line = len(data) // img.height
+    qt_img = QImage(data, img.width, img.height, bytes_per_line, fmt)
+    return qt_img
+
 
 def start_attempt(user_id, exam_id, total_score):
     a_uuid = str(uuid.uuid4())
@@ -606,14 +673,14 @@ def list_questions_by_pool(exam_id, pool):
     conn = get_exam_conn()
     c = conn.cursor()
     try:
-        c.execute('SELECT id, type, text, options, correct_answers, score FROM questions WHERE exam_id=? AND (pool=? OR (pool IS NULL AND ?="mandatory")) ORDER BY id', (exam_id, pool, pool))
+        c.execute('SELECT id, type, text, options, correct_answers, score, pictures FROM questions WHERE exam_id=? AND (pool=? OR (pool IS NULL AND ?="mandatory")) ORDER BY id', (exam_id, pool, pool))
     except Exception:
-        c.execute('SELECT id, type, text, options, correct_answers, score FROM questions WHERE exam_id=? ORDER BY id', (exam_id,))
+        c.execute('SELECT id, type, text, options, correct_answers, score, pictures FROM questions WHERE exam_id=? ORDER BY id', (exam_id,))
     rows = c.fetchall()
     conn.close()
     out = []
     for r in rows:
-        out.append({'id': r[0], 'type': r[1], 'text': decrypt_text(r[2]) if r[2] else '', 'options': decrypt_json(r[3]) or [], 'correct': decrypt_json(r[4]) or [], 'score': r[5]})
+        out.append({'id': r[0], 'type': r[1], 'text': decrypt_text(r[2]) if r[2] else '', 'options': decrypt_json(r[3]) or [], 'correct': decrypt_json(r[4]) or [], 'score': r[5], 'pictures': r[6]})
     return out
 
 def get_exam_random_pick_count(exam_id):

@@ -1,5 +1,7 @@
 import os
+import json
 import pathlib
+from io import BytesIO
 from PySide6.QtCore import Qt, QDateTime
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout, QLineEdit, QTextEdit, QSpinBox, QDateTimeEdit, QPushButton, QFileDialog, QTableWidget, QTableWidgetItem, QAbstractItemView, QCheckBox
 from PySide6.QtWidgets import QMessageBox
@@ -7,7 +9,7 @@ from icon_manager import IconManager
 from theme_manager import theme_manager
 from language import tr
 from utils import show_info, show_warn, ask_yes_no
-from models import list_exams, add_exam, import_questions_from_json, get_exam_stats, update_exam_title_desc
+from models import list_exams, add_exam, import_questions_from_json, get_exam_stats, update_exam_title_desc, save_pic
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils import get_column_letter
@@ -262,8 +264,16 @@ class AdminExamsModule(QWidget):
                     return []
                 if start_opts is None:
                     start_opts = (max(base_cols) + 1) if base_cols else 3
+
+                img_dic = {}
+                for image in ws._images:
+                    col = image.anchor._from.col
+                    row = image.anchor._from.row
+                    img_io = BytesIO(image._data())
+                    img_dic[row] = {col: img_io}
+
                 data_local = []
-                for row in ws.iter_rows(min_row=2, values_only=True):
+                for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True)):
                     tval = (str(row[itype]).strip().lower() if row[itype] is not None else '')
                     qtype = None
                     if tval in ('单选', 'single'):
@@ -311,7 +321,16 @@ class AdminExamsModule(QWidget):
                                 sc = float(str(v).strip())
                         except Exception:
                             sc = 1.0
-                    item = {'type': qtype, 'text': text, 'score': sc, 'options': options, 'correct': correct}
+                    pic_group = img_dic.get(idx, None)
+                    pic_hash_list = []
+                    if isinstance(pic_group, dict):
+                        pic_list = [v for k, v in sorted(pic_group.items())]
+                        for pic in pic_list:
+                            hash_str = save_pic(pic)
+                            if hash_str:
+                                pic_hash_list.append(hash_str)
+                    pic_hash_list_str = json.dumps(pic_hash_list, ensure_ascii=False)
+                    item = {'type': qtype, 'text': text, 'score': sc, 'options': options, 'correct': correct, 'pictures': pic_hash_list_str}
                     data_local.append(item)
                 return data_local
 
