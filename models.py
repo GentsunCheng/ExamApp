@@ -353,7 +353,7 @@ def save_pic(img_io):
         print(f"Save_pic error: {e}")
         return False
 
-def get_pic(sha_str):
+def get_pic(sha_str, max_dim=1080):
     img_path = os.path.join(DB_DIR, 'source')
     filepath = os.path.join(img_path, sha_str)
     if not os.path.exists(filepath):
@@ -361,6 +361,11 @@ def get_pic(sha_str):
     img = Image.open(filepath)
     if img.mode not in ("RGB", "RGBA", "L"):
         img = img.convert("RGB")
+    width, height = img.size
+    if width > max_dim or height > max_dim:
+        scale = max_dim / max(width, height)
+        new_size = (int(width * scale), int(height * scale))
+        img = img.resize(new_size, Image.Resampling.LANCZOS)
     data = img.tobytes("raw", img.mode)
     if img.mode == "RGB":
         fmt = QImage.Format.Format_RGB888
