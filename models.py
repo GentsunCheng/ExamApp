@@ -1,6 +1,7 @@
 import os
 import random
 import uuid
+from io import BytesIO
 from datetime import datetime
 from PIL import Image
 from PySide6.QtGui import QImage
@@ -18,7 +19,7 @@ from database import (
 )
 from utils import hash_password, verify_password
 import sqlite3
-from crypto_util import encrypt_text, decrypt_text, encrypt_json, decrypt_json
+from crypto_util import encrypt_text, decrypt_text, encrypt_json, decrypt_json, aes_bytesio
 import hashlib
 import hmac
 import json
@@ -346,8 +347,12 @@ def save_pic(img_io):
     sha256.update(img_io.read())
     sha_str = sha256.hexdigest()
     try:
+        img_bytes_io = BytesIO()
         img = Image.open(img_io)
-        img.save(os.path.join(img_path, sha_str), format="PNG")
+        img.save(img_bytes_io, format="PNG")
+        img_bytes_encrypted = aes_bytesio(img_bytes_io, secret_key=SERECT_KEY, operation="encrypt")
+        with open(os.path.join(img_path, sha_str), 'wb') as f:
+            f.write(img_bytes_encrypted.read())
         return sha_str
     except Exception as e:
         print(f"Save_pic error: {e}")
@@ -358,7 +363,13 @@ def get_pic(sha_str, max_dim=1080):
     filepath = os.path.join(img_path, sha_str)
     if not os.path.exists(filepath):
         return None
-    img = Image.open(filepath)
+    io_file_encrypted = None
+    with open(filepath, 'rb') as f:
+        io_file_encrypted = BytesIO(f.read())
+    if not io_file_encrypted:
+        return None
+    io_file = aes_bytesio(io_file_encrypted, secret_key=SERECT_KEY, operation="decrypt")
+    img = Image.open(io_file)
     if img.mode not in ("RGB", "RGBA", "L"):
         img = img.convert("RGB")
     width, height = img.size

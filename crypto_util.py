@@ -1,8 +1,10 @@
 import base64
 import os
 import hashlib
+from io import BytesIO
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
+from Crypto.Util.Padding import pad, unpad
 
 def _load_key():
     try:
@@ -88,3 +90,44 @@ def verify_probe(enc):
         return decrypt_text(enc) == 'EXAMAPP_KEY_PROBE'
     except Exception:
         return False
+
+
+def aes_bytesio(data_io: BytesIO, secret_key: str, operation: str) -> BytesIO:
+    """
+    对 BytesIO 对象进行 AES-CBC 加密或解密，secret_key 为字符串。
+
+    参数:
+        data_io: BytesIO 对象
+        secret_key: str
+        operation: "encrypt" 或 "decrypt"
+
+    返回:
+        BytesIO 对象
+    """
+    data_io.seek(0)
+    data = data_io.read()
+
+    # 将字符串 key 转为 bytes，并调整长度为 32 字节（AES-256）
+    key_bytes = secret_key.encode('utf-8')
+    if len(key_bytes) < 32:
+        key_bytes = key_bytes.ljust(32, b'\0')  # 不够 32 字节补 0
+    else:
+        key_bytes = key_bytes[:32]  # 超过截断
+
+    if operation == "encrypt":
+        iv = get_random_bytes(16)
+        cipher = AES.new(key_bytes, AES.MODE_CBC, iv)
+        encrypted_data = cipher.encrypt(pad(data, AES.block_size))
+        return BytesIO(iv + encrypted_data)
+
+    elif operation == "decrypt":
+        if len(data) < 16:
+            raise ValueError("Data too short to contain IV")
+        iv = data[:16]
+        encrypted_data = data[16:]
+        cipher = AES.new(key_bytes, AES.MODE_CBC, iv)
+        decrypted_data = unpad(cipher.decrypt(encrypted_data), AES.block_size)
+        return BytesIO(decrypted_data)
+
+    else:
+        raise ValueError("Operation must be 'encrypt' or 'decrypt'")
