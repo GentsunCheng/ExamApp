@@ -45,6 +45,6 @@ logs/
 node_modules/
 *.db
 .trae/
-serect_key.py
+secret_key.py
 pack.sh
 nuitka-crash-report.xml

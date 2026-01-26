@@ -36,7 +36,7 @@ jobs:
           python3 -m pip install --upgrade pip
           mkdir conf
           echo AES_KEY_B64=${{ secrets.AES_KEY }} > .env
-          echo SERECT_KEY=${{ secrets.SERECT_KEY }} >> .env
+          echo SECRET_KEY=${{ secrets.SECRET_KEY }} >> .env
           pip3 install -r requirements.txt
           pip3 install nuitka
 

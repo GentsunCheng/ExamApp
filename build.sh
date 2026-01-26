@@ -69,25 +69,25 @@ case "$CMD" in
     ;;
   genkey)
     echo "生成密钥文件..."
-    if [ -f conf/serect_key.py ]; then
+    if [ -f conf/secret_key.py ]; then
       echo "密钥已存在，跳过"
     else
       if [ -f .env ]; then
         ENV_AES_B64=$(grep -E '^AES_KEY_B64=' .env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' ' || echo "")
         ENV_AES=$(grep -E '^AES_KEY=' .env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' ' || echo "")
-        ENV_HMAC_B64=$(grep -E '^SERECT_KEY_B64=' .env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' ' || echo "")
-        ENV_HMAC=$(grep -E '^SERECT_KEY=' .env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' ' || echo "")
+        ENV_HMAC_B64=$(grep -E '^SECRET_KEY_B64=' .env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' ' || echo "")
+        ENV_HMAC=$(grep -E '^SECRET_KEY=' .env | head -n1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d ' ' || echo "")
         AK=${ENV_AES_B64:-$ENV_AES}
         SK=${ENV_HMAC_B64:-$ENV_HMAC}
         if [ -n "$AK" ] || [ -n "$SK" ]; then
-          printf "AES_KEY = '%s'\n" "$AK" > conf/serect_key.py
-          printf "SERECT_KEY = '%s'\n" "$SK" >> conf/serect_key.py
-          echo "conf/serect_key.py 已生成"
+          printf "AES_KEY = '%s'\n" "$AK" > conf/secret_key.py
+          printf "SECRET_KEY = '%s'\n" "$SK" >> conf/secret_key.py
+          echo "conf/secret_key.py 已生成"
         else
-          python3 -c 'import os, base64; ak=os.urandom(32); sk=os.urandom(32); open("conf/serect_key.py","w").write("AES_KEY = " + repr(base64.b64encode(ak).decode("ascii")) + "\n" + "SERECT_KEY = " + repr(base64.b64encode(sk).decode("ascii")) + "\n"); print("serect_key.py 已生成")'
+          python3 -c 'import os, base64; ak=os.urandom(32); sk=os.urandom(32); open("conf/secret_key.py","w").write("AES_KEY = " + repr(base64.b64encode(ak).decode("ascii")) + "\n" + "SECRET_KEY = " + repr(base64.b64encode(sk).decode("ascii")) + "\n"); print("secret_key.py 已生成")'
         fi
       else
-        python3 -c 'import os, base64; ak=os.urandom(32); sk=os.urandom(32); open("conf/serect_key.py","w").write("AES_KEY = " + repr(base64.b64encode(ak).decode("ascii")) + "\n" + "SERECT_KEY = " + repr(base64.b64encode(sk).decode("ascii")) + "\n"); print("serect_key.py 已生成")'
+        python3 -c 'import os, base64; ak=os.urandom(32); sk=os.urandom(32); open("conf/secret_key.py","w").write("AES_KEY = " + repr(base64.b64encode(ak).decode("ascii")) + "\n" + "SECRET_KEY = " + repr(base64.b64encode(sk).decode("ascii")) + "\n"); print("secret_key.py 已生成")'
       fi
     fi
     ;;

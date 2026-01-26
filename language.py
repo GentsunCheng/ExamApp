@@ -639,6 +639,7 @@ def tr(key, **kwargs):
     if kwargs:
         try:
             return text.format(**kwargs)
-        except Exception:
+        except Exception as e:
+            print(f'Warn: {e}')
             return text
     return text

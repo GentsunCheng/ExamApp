@@ -1,6 +1,6 @@
 import json
 import random
-from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QGridLayout, QScrollArea
 from PySide6.QtGui import QKeySequence, QShortcut, QPixmap, QGuiApplication
 from theme_manager import theme_manager

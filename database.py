@@ -55,7 +55,8 @@ def ensure_db():
     try:
         c.execute('CREATE INDEX IF NOT EXISTS idx_progress_tasks_module ON progress_tasks (module_id, sort_order, id)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_user_task_progress_user ON user_task_progress (user_id, task_id)')
-    except Exception:
+    except Exception as e:
+        print(e)
         pass
     conn.commit()
     conn.close()
@@ -108,7 +109,8 @@ def ensure_key_probe():
         v = get_setting('key_probe')
         if v is None:
             set_setting('key_probe', encrypt_probe())
-    except Exception:
+    except Exception as e:
+        print(e)
         pass
 
 def verify_db_encryption_key():
@@ -117,5 +119,6 @@ def verify_db_encryption_key():
         if v is None:
             return True
         return bool(verify_probe(v))
-    except Exception:
+    except Exception as e:
+        print(e)
         return False

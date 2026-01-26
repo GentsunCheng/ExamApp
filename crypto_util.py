@@ -8,8 +8,8 @@ from Crypto.Util.Padding import pad, unpad
 
 def _load_key():
     try:
-        from conf.serect_key import AES_KEY as k
-        return base64.b64decode(k)
+        from conf.secret_key import AES_KEY
+        return base64.b64decode(AES_KEY)
     except ImportError:
         try:
             key = None
@@ -22,10 +22,11 @@ def _load_key():
                         key = line[len('AES_KEY_B64='):]
             if key is None:
                 key = os.urandom(32)
-            with open('conf/serect_key.py','w') as f:
+            with open('conf/secret_key.py','w') as f:
                 f.write('AES_KEY = ' + repr(base64.b64encode(key).decode('ascii')) + '\n')
             return key
-        except Exception:
+        except Exception as e:
+            print(f"No secret_key.py found: {e}, gen random key")
             k = get_random_bytes(32)
             return k
 

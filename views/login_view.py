@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt, QRegularExpression
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QLineEdit, QPushButton, QLabel, QMessageBox
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QLineEdit, QPushButton, QLabel
 from PySide6.QtGui import QRegularExpressionValidator
 from models import authenticate, verify_encryption_ok
 from utils import show_warn

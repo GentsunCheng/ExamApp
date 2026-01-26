@@ -58,7 +58,7 @@ class MainWindow(QMainWindow):
         self._zoom_anim.setDuration(180)
         self._zoom_anim.setStartValue(start_rect)
         self._zoom_anim.setEndValue(rect)
-        self._zoom_anim.setEasingCurve(QEasingCurve.OutCubic)
+        self._zoom_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._zoom_anim.start()
 
     def _create_opacity_anim(self, widget, start, end):
@@ -72,7 +72,7 @@ class MainWindow(QMainWindow):
         anim.setDuration(220)
         anim.setStartValue(start)
         anim.setEndValue(end)
-        anim.setEasingCurve(QEasingCurve.InOutCubic)
+        anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
         return anim
 
     def _switch_with_fade(self, target_widget, cleanup=None):

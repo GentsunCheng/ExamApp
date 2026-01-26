@@ -17,8 +17,8 @@ class SmoothScrollFilter(QObject):
                 return False
             if isinstance(area, QAbstractItemView):
                 try:
-                    area.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
-                    area.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+                    area.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+                    area.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
                 except Exception:
                     pass
             self._ensure_scroller(area)

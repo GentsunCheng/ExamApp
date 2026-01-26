@@ -89,7 +89,7 @@ class UserView(QWidget):
         anim.setDuration(75)
         anim.setStartValue(0.0)
         anim.setEndValue(1.0)
-        anim.setEasingCurve(QEasingCurve.InOutCubic)
+        anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
 
         def finished():
             effect.setOpacity(1.0)

@@ -24,9 +24,9 @@ import hashlib
 import hmac
 import json
 try:
-    from conf.serect_key import SERECT_KEY
+    from conf.secret_key import SECRET_KEY
 except Exception:
-    SERECT_KEY = 'example'
+    SECRET_KEY = 'example'
 
 def create_admin_if_absent():
     conn = get_admin_conn()
@@ -345,7 +345,7 @@ def save_pic(img_io):
         img_bytes_io = BytesIO()
         img = Image.open(img_io)
         img.save(img_bytes_io, format="PNG")
-        img_bytes_encrypted = aes_bytesio(img_bytes_io, secret_key=SERECT_KEY, operation="encrypt")
+        img_bytes_encrypted = aes_bytesio(img_bytes_io, secret_key=SECRET_KEY, operation="encrypt")
         with open(os.path.join(RESOURCE_PATH, sha_str), 'wb') as f:
             f.write(img_bytes_encrypted.read())
         return sha_str
@@ -362,7 +362,7 @@ def get_pic(sha_str, max_dim=1080):
         io_file_encrypted = BytesIO(f.read())
     if not io_file_encrypted:
         return None
-    io_file = aes_bytesio(io_file_encrypted, secret_key=SERECT_KEY, operation="decrypt")
+    io_file = aes_bytesio(io_file_encrypted, secret_key=SECRET_KEY, operation="decrypt")
     img = Image.open(io_file)
     if img.mode not in ("RGB", "RGBA", "L"):
         img = img.convert("RGB")
@@ -388,7 +388,7 @@ def start_attempt(user_id, exam_id, total_score):
     conn = get_score_conn()
     c = conn.cursor()
     ts = now_iso()
-    checksum = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(a_uuid), str(user_id), str(exam_id), str(ts), '-', str(0.0), str(0), str(total_score)])).encode('utf-8'), hashlib.sha256).hexdigest()
+    checksum = hmac.new(SECRET_KEY.encode('utf-8'), ('|'.join([str(a_uuid), str(user_id), str(exam_id), str(ts), '-', str(0.0), str(0), str(total_score)])).encode('utf-8'), hashlib.sha256).hexdigest()
     c.execute('INSERT INTO attempts (uuid, user_id, exam_id, started_at, submitted_at, score, passed, total_score, checksum) VALUES (?,?,?,?,?,?,?,?,?)', (a_uuid, user_id, exam_id, ts, None, 0.0, 0, float(total_score), checksum))
     conn.commit()
     conn.close()
@@ -440,7 +440,7 @@ def submit_attempt(attempt_uuid):
         passed = 1
     c.execute('UPDATE attempts SET submitted_at=?, score=?, passed=? WHERE uuid=?', (sub_ts, total, passed, attempt_uuid))
     try:
-        checksum = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(attempt_uuid), str(row[1]), str(exam_id), str(started_at), str(sub_ts), str(total), str(passed), str(attempt_total)])).encode('utf-8'), hashlib.sha256).hexdigest()
+        checksum = hmac.new(SECRET_KEY.encode('utf-8'), ('|'.join([str(attempt_uuid), str(row[1]), str(exam_id), str(started_at), str(sub_ts), str(total), str(passed), str(attempt_total)])).encode('utf-8'), hashlib.sha256).hexdigest()
         c.execute('UPDATE attempts SET checksum=? WHERE uuid=?', (checksum, attempt_uuid))
     except Exception:
         pass
@@ -468,7 +468,7 @@ def list_attempts(user_id=None):
     conn.close()
     out = []
     for r in rows:
-        expect = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(r[0]), str(r[1]), str(r[2]), str(r[3]), str(r[4]) if r[4] else '-', str(r[5]), str(r[6]), str(r[7])])).encode('utf-8'), hashlib.sha256).hexdigest()
+        expect = hmac.new(SECRET_KEY.encode('utf-8'), ('|'.join([str(r[0]), str(r[1]), str(r[2]), str(r[3]), str(r[4]) if r[4] else '-', str(r[5]), str(r[6]), str(r[7])])).encode('utf-8'), hashlib.sha256).hexdigest()
         valid = str(r[8] or '') == expect
         out.append((r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], 1 if valid else 0))
     return out
@@ -499,7 +499,7 @@ def list_attempts_with_user():
     out = []
     for r in rows:
         uname, fn = users_map.get(r[1], (None, None))
-        expect = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(r[0]), str(r[1]), str(r[2]), str(r[3]), str(r[4]) if r[4] else '-', str(r[5]), str(r[6]), str(r[7])])).encode('utf-8'), hashlib.sha256).hexdigest()
+        expect = hmac.new(SECRET_KEY.encode('utf-8'), ('|'.join([str(r[0]), str(r[1]), str(r[2]), str(r[3]), str(r[4]) if r[4] else '-', str(r[5]), str(r[6]), str(r[7])])).encode('utf-8'), hashlib.sha256).hexdigest()
         valid = str(r[8] or '') == expect
         out.append((r[0], uname, decrypt_text(fn) if fn else None, r[1], r[2], r[3], r[4], r[5], r[6], r[7], 1 if valid else 0))
     return out
@@ -512,7 +512,7 @@ def list_exam_user_overview(exam_id):
     conn.close()
     stats = {}
     for r in rows:
-        expect = hmac.new(SERECT_KEY.encode('utf-8'), ('|'.join([str(r[0]), str(r[1]), str(r[2]), str(r[3]), str(r[4]) if r[4] else '-', str(r[5]), str(r[6]), str(r[7])])).encode('utf-8'), hashlib.sha256).hexdigest()
+        expect = hmac.new(SECRET_KEY.encode('utf-8'), ('|'.join([str(r[0]), str(r[1]), str(r[2]), str(r[3]), str(r[4]) if r[4] else '-', str(r[5]), str(r[6]), str(r[7])])).encode('utf-8'), hashlib.sha256).hexdigest()
         valid = str(r[8] or '') == expect
         if not valid:
             continue

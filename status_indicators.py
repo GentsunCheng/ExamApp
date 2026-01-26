@@ -683,7 +683,7 @@ class ToastNotification(QWidget):
     def show_notification(self, text, type="info", duration=3000):
         """显示通知"""
         # 设置通知样式
-        style_config = self._get_notification_config(type)
+        style_config = self._get_notification_config(type=type)
         
         self.icon_label.setText(style_config['icon'])
         self.text_label.setText(text)
@@ -702,7 +702,7 @@ class ToastNotification(QWidget):
         QTimer.singleShot(duration, self.hide)
 
     @staticmethod
-    def _get_notification_config(self, type):
+    def _get_notification_config(type):
         """获取通知配置"""
         config_map = {
             'success': {

@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt, QPoint, QRect, QSize
-from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QScrollArea, QLabel, QGroupBox, QHBoxLayout, QLayout
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QScrollArea, QLabel, QGroupBox, QLayout
 from PySide6.QtGui import QKeySequence, QShortcut
 
 from theme_manager import theme_manager

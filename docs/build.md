@@ -27,7 +27,7 @@
 
 系统使用 `PyCryptodome` 的 AES-GCM 对部分字段加密存储（如试题标题/描述、题目文本/选项/答案、用户姓名、作答选项、SSH 密码等）。
 
-- 密钥文件：`conf/serect_key.py`
+- 密钥文件：`conf/secret_key.py`
 - 重要：首次运行或打包前执行 `make genkey` 或 `./build.sh genkey` 生成密钥，并妥善备份；密钥一旦丢失，将无法解密已加密的数据
 
 ### 使用 `.env` 指定密钥
