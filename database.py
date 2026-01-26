@@ -86,7 +86,7 @@ def get_progress_conn():
     return sqlite3.connect(PROGRESS_DB_PATH)
 
 def now_iso():
-    return datetime.now().isoformat()
+    return datetime.now().isoformat(timespec='seconds')
 
 def get_setting(key):
     conn = sqlite3.connect(CONFIG_DB_PATH)
