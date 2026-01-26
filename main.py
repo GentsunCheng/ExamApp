@@ -1,7 +1,7 @@
 import sys
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget, QGraphicsOpacityEffect
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QKeySequence, QShortcut, QPalette
 from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QRect, QParallelAnimationGroup
 from database import ensure_db
 from models import create_admin_if_absent
@@ -15,6 +15,11 @@ from language import set_language, get_system_language_codes, tr
 __language__ = get_system_language_codes()
 set_language(__language__)
 
+
+def is_dark_mode(app):
+    palette = app.palette()
+    color = palette.color(QPalette.Window)
+    return color.lightness() < 128
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -36,6 +41,12 @@ class MainWindow(QMainWindow):
         self.login = LoginView(self.on_login)
         self.stack.addWidget(self.login)
         self.setCentralWidget(self.stack)
+        app = QApplication.instance()
+        app.paletteChanged.connect(self.on_palette_changed)
+
+    def on_palette_changed(self):
+        self.setStyleSheet(theme_manager.get_scrollbar_style())
+        theme_manager.install_smooth_scroll(self)
 
     def showEvent(self, event):
         super().showEvent(event)
