@@ -17,6 +17,8 @@ DB_PATH = EXAMS_DB_PATH
 def ensure_db():
     if not os.path.exists(DB_DIR):
         os.makedirs(DB_DIR, exist_ok=True)
+    if not os.path.exists(RESOURCE_PATH):
+        os.makedirs(RESOURCE_PATH, exist_ok=True)
     conn = sqlite3.connect(ADMIN_DB_PATH)
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS admins (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT, active INTEGER DEFAULT 1, created_at TEXT, full_name TEXT)')

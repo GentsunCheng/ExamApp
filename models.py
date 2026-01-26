@@ -332,7 +332,7 @@ def delete_exam(exam_id):
 
 def save_pic(img_io):
     if not os.path.exists(RESOURCE_PATH):
-        os.makedirs(RESOURCE_PATH)
+        return False
     img_io.seek(0)
     sha256 = hashlib.sha256()
     sha256.update(img_io.read())

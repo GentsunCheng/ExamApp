@@ -1,8 +1,8 @@
 import json
 import random
 from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect
-from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QGridLayout
-from PySide6.QtGui import QKeySequence, QShortcut, QPixmap
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QGridLayout, QScrollArea
+from PySide6.QtGui import QKeySequence, QShortcut, QPixmap, QGuiApplication
 from theme_manager import theme_manager
 from icon_manager import IconManager
 from exam_interface import ModernTimer, ModernProgressBar
@@ -52,6 +52,7 @@ class ExamWindow(QMainWindow):
             self.total_score += q["score"]
         self.attempt_uuid = start_attempt(user['id'], exam_id, self.total_score)
         self.current_index = 0
+        self.pic_width = self.get_resolution() / 2
         self.setWindowTitle(tr('exam.in_progress', total=self.total_score))
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -102,22 +103,36 @@ class ExamWindow(QMainWindow):
         self.progress_bar.setRange(0, max(1, len(self.questions)))
         self.progress_bar.setValue(1)
         right.addWidget(self.progress_bar)
-        gb = QGroupBox()
-        gb.setStyleSheet(f"QGroupBox {{ border:1px solid {colors['border']}; border-radius:8px; padding:12px; }}")
-        vb = QVBoxLayout()
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setStyleSheet(f"QScrollArea {{ border:1px solid {colors['border']}; border-radius:8px; background-color: transparent; }}")
+        self.scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background-color: transparent;")
+        vb = QVBoxLayout(scroll_content)
+        vb.setContentsMargins(12, 12, 12, 12)
+        
         self.q_title = QLabel('')
         self.q_title.setWordWrap(True)
         self.q_title.setStyleSheet("font-size:16px; margin-bottom:8px;")
+        
         self.q_picture_layout = QGridLayout()
+        self.q_picture_layout.setSpacing(10)
+        
         self.opts_container = QWidget()
         self.opts_layout = QVBoxLayout()
         self.opts_layout.setSpacing(8)
+        self.opts_layout.setContentsMargins(0, 0, 0, 0)
         self.opts_container.setLayout(self.opts_layout)
+        
         vb.addWidget(self.q_title)
         vb.addLayout(self.q_picture_layout)
         vb.addWidget(self.opts_container)
-        gb.setLayout(vb)
-        right.addWidget(gb)
+        vb.addStretch()
+        
+        self.scroll_area.setWidget(scroll_content)
+        right.addWidget(self.scroll_area)
         hb = QHBoxLayout()
         self.prev_btn = QPushButton(tr('exam.prev'))
         self.next_btn = QPushButton(tr('exam.next'))
@@ -151,6 +166,15 @@ class ExamWindow(QMainWindow):
         self.timer_widget.start_timer(self.remaining)
         self.update_nav_buttons_state()
         self.render_q()
+
+    def get_resolution(self):
+        screen = QGuiApplication.primaryScreen()
+        size = screen.size()
+        width = size.width()
+        height = size.height()
+        h = min(width, height)
+        return h
+
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -290,16 +314,13 @@ class ExamWindow(QMainWindow):
                 widget.setParent(None)
         # 渲染新图片
         for picture_hash in picture_hash_list:
-            picture = get_pic(picture_hash)
+            picture = get_pic(picture_hash, max_dim=self.pic_width)
+            if not picture:
+                continue
             label = QLabel()
-            scaled_pixmap = QPixmap.fromImage(picture).scaled(
-                picture.width(),
-                self.q_title.height(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
-            label.setPixmap(scaled_pixmap)
-            label.resize(picture.width(), self.q_title.height())
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            pixmap = QPixmap.fromImage(picture)
+            label.setPixmap(pixmap)
             self.q_picture_layout.addWidget(label)
         # 清空旧选项
         while self.opts_layout.count():

@@ -52,20 +52,19 @@ PYINSTALLER_COMMON_ARGS = \
 PYINSTALLER_MACOS_ARGS = \
     --windowed \
     --noconsole \
-	--add-data "resources/sshpass_darwin:resources/sshpass_darwin" \
+	--add-binary "resources/sshpass_darwin:resources" \
     --icon resources/logo.icns \
-    --osx-bundle-identifier top.orii.exam \
-	--output-folder-name=$(APP_NAME)_$(ARCH)
+    --osx-bundle-identifier top.orii.exam
 
 PYINSTALLER_WINDOWS_ARGS = \
     --windowed \
     --noconsole \
-	--add-data "resources/sshpass_win.exe:resources/sshpass_win.exe" \
+	--add-binary "resources/sshpass_win.exe:resources" \
     --icon resources/logo.ico
 
 PYINSTALLER_LINUX_ARGS = \
     --noconsole \
-	--add-data "resources/sshpass_linux:resources/sshpass_linux"
+	--add-binary "resources/sshpass_linux:resources"
 
 ifeq ($(PLATFORM),macos)
     PYINSTALLER_ARGS = $(PYINSTALLER_COMMON_ARGS) $(PYINSTALLER_MACOS_ARGS)
