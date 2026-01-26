@@ -321,7 +321,7 @@ class AdminExamsModule(QWidget):
                                 sc = float(str(v).strip())
                         except Exception:
                             sc = 1.0
-                    pic_group = img_dic.get(idx, None)
+                    pic_group = img_dic.get(idx + 1, None)
                     pic_hash_list = []
                     if isinstance(pic_group, dict):
                         pic_list = [v for k, v in sorted(pic_group.items())]

@@ -297,7 +297,9 @@ def clear_exam_questions(exam_id):
             pic_l = json.loads(row[0])
             pic_list += pic_l
     for p in pic_list:
-        os.remove(os.path.join(RESOURCE_PATH, p))
+        picture_path = os.path.join(RESOURCE_PATH, p)
+        if os.path.exists(picture_path):
+            os.remove(picture_path)
     c.execute('DELETE FROM questions WHERE exam_id=?', (exam_id,))
     conn.commit()
     conn.close()
@@ -324,7 +326,9 @@ def delete_exam(exam_id):
             pic_l = json.loads(row[0])
             pic_list += pic_l
     for p in pic_list:
-        os.remove(os.path.join(RESOURCE_PATH, p))
+        picture_path = os.path.join(RESOURCE_PATH, p)
+        if os.path.exists(picture_path):
+            os.remove(picture_path)
     ec.execute('DELETE FROM questions WHERE exam_id=?', (exam_id,))
     ec.execute('DELETE FROM exams WHERE id=?', (exam_id,))
     econn.commit()
