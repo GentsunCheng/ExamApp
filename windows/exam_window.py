@@ -37,6 +37,10 @@ class ExamWindow(QMainWindow):
         self.shortcut_cheat.activated.connect(self.cheat)
         self.shortcut_quit = QShortcut(QKeySequence("Ctrl+W"), self)
         self.shortcut_quit.activated.connect(self.quit_exam)
+        self.shortcut_next_q = QShortcut(Qt.Key_PageDown, self)
+        self.shortcut_next_q.activated.connect(self.next_q)
+        self.shortcut_prev_q = QShortcut(Qt.Key_PageUp, self)
+        self.shortcut_prev_q.activated.connect(self.prev_q)
         self.cheatting = False
         self.user = user
         self.exam_id = exam_id
@@ -133,8 +137,8 @@ class ExamWindow(QMainWindow):
         self.scroll_area.setWidget(scroll_content)
         right.addWidget(self.scroll_area)
         hb = QHBoxLayout()
-        self.prev_btn = QPushButton(tr('exam.prev'))
-        self.next_btn = QPushButton(tr('exam.next'))
+        self.prev_btn = QPushButton(f"{tr('exam.prev')} (PgUp)")
+        self.next_btn = QPushButton(f"{tr('exam.next')} (PgDn)")
         self.submit_btn = QPushButton(tr('exam.submit'))
         self.submit_btn.setIcon(self.icon_manager.get_icon('submit'))
         self.next_btn.setDefault(True)
