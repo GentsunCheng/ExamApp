@@ -181,12 +181,12 @@ def delete_admin(admin_id):
 def demote_admin_to_user(admin_id):
     aconn = get_admin_conn()
     ac = aconn.cursor()
-    ac.execute('SELECT username, password_hash, active, full_name FROM admins WHERE id=?', (admin_id,))
+    ac.execute('SELECT username, password_hash, active, full_name, edit_at FROM admins WHERE id=?', (admin_id,))
     row = ac.fetchone()
     aconn.close()
     if not row:
         raise Exception('管理员不存在')
-    username, pwd_hash, active, full_name_cipher = row[0], row[1], int(row[2] or 0), row[3]
+    username, pwd_hash, active, full_name_cipher, edit_at = row[0], row[1], int(row[2] or 0), row[3], row[4]
     uconn = get_user_conn()
     uc = uconn.cursor()
     uc.execute('SELECT COUNT(*) FROM users WHERE username=?', (username,))
@@ -194,7 +194,7 @@ def demote_admin_to_user(admin_id):
         uconn.close()
         raise Exception('用户名已存在于用户库')
     try:
-        uc.execute('INSERT INTO users (username, password_hash, role, active, created_at, full_name) VALUES (?,?,?,?,?,?)', (username, pwd_hash, 'user', active, now_iso(), full_name_cipher))
+        uc.execute('INSERT INTO users (username, password_hash, role, active, created_at, full_name, edit_at) VALUES (?,?,?,?,?,?,?)', (username, pwd_hash, 'user', active, now_iso(), full_name_cipher, edit_at))
         uconn.commit()
     finally:
         uconn.close()
@@ -203,12 +203,12 @@ def demote_admin_to_user(admin_id):
 def promote_user_to_admin(user_id):
     uconn = get_user_conn()
     uc = uconn.cursor()
-    uc.execute('SELECT username, password_hash, active, full_name FROM users WHERE id=?', (user_id,))
+    uc.execute('SELECT username, password_hash, active, full_name, edit_at FROM users WHERE id=?', (user_id,))
     row = uc.fetchone()
     if not row:
         uconn.close()
         raise Exception('用户不存在')
-    username, pwd_hash, active, full_name_cipher = row[0], row[1], int(row[2] or 0), row[3]
+    username, pwd_hash, active, full_name_cipher, edit_at = row[0], row[1], int(row[2] or 0), row[3], row[4]
     aconn = get_admin_conn()
     ac = aconn.cursor()
     ac.execute('SELECT COUNT(*) FROM admins WHERE username=?', (username,))
@@ -217,7 +217,7 @@ def promote_user_to_admin(user_id):
         uconn.close()
         raise Exception('用户名已存在于管理员库')
     try:
-        ac.execute('INSERT INTO admins (username, password_hash, active, created_at, full_name) VALUES (?,?,?,?,?)', (username, pwd_hash, active, now_iso(), full_name_cipher))
+        ac.execute('INSERT INTO admins (username, password_hash, active, created_at, full_name, edit_at) VALUES (?,?,?,?,?,?)', (username, pwd_hash, active, now_iso(), full_name_cipher, edit_at))
         aconn.commit()
     finally:
         aconn.close()

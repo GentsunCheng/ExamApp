@@ -14,6 +14,18 @@ PROGRESS_DB_PATH = os.path.join(DB_DIR, 'progress.db')
 RESOURCE_PATH = os.path.join(DB_DIR, 'resources')
 DB_PATH = EXAMS_DB_PATH
 
+ITER_LIST = [
+    (ADMIN_DB_PATH, 'admins', 'edit_at', 'TEXT', 'NULL'),
+    (USERS_DB_PATH, 'users', 'edit_at', 'TEXT', 'NULL')
+]
+
+TYPE_DEFAULT_DICT = {
+    'TEXT': 'NULL',
+    'INTEGER': '0',
+    'REAL': '0.0',
+    'BLOB': 'NULL',
+}
+
 def ensure_db():
     if not os.path.exists(DB_DIR):
         os.makedirs(DB_DIR, exist_ok=True)
@@ -61,7 +73,7 @@ def ensure_db():
     conn.commit()
     conn.close()
 
-def iter_columns(db_path, table_name, column_name, column_type, default_value=None):
+def iter_columns_model(db_path, table_name, column_name, column_type, default_value=None):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     c.execute(f'PRAGMA table_info({table_name})')
@@ -72,29 +84,39 @@ def iter_columns(db_path, table_name, column_name, column_type, default_value=No
         conn.commit()
     conn.close()
 
+def iter_columns():
+    for iter_data in ITER_LIST:
+        db_path, table_name, column_name, column_type, default_value = iter_data
+        iter_columns_model(db_path, table_name, column_name, column_type, default_value)
 
 def get_admin_conn():
     ensure_db()
+    iter_columns()
     return sqlite3.connect(ADMIN_DB_PATH)
 
 def get_user_conn():
     ensure_db()
+    iter_columns()
     return sqlite3.connect(USERS_DB_PATH)
 
 def get_exam_conn():
     ensure_db()
+    iter_columns()
     return sqlite3.connect(EXAMS_DB_PATH)
 
 def get_score_conn():
     ensure_db()
+    iter_columns()
     return sqlite3.connect(SCORES_DB_PATH)
 
 def get_config_conn():
     ensure_db()
+    iter_columns()
     return sqlite3.connect(CONFIG_DB_PATH)
 
 def get_progress_conn():
     ensure_db()
+    iter_columns()
     return sqlite3.connect(PROGRESS_DB_PATH)
 
 def now_iso():
