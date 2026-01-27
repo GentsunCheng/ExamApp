@@ -33,6 +33,19 @@ if os.path.exists(SSHPASS_PATH):
 else:
     print(f"Error: sshpass binary not found at {SSHPASS_PATH}")
 
+
+def get_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('10.255.255.255', 1))
+        local_ip = s.getsockname()[0]
+    except Exception as err_net:
+        print(f"{err_net}")
+        local_ip = '127.0.0.1'
+    finally:
+        s.close()
+    return local_ip
+
 def _parse_ip_port(ip_str):
     """
     解析 IP 和端口，格式为 ip:port 或 ip
@@ -124,6 +137,8 @@ def rsync_push(ip, username, remote_dir, ssh_password=None, include_admin=False)
     ip_addr, port = _parse_ip_port(ip)
     if not _is_port_open(ip_addr, port):
         return 1, '', f"Connection failed: {ip_addr}:{port} is unreachable."
+    if ip_addr == get_local_ip() or ip_addr == '127.0.0.1':
+        return 304, f"Skip local device: {ip_addr}:{port}", ''
     remote_dir = _expand_remote_tilde(remote_dir, ip, username, ssh_password)
     local_files = [SCORES_DB_PATH, EXAMS_DB_PATH, USERS_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH, RESOURCE_PATH]
     if include_admin:

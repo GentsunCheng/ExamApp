@@ -29,11 +29,16 @@ except Exception:
     SECRET_KEY = 'example'
 
 def create_admin_if_absent():
+    conn = get_user_conn()
+    c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM users')
+    count_user = c.fetchone()[0]
+    conn.close()
     conn = get_admin_conn()
     c = conn.cursor()
     c.execute('SELECT COUNT(*) FROM admins')
-    count = c.fetchone()[0]
-    if count == 0:
+    count_admin = c.fetchone()[0]
+    if int(count_admin) + int(count_user) == 0:
         try:
             c.execute('INSERT INTO admins (username, password_hash, active, created_at, full_name) VALUES (?,?,?,?,?)', ('admin', hash_password('admin'), 1, now_iso(), encrypt_text('管理员')))
         except Exception:

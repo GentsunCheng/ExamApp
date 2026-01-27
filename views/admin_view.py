@@ -9,8 +9,8 @@ from views.admin_modules.users_module import AdminUsersModule
 from views.admin_modules.exams_module import AdminExamsModule
 from views.admin_modules.sync_module import AdminSyncModule
 from views.admin_modules.scores_module import AdminScoresModule
-from views.admin_modules.progress_module import AdminProgressModule
-from views.admin_modules.scores_overview_module import AdminScoresOverviewModule
+from views.admin_modules.study_progress_module import AdminProgressModule
+from views.admin_modules.exam_progress_module import AdminScoresOverviewModule
 
 
 class AdminView(QWidget):
@@ -49,8 +49,8 @@ class AdminView(QWidget):
         self.tabs.addTab(AdminExamsModule(self), tr('admin.exams_tab'))
         self.tabs.addTab(AdminSyncModule(self), tr('admin.sync_tab'))
         self.tabs.addTab(AdminScoresModule(self), tr('admin.scores_tab'))
-        self.tabs.addTab(AdminScoresOverviewModule(self), tr('admin.scores_overview_tab'))
-        self.tabs.addTab(AdminProgressModule(self), tr('admin.progress_tab'))
+        self.tabs.addTab(AdminScoresOverviewModule(self), tr('admin.exam_progress_tab'))
+        self.tabs.addTab(AdminProgressModule(self), tr('admin.study_progress_tab'))
         self.tabs.setTabIcon(0, self.icon_manager.get_icon('user'))
         self.tabs.setTabIcon(1, self.icon_manager.get_icon('exam'))
         self.tabs.setTabIcon(2, self.icon_manager.get_icon('sync'))

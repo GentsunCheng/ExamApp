@@ -12,7 +12,7 @@ class ProgressExcelTest(unittest.TestCase):
             os.environ['HOME'] = td
             import database
             import models
-            from views.admin_modules import progress_module as progress_excel
+            from views.admin_modules import study_progress_module as progress_excel
 
             importlib.reload(database)
             importlib.reload(models)
@@ -42,7 +42,7 @@ class ProgressExcelTest(unittest.TestCase):
     def test_export_progress_template(self):
         with tempfile.TemporaryDirectory() as td:
             out = os.path.join(td, 'tpl.xlsx')
-            from views.admin_modules import progress_module as progress_excel
+            from views.admin_modules import study_progress_module as progress_excel
             out2 = progress_excel.export_progress_template(out)
             wb = load_workbook(out2)
             self.assertIn('说明', wb.sheetnames)
@@ -53,7 +53,7 @@ class ProgressExcelTest(unittest.TestCase):
             os.environ['HOME'] = td
             import database
             import models
-            from views.admin_modules import progress_module as progress_excel
+            from views.admin_modules import study_progress_module as progress_excel
 
             importlib.reload(database)
             importlib.reload(models)

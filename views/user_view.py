@@ -59,7 +59,7 @@ class UserView(QWidget):
         self.tabs.setTabIcon(0, self.icon_manager.get_icon('exam'))
         self.tabs.addTab(self.history_module, tr('user.history_tab'))
         self.tabs.setTabIcon(1, self.icon_manager.get_icon('score'))
-        self.tabs.addTab(self.progress_module, tr('user.progress_tab'))
+        self.tabs.addTab(self.progress_module, tr('user.study_progress_tab'))
         self.tabs.setTabIcon(2, self.icon_manager.get_icon('info'))
         self.tabs.currentChanged.connect(self.on_tab_changed)
         layout.addWidget(self.tabs)

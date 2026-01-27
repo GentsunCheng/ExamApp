@@ -97,6 +97,8 @@ class SyncWorker(QThread):
                     code2, out2, err2 = rsync_push(t[2], t[3], t[4], ssh_password, include_admin=bool(is_admin))
                     if code2 == 0:
                         msg = f'{t[1]} ({t[2]}) 上传完成'
+                    elif code2 == 304:
+                        msg = f'{t[1]} ({t[2]}) 跳过本地设备'
                     else:
                         msg = f'{t[1]} ({t[2]}) 上传失败: {err2 or "未知错误"}'
                     return t, msg
@@ -123,7 +125,12 @@ class SyncWorker(QThread):
                         ssh_password = t[5] if len(t) > 5 else None
                         is_admin = t[6] if len(t) > 6 else 0
                         code, out, err = rsync_push(t[2], t[3], t[4], ssh_password, include_admin=bool(is_admin))
-                        msg = f'{t[1]} ({t[2]}) ' + ('推送成功' if code == 0 else f'推送失败: {err or "未知错误"}')
+                        if code == 0:
+                            msg = f'{t[1]} ({t[2]}) 推送成功'
+                        elif code == 304:
+                            msg = f'{t[1]} ({t[2]}) 跳过设备'
+                        else:
+                            msg = f'推送失败: {err or "未知错误"}'
                         return t, msg
                     with ThreadPoolExecutor(max_workers=max_workers) as ex:
                         future_map = {ex.submit(push_only, t): t for t in self.targets}
