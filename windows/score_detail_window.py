@@ -138,19 +138,9 @@ class ScoreDetailWindow(QDialog):
         self.opts_layout.setContentsMargins(0, 0, 0, 0)
         self.opts_container.setLayout(self.opts_layout)
         
-        # Feedback Section (Blends into the scroll area)
-        self.feedback_box = QFrame()
-        self.feedback_box.setStyleSheet(f"QFrame {{ background-color:{colors['background']}; border-top:1px solid {colors['border']}; margin-top:10px; padding-top:10px; }}")
-        feedback_layout = QVBoxLayout(self.feedback_box)
-        self.your_ans_label = QLabel()
-        self.correct_ans_label = QLabel()
-        feedback_layout.addWidget(self.your_ans_label)
-        feedback_layout.addWidget(self.correct_ans_label)
-        
         self.vb.addWidget(self.q_title)
         self.vb.addLayout(self.q_picture_layout)
         self.vb.addWidget(self.opts_container)
-        self.vb.addWidget(self.feedback_box)
         self.vb.addStretch()
         
         self.scroll_area.setWidget(scroll_content)
@@ -324,7 +314,7 @@ class ScoreDetailWindow(QDialog):
             options = [(tr('exam.true'), True), (tr('exam.false'), False)]
             for label, val in options:
                 btn = QPushButton(label)
-                btn.setStyleSheet(self.get_option_style(q, val, user_ans, is_q_correct))
+                btn.setStyleSheet(self.get_option_style(q, val, user_ans))
                 self.opts_layout.addWidget(btn)
         else:
             raw_opts = q['options'] or []
@@ -338,46 +328,10 @@ class ScoreDetailWindow(QDialog):
                 
                 label = chr(65 + i) if i < 26 else str(i + 1)
                 btn = QPushButton(f"{label}. {text}")
-                btn.setStyleSheet(self.get_option_style(q, key, user_ans, is_q_correct))
+                btn.setStyleSheet(self.get_option_style(q, key, user_ans))
                 self.opts_layout.addWidget(btn)
 
-        # 4. Feedback Info
-        def format_ans(a):
-            if q['type'] == 'truefalse':
-                val = a[0] if isinstance(a, list) and a else a
-                if val is True: return tr('exam.true')
-                if val is False: return tr('exam.false')
-                return str(val) if val is not None else "-"
-            
-            if a is None: return "-"
-            vals = a if isinstance(a, list) else [a]
-            if not q['options']: return ", ".join(map(str, vals))
-            
-            texts = []
-            for v in vals:
-                for opt in q['options']:
-                    if isinstance(opt, dict):
-                        if opt.get('key') == v:
-                            texts.append(str(opt.get('text') or opt.get('key')))
-                            break
-                    elif opt == v:
-                        texts.append(str(opt))
-                        break
-                else:
-                    texts.append(str(v))
-            return ", ".join(texts)
-
-        self.your_ans_label.setText(f"{tr('attempts.your_answer')} {format_ans(user_ans)}")
-        self.your_ans_label.setStyleSheet(f"font-weight: bold; font-size: 15px; color: {colors['text_primary']};")
-        
-        if is_q_correct:
-            self.correct_ans_label.setText(f"{tr('attempts.correct_answer')} {format_ans(q['correct'])}")
-            self.correct_ans_label.setStyleSheet(f"font-weight: bold; font-size: 15px; color: {colors['success']};")
-            self.correct_ans_label.show()
-        else:
-            self.correct_ans_label.hide()
-
-    def get_option_style(self, q, current_val, user_ans, is_q_correct):
+    def get_option_style(self, q, current_val, user_ans):
         colors = theme_manager.get_theme_colors()
         
         # Determine if this option is selected by user
@@ -400,19 +354,16 @@ class ScoreDetailWindow(QDialog):
         border = colors['input_border']
         text_color = colors['text_primary']
         
-        if is_q_correct:
-            # If the whole question is correct, all selected options are correct
-            if is_selected:
-                bg = colors['success_light']
-                border = colors['success']
-                text_color = colors['success']
-        else:
-            # If the whole question is incorrect, show selected options as error
-            # and DO NOT show correct answers that weren't selected
-            if is_selected:
-                bg = colors['error_light']
-                border = colors['error']
-                text_color = colors['error']
+        if is_correct:
+            # Always show correct answers in green
+            bg = colors['success_light']
+            border = colors['success']
+            text_color = colors['success']
+        elif is_selected:
+            # If selected but not correct, show in red
+            bg = colors['error_light']
+            border = colors['error']
+            text_color = colors['error']
         
         return f"""
             QPushButton {{
