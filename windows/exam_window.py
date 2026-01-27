@@ -351,8 +351,9 @@ class ExamWindow(QMainWindow):
                 order = keys
             by_key = {opt['key_str']: opt for opt in normalized}
             ordered_opts = [by_key[k] for k in order if k in by_key]
-            for opt in ordered_opts:
-                text = f"{opt['key_str']}. {opt['text']}"
+            for i, opt in enumerate(ordered_opts):
+                label = chr(65 + i) if i < 26 else str(i + 1)
+                text = f"{label}. {opt['text']}"
                 btn = QPushButton(text)
                 btn.setCheckable(True)
                 btn.setStyleSheet(btn_style)
