@@ -42,6 +42,7 @@ class LoginView(QWidget):
             f"font-size:20px; font-weight:bold; margin-bottom:16px; padding:6px 12px; border-radius:12px; "
             f"background-color:{colors['border_light']}; color:{colors['text_primary']}; border:1px solid {colors['border']};"
         )
+        self.user_role = 'auto'
         self.user = QLineEdit()
         self.user.setPlaceholderText(tr('login.username'))
         self.user.setInputMethodHints(Qt.InputMethodHint.ImhNoPredictiveText | Qt.InputMethodHint.ImhNoAutoUppercase | Qt.InputMethodHint.ImhPreferLowercase)
@@ -88,4 +89,4 @@ class LoginView(QWidget):
         if not u:
             show_warn(self, tr('common.error'), tr('error.bad_credentials'))
             return
-        self.on_login(u)
+        self.on_login(u, self.user_role)

@@ -137,8 +137,10 @@ class MainWindow(QMainWindow):
         self.logout()
         event.accept()
 
-    def on_login(self, user):
-        if user['role'] == 'admin':
+    def on_login(self, user, role='auto'):
+        if role == 'auto':
+            role = user['role']
+        if role == 'admin':
             self.admin = AdminView(self)
             self._switch_with_fade(self.admin)
         else:
