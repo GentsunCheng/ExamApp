@@ -3,8 +3,15 @@
 # 项目配置
 APP_NAME = ExamSystem
 PYTHON_VERSION = 3.9+
-APP_VERSION ?= 1.1.0
 MAIN_SCRIPT = main.py
+GIT_SHORT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null)
+ifeq ($(origin APP_VERSION),undefined)
+  ifeq ($(GIT_SHORT_HASH),)
+      APP_VERSION ?= $(shell date +%s | sha256sum | cut -c1-8)
+  else
+      APP_VERSION ?= $(GIT_SHORT_HASH)
+  endif
+endif
 DIST_DIR = dist
 BUILD_DIR = build
 JOBS ?= 1

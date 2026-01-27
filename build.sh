@@ -3,8 +3,15 @@ set -euo pipefail
 
 # 项目配置
 APP_NAME="ExamSystem"
-APP_VERSION="${APP_VERSION:-1.1.0}"
 MAIN_SCRIPT="main.py"
+GIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || true)
+if [[ -n "${APP_VERSION:-}" ]]; then
+    APP_VERSION="${APP_VERSION}"
+elif [[ -n "$GIT_HASH" ]]; then
+    APP_VERSION="$GIT_HASH"
+else
+    APP_VERSION="$(date +%s | sha256sum | cut -c1-8)"
+fi
 DIST_DIR="dist"
 BUILD_DIR="build"
 
