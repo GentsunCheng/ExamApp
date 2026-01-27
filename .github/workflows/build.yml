@@ -48,7 +48,7 @@ jobs:
       - name: Build with Nuitka
         run: |
           make genkey
-          make build-nuitka ARCH=${{ matrix.arch }}
+          make build-nuitka ARCH=${{ matrix.arch }} APP_VERSION=${{ github.ref_name }}
 
       - name: Package App Bundle
         run: |
