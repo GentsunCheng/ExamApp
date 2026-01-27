@@ -37,9 +37,9 @@ class ExamWindow(QMainWindow):
         self.shortcut_cheat.activated.connect(self.cheat)
         self.shortcut_quit = QShortcut(QKeySequence("Ctrl+W"), self)
         self.shortcut_quit.activated.connect(self.quit_exam)
-        self.shortcut_next_q = QShortcut(Qt.Key_PageDown, self)
+        self.shortcut_next_q = QShortcut(Qt.Key.Key_PageDown, self)
         self.shortcut_next_q.activated.connect(self.next_q)
-        self.shortcut_prev_q = QShortcut(Qt.Key_PageUp, self)
+        self.shortcut_prev_q = QShortcut(Qt.Key.Key_PageUp, self)
         self.shortcut_prev_q.activated.connect(self.prev_q)
         self.cheatting = False
         self.user = user
