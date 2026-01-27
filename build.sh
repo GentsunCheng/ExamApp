@@ -3,7 +3,7 @@ set -euo pipefail
 
 # 项目配置
 APP_NAME="ExamSystem"
-APP_VERSION="1.1.0"
+APP_VERSION="${APP_VERSION:-1.1.0}"
 MAIN_SCRIPT="main.py"
 DIST_DIR="dist"
 BUILD_DIR="build"

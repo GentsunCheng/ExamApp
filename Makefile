@@ -3,7 +3,7 @@
 # 项目配置
 APP_NAME = ExamSystem
 PYTHON_VERSION = 3.9+
-APP_VERSION = 1.1.0
+APP_VERSION ?= 1.1.0
 MAIN_SCRIPT = main.py
 DIST_DIR = dist
 BUILD_DIR = build
