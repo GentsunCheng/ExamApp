@@ -61,6 +61,18 @@ def ensure_db():
     conn.commit()
     conn.close()
 
+def iter_columns(db_path, table_name, column_name, column_type, default_value=None):
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute(f'PRAGMA table_info({table_name})')
+    columns = [row[1] for row in c.fetchall()]
+    if column_name not in columns:
+        default_value = TYPE_DEFAULT_DICT.get(column_type, 'NULL') if default_value is None else default_value
+        c.execute(f'ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type} DEFAULT {default_value}')
+        conn.commit()
+    conn.close()
+
+
 def get_admin_conn():
     ensure_db()
     return sqlite3.connect(ADMIN_DB_PATH)
