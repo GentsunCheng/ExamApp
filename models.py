@@ -28,6 +28,9 @@ try:
 except Exception:
     SECRET_KEY = 'example'
 
+DELETE_IDENTIFIER = '␡'
+
+
 def create_admin_if_absent():
     conn = get_user_conn()
     c = conn.cursor()
@@ -77,10 +80,12 @@ def authenticate(username, password):
     # 先查管理员库
     conn_a = get_admin_conn()
     ca = conn_a.cursor()
-    ca.execute('SELECT id, username, password_hash, active, full_name FROM admins WHERE username=?', (username,))
+    ca.execute('SELECT id, username, password_hash, active, full_name, shadow_delete FROM admins WHERE username=?', (username,))
     row_a = ca.fetchone()
     conn_a.close()
     if row_a:
+        if row_a[5] == 1:
+            return None
         if row_a[3] != 1:
             return None
         if not verify_password(password, row_a[2]):
@@ -89,10 +94,12 @@ def authenticate(username, password):
     # 再查用户库
     conn_u = get_user_conn()
     cu = conn_u.cursor()
-    cu.execute('SELECT id, username, password_hash, role, active, full_name FROM users WHERE username=?', (username,))
+    cu.execute('SELECT id, username, password_hash, role, active, full_name, shadow_delete FROM users WHERE username=?', (username,))
     row = cu.fetchone()
     conn_u.close()
     if not row:
+        return None
+    if row[6] == 1:
         return None
     if row[4] != 1:
         return None
@@ -104,9 +111,9 @@ def list_users():
     conn = get_user_conn()
     c = conn.cursor()
     try:
-        c.execute('SELECT id, username, full_name, role, active, created_at FROM users ORDER BY id DESC')
+        c.execute('SELECT id, username, full_name, role, active, created_at FROM users WHERE shadow_delete=0 ORDER BY id DESC')
     except Exception:
-        c.execute('SELECT id, username, NULL as full_name, role, active, created_at FROM users ORDER BY id DESC')
+        c.execute('SELECT id, username, NULL as full_name, role, active, created_at FROM users WHERE shadow_delete=0 ORDER BY id DESC')
     rows = c.fetchall()
     conn.close()
     out = []
@@ -119,9 +126,9 @@ def list_admins():
     conn = get_admin_conn()
     c = conn.cursor()
     try:
-        c.execute('SELECT id, username, full_name, active, created_at FROM admins ORDER BY id DESC')
+        c.execute('SELECT id, username, full_name, active, created_at FROM admins WHERE shadow_delete=0 ORDER BY id DESC')
     except Exception:
-        c.execute('SELECT id, username, NULL as full_name, active, created_at FROM admins ORDER BY id DESC')
+        c.execute('SELECT id, username, NULL as full_name, active, created_at FROM admins WHERE shadow_delete=0 ORDER BY id DESC')
     rows = c.fetchall()
     conn.close()
     out = []
@@ -174,7 +181,10 @@ def delete_admin(admin_id):
             raise Exception('至少保留一个启用的管理员')
     except Exception:
         pass
-    c.execute('UPDATE admins SET shadow_delete=1 WHERE id=?', (admin_id,))
+    c.execute('SELECT username FROM admins WHERE id=?', (admin_id,))
+    username = c.fetchone()[0]
+    delete_username = f"{str(uuid.uuid4())}_{username}_{DELETE_IDENTIFIER}"
+    c.execute(f'UPDATE admins SET username="{delete_username}", shadow_delete=1 WHERE id=?', (admin_id,))
     conn.commit()
     conn.close()
 
@@ -495,11 +505,18 @@ def list_attempts_with_user():
         try:
             uc.execute(f'SELECT id, username, full_name FROM users WHERE id IN ({placeholders})', tuple(user_ids))
             for ur in uc.fetchall():
-                users_map[ur[0]] = (ur[1], ur[2])
+                username = ur[1]
+                full_name = ur[2]
+                if username and username.endswith(DELETE_IDENTIFIER):
+                    username = username.split('_')[1]
+                users_map[ur[0]] = (username, full_name)
         except Exception:
             uc.execute(f'SELECT id, username, NULL as full_name FROM users WHERE id IN ({placeholders})', tuple(user_ids))
             for ur in uc.fetchall():
-                users_map[ur[0]] = (ur[1], ur[2])
+                username = ur[1]
+                if username and username.endswith(DELETE_IDENTIFIER):
+                    username = username.split('_')[1]
+                users_map[ur[0]] = (username, None)
     uconn.close()
     out = []
     for r in rows:
@@ -581,7 +598,10 @@ def merge_remote_scores_db(remote_scores_db_path):
 def delete_user(user_id):
     conn = get_user_conn()
     c = conn.cursor()
-    c.execute('UPDATE users SET shadow_delete=1 WHERE id=?', (user_id,))
+    c.execute('SELECT username FROM users WHERE id=?', (user_id,))
+    username = c.fetchone()[0]
+    delete_username = f"{str(uuid.uuid4())}_{username}_{DELETE_IDENTIFIER}"
+    c.execute(f'UPDATE users SET username="{delete_username}", shadow_delete=1 WHERE id=?', (user_id,))
     conn.commit()
     conn.close()
 

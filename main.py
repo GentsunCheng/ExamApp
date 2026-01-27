@@ -34,7 +34,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self._zoom_anim = None
         self.user_view = None
-        self.admin = None
+        self.admin_view = None
         ensure_db()
         create_admin_if_absent()
         self.setWindowTitle(f"{tr('app.title')} - {__version__}")
@@ -141,8 +141,8 @@ class MainWindow(QMainWindow):
         if role == 'auto':
             role = user['role']
         if role == 'admin':
-            self.admin = AdminView(self)
-            self._switch_with_fade(self.admin)
+            self.admin_view = AdminView(self)
+            self._switch_with_fade(self.admin_view)
         else:
             self.user_view = UserView(user, self)
             self._switch_with_fade(self.user_view)
