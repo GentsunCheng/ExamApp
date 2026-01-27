@@ -3,6 +3,7 @@ set -euo pipefail
 
 # 项目配置
 APP_NAME="ExamSystem"
+APP_VERSION="1.1.0"
 MAIN_SCRIPT="main.py"
 DIST_DIR="dist"
 BUILD_DIR="build"
@@ -37,7 +38,7 @@ ARCH=$(uname -m)
 EXTRA_HIDDEN_IMPORTS=$(python3 -c 'import importlib.util; mods=["winreg","ctypes"]; print(" ".join(["--hidden-import "+m for m in mods if importlib.util.find_spec(m)]))')
 
 # PyInstaller 基础参数
-PYINSTALLER_ARGS="--onedir --name ${APP_NAME} --distpath ${DIST_DIR} --workpath ${BUILD_DIR} ${EXTRA_HIDDEN_IMPORTS}"
+PYINSTALLER_ARGS="--onedir --name ${APP_NAME} --distpath ${DIST_DIR} --workpath ${BUILD_DIR} ${EXTRA_HIDDEN_IMPORTS} --add-binary "resources/version:resources""
 
 # 平台特定参数
 if [[ "$PLATFORM" == "macos" ]]; then
@@ -49,7 +50,7 @@ elif [[ "$PLATFORM" == "linux" ]]; then
 fi
 
 # Nuitka 基础参数
-NUITKA_ARGS="--output-dir=${DIST_DIR} --standalone --jobs=${JOBS} --lto=yes --output-filename=${APP_NAME} --output-folder-name=${APP_NAME} --enable-plugin=pyside6"
+NUITKA_ARGS="--output-dir=${DIST_DIR} --standalone --jobs=${JOBS} --lto=yes --output-filename=${APP_NAME} --output-folder-name=${APP_NAME} --include-data-file=resources/version=resources/version --enable-plugin=pyside6"
 
 # Nuitka 平台特定参数
 if [[ "$PLATFORM" == "macos" ]]; then
@@ -94,7 +95,9 @@ case "$CMD" in
   build)
     echo "开始构建可执行文件..."
     rm -rf "${BUILD_DIR}" "${DIST_DIR}" *.spec
+    echo "${APP_VERSION}" > resources/version
     pyinstaller ${PYINSTALLER_ARGS} "${MAIN_SCRIPT}"
+    rm resources/version
     if [[ "$PLATFORM" == "macos" ]]; then
         echo "构建完成: ${DIST_DIR}/${APP_NAME}.app"
     else
@@ -104,7 +107,9 @@ case "$CMD" in
   build-nuitka)
     echo "开始使用 Nuitka 构建..."
     rm -rf "${BUILD_DIR}" "${DIST_DIR}"
+    echo "${APP_VERSION}" > resources/version
     python3 -m nuitka ${NUITKA_ARGS} "${MAIN_SCRIPT}"
+    rm resources/version
     echo "Nuitka 构建完成"
     ;;
   run)

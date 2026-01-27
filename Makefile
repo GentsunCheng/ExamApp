@@ -160,6 +160,7 @@ build: clean
 	@echo "开始构建可执行文件..."
 	echo $(APP_VERSION) > resources/version
 	$(PYINSTALLER) $(PYINSTALLER_ARGS) $(MAIN_SCRIPT)
+	rm resources/version
 	@echo "构建完成! 可执行文件位于: $(DIST_DIR)/$(APP_NAME).app"
 
 # 使用nuitka构建
@@ -168,6 +169,7 @@ build-nuitka: clean
 	@echo "开始使用nuitka构建..."
 	echo $(APP_VERSION) > resources/version
 	$(NUITKA) $(NUITKA_ARGS) $(MAIN_SCRIPT)
+	rm resources/version
 	@echo "nuitka构建完成! 可执行文件位于: $(DIST_DIR)/$(APP_NAME)"
 
 # 构建并运行
