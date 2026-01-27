@@ -4,6 +4,7 @@ from theme_manager import theme_manager
 from language import tr
 from models import list_attempts, get_exam_title
 from PySide6.QtGui import QColor
+from windows.score_detail_window import ScoreDetailWindow
 
 
 class UserHistoryModule(QWidget):
@@ -20,6 +21,7 @@ class UserHistoryModule(QWidget):
         self.attempts_table.horizontalHeader().setStretchLastSection(True)
         self.attempts_table.setAlternatingRowColors(True)
         self.attempts_table.setShowGrid(False)
+        self.attempts_table.cellDoubleClicked.connect(self.on_item_double_clicked)
         self.refresh_attempts()
         history_v.addWidget(self.attempts_table)
         self.setLayout(history_v)
@@ -53,3 +55,10 @@ class UserHistoryModule(QWidget):
                         it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         except Exception:
             pass
+
+    def on_item_double_clicked(self, row, column):
+        uuid_item = self.attempts_table.item(row, 0)
+        if uuid_item:
+            attempt_uuid = uuid_item.text()
+            dlg = ScoreDetailWindow(attempt_uuid, self)
+            dlg.exec()

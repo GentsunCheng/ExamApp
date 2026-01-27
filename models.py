@@ -274,12 +274,20 @@ def add_question(exam_id, qtype, text, options, correct_answers, score):
 def list_questions(exam_id):
     conn = get_exam_conn()
     c = conn.cursor()
-    c.execute('SELECT id, type, text, options, correct_answers, score FROM questions WHERE exam_id=? ORDER BY id', (exam_id,))
+    c.execute('SELECT id, type, text, options, correct_answers, score, pictures FROM questions WHERE exam_id=? ORDER BY id', (exam_id,))
     rows = c.fetchall()
     conn.close()
     result = []
     for r in rows:
-        result.append({'id': r[0], 'type': r[1], 'text': decrypt_text(r[2]) if r[2] else '', 'options': decrypt_json(r[3]) or [], 'correct': decrypt_json(r[4]) or [], 'score': r[5]})
+        result.append({
+            'id': r[0], 
+            'type': r[1], 
+            'text': decrypt_text(r[2]) if r[2] else '', 
+            'options': decrypt_json(r[3]) or [], 
+            'correct': decrypt_json(r[4]) or [], 
+            'score': r[5],
+            'pictures': r[6]
+        })
     return result
 
 def get_exam_stats(exam_id):
@@ -511,6 +519,42 @@ def list_attempts(user_id=None, username=None):
         valid = str(r[8] or '') == expect
         out.append((r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], 1 if valid else 0))
     return out
+
+def get_attempt_answers(attempt_uuid):
+    conn = get_score_conn()
+    c = conn.cursor()
+    c.execute('SELECT question_id, selected, cheat FROM attempt_answers WHERE attempt_uuid=?', (attempt_uuid,))
+    rows = c.fetchall()
+    conn.close()
+    result = {}
+    for r in rows:
+        result[r[0]] = {
+            'selected': decrypt_json(r[1]),
+            'cheat': bool(r[2])
+        }
+    return result
+
+def get_attempt(attempt_uuid):
+    conn = get_score_conn()
+    c = conn.cursor()
+    c.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, total_score, checksum FROM attempts WHERE uuid=?', (attempt_uuid,))
+    r = c.fetchone()
+    conn.close()
+    if not r:
+        return None
+    expect = hmac.new(SECRET_KEY.encode('utf-8'), ('|'.join([str(r[0]), str(r[1]), str(r[2]), str(r[3]), str(r[4]) if r[4] else '-', str(r[5]), str(r[6]), str(r[7])])).encode('utf-8'), hashlib.sha256).hexdigest()
+    valid = str(r[8] or '') == expect
+    return {
+        'uuid': r[0],
+        'user_id': r[1],
+        'exam_id': r[2],
+        'started_at': r[3],
+        'submitted_at': r[4],
+        'score': r[5],
+        'passed': bool(r[6]),
+        'total_score': r[7],
+        'valid': valid
+    }
 
 def list_attempts_with_user():
     # 先取成绩

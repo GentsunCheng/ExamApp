@@ -9,6 +9,7 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils import get_column_letter
 from models import get_exam_title
+from windows.score_detail_window import ScoreDetailWindow
 import os
 import pathlib
 
@@ -32,6 +33,7 @@ class AdminScoresModule(QWidget):
         self.scores_table.setColumnWidth(6, 200)
         self.scores_table.setAlternatingRowColors(True)
         self.scores_table.setShowGrid(False)
+        self.scores_table.cellDoubleClicked.connect(self.on_item_double_clicked)
         self.refresh_scores()
         vb.addWidget(self.scores_table)
         hb = QHBoxLayout()
@@ -82,6 +84,14 @@ class AdminScoresModule(QWidget):
                         it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         except Exception:
             pass
+
+    def on_item_double_clicked(self, row, column):
+        uuid_item = self.scores_table.item(row, 0)
+        if uuid_item:
+            attempt_uuid = uuid_item.text()
+            dlg = ScoreDetailWindow(attempt_uuid, self)
+            dlg.exec()
+
     def export_scores_to_excel(self):
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents/scores')
         fn, sel = QFileDialog.getSaveFileName(self, tr('scores.export_excel'), suggested, 'Excel (*.xlsx)')
