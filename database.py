@@ -16,7 +16,9 @@ DB_PATH = EXAMS_DB_PATH
 
 ITER_LIST = [
     (ADMIN_DB_PATH, 'admins', 'edit_at', 'TEXT', 'NULL'),
-    (USERS_DB_PATH, 'users', 'edit_at', 'TEXT', 'NULL')
+    (USERS_DB_PATH, 'users', 'edit_at', 'TEXT', 'NULL'),
+    (ADMIN_DB_PATH, 'admins', 'shadow_delete', 'INTEGER NOT NULL', '0'),
+    (USERS_DB_PATH, 'users', 'shadow_delete', 'INTEGER NOT NULL', '0')
 ]
 
 TYPE_DEFAULT_DICT = {

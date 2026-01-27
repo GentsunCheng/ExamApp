@@ -174,7 +174,7 @@ def delete_admin(admin_id):
             raise Exception('至少保留一个启用的管理员')
     except Exception:
         pass
-    c.execute('DELETE FROM admins WHERE id=?', (admin_id,))
+    c.execute('UPDATE admins SET shadow_delete=1 WHERE id=?', (admin_id,))
     conn.commit()
     conn.close()
 
@@ -581,7 +581,7 @@ def merge_remote_scores_db(remote_scores_db_path):
 def delete_user(user_id):
     conn = get_user_conn()
     c = conn.cursor()
-    c.execute('DELETE FROM users WHERE id=?', (user_id,))
+    c.execute('UPDATE users SET shadow_delete=1 WHERE id=?', (user_id,))
     conn.commit()
     conn.close()
 
