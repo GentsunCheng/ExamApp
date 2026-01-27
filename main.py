@@ -1,10 +1,11 @@
+import os
 import sys
-
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget, QGraphicsOpacityEffect
 from PySide6.QtGui import QKeySequence, QShortcut, QPalette
 from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QRect, QParallelAnimationGroup
 from database import ensure_db
 from models import create_admin_if_absent
+from utils import load_binary
 from theme_manager import theme_manager
 from views.login_view import LoginView
 from views.admin_view import AdminView
@@ -15,6 +16,13 @@ from language import set_language, get_system_language_codes, tr
 __language__ = get_system_language_codes()
 set_language(__language__)
 
+__versionfile__ = load_binary(filename="version", no_raise=True)
+__version__ = "dev"
+
+if __versionfile__:
+    if os.path.exists(__versionfile__):
+        with open(__versionfile__, "r") as f:
+            __version__ = f.read().strip()
 
 def is_dark_mode(app):
     palette = app.palette()
@@ -29,7 +37,7 @@ class MainWindow(QMainWindow):
         self.admin = None
         ensure_db()
         create_admin_if_absent()
-        self.setWindowTitle(tr('app.title'))
+        self.setWindowTitle(f"{tr('app.title')} - {__version__}")
         self.setMinimumSize(900, 600)
         self.resize(1440, 960)
         self.shortcut_quit = QShortcut(QKeySequence("Ctrl+W"), self)

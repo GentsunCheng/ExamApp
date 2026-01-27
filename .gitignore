@@ -48,3 +48,4 @@ node_modules/
 secret_key.py
 pack.sh
 nuitka-crash-report.xml
+resources/version

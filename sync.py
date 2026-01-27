@@ -13,6 +13,8 @@ from database import (
     RESOURCE_PATH,
 )
 
+from utils import load_binary
+
 
 FILENAME = None
 if sys.platform.startswith("win"):
@@ -24,37 +26,8 @@ elif sys.platform.startswith("darwin"):
 else:
     raise Exception("Unsupported platform")
 
-def get_resource_base():
-    """
-    返回资源目录的实际路径
-    - 开发环境: ./resources
-    - PyInstaller: sys._MEIPASS/resources
-    - Nuitka macOS app bundle: main.app/Contents/MacOS/resources
-    """
-    if hasattr(sys, "_MEIPASS"):
-        return os.path.join(sys._MEIPASS, "resources")
-    print(sys.executable)
-    exe_dir = os.path.dirname(sys.executable)
-    resources_dir = os.path.join(exe_dir, "resources")
-    if os.path.exists(resources_dir):
-        return resources_dir
 
-    return os.path.abspath("resources")
-
-
-def load_binary():
-    """
-    返回 sshpass 二进制文件路径，并设置可执行权限
-    """
-    base = get_resource_base()
-    bin_path = os.path.join(base, FILENAME)
-    if not os.path.exists(bin_path):
-        raise FileNotFoundError(f"Cannot find binary: {bin_path}")
-    os.chmod(bin_path, 0o755)
-    return bin_path
-
-
-SSHPASS_PATH = load_binary()
+SSHPASS_PATH = load_binary(filename=FILENAME)
 if os.path.exists(SSHPASS_PATH):
     print(f"Found sshpass binary: {SSHPASS_PATH}")
 else:

@@ -3,6 +3,7 @@
 # 项目配置
 APP_NAME = ExamSystem
 PYTHON_VERSION = 3.9+
+APP_VERSION = 1.1.0
 MAIN_SCRIPT = main.py
 DIST_DIR = dist
 BUILD_DIR = build
@@ -48,6 +49,7 @@ PYINSTALLER_COMMON_ARGS = \
     --name $(APP_NAME) \
     --distpath $(DIST_DIR) \
     --workpath $(BUILD_DIR) \
+	--add-binary "resources/version:resources"
 
 PYINSTALLER_MACOS_ARGS = \
     --windowed \
@@ -86,6 +88,7 @@ NUITKA_COMPILE_ARGS = \
 	--lto=yes \
 	--output-filename=$(APP_NAME) \
 	--output-folder-name=$(APP_NAME) \
+	--include-data-file=resources/version=resources/version \
 	--enable-plugin=pyside6
 
 NUITKA_MACOS_ARGS = \
@@ -155,6 +158,7 @@ deep-clean: clean
 .PHONY: build
 build: clean
 	@echo "开始构建可执行文件..."
+	echo $(APP_VERSION) > resources/version
 	$(PYINSTALLER) $(PYINSTALLER_ARGS) $(MAIN_SCRIPT)
 	@echo "构建完成! 可执行文件位于: $(DIST_DIR)/$(APP_NAME).app"
 
@@ -162,6 +166,7 @@ build: clean
 .PHONY: build-nuitka
 build-nuitka: clean
 	@echo "开始使用nuitka构建..."
+	echo $(APP_VERSION) > resources/version
 	$(NUITKA) $(NUITKA_ARGS) $(MAIN_SCRIPT)
 	@echo "nuitka构建完成! 可执行文件位于: $(DIST_DIR)/$(APP_NAME)"
 
