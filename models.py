@@ -472,15 +472,39 @@ def grade_question(q, sel):
         return sel is not None and sel == q['correct']
     return False
 
-def list_attempts(user_id=None):
-    conn = get_score_conn()
-    c = conn.cursor()
-    if user_id:
-        c.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, total_score, checksum FROM attempts WHERE user_id=? ORDER BY id DESC', (user_id,))
+def list_attempts(user_id=None, username=None):
+    history_user_id_list = []
+    if username:
+        user_conn = get_user_conn()
+        uc = user_conn.cursor()
+        uc.execute("SELECT id FROM users WHERE username LIKE ? ESCAPE '\\'",
+        (f"%\\_{username}\\_%",))
+        history_user_id_list = [r[0] for r in uc.fetchall()]
+        user_conn.close()
+    score_conn = get_score_conn()
+    sc = score_conn.cursor()
+    if user_id and history_user_id_list:
+        all_id = history_user_id_list
+        all_id.append(user_id)
+        sc.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, total_score, checksum '
+        'FROM attempts WHERE user_id IN ({}) ORDER BY id DESC'
+        .format(','.join(['?'] * len(all_id))),
+         tuple(all_id))
+    elif not user_id and history_user_id_list:
+        sc.execute(
+            'SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, total_score, checksum '
+            'FROM attempts WHERE user_id IN ({}) ORDER BY id DESC'
+            .format(','.join(['?'] * len(history_user_id_list))), 
+            tuple(history_user_id_list))
+    elif user_id and not history_user_id_list:
+        sc.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, total_score, checksum '
+        'FROM attempts WHERE user_id=? ORDER BY id DESC', 
+        (user_id,))
     else:
-        c.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, total_score, checksum FROM attempts ORDER BY id DESC')
-    rows = c.fetchall()
-    conn.close()
+        sc.execute('SELECT uuid, user_id, exam_id, started_at, submitted_at, score, passed, total_score, checksum '
+        'FROM attempts ORDER BY id DESC')
+    rows = sc.fetchall()
+    score_conn.close()
     out = []
     for r in rows:
         expect = hmac.new(SECRET_KEY.encode('utf-8'), ('|'.join([str(r[0]), str(r[1]), str(r[2]), str(r[3]), str(r[4]) if r[4] else '-', str(r[5]), str(r[6]), str(r[7])])).encode('utf-8'), hashlib.sha256).hexdigest()

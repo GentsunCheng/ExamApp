@@ -25,7 +25,7 @@ class UserHistoryModule(QWidget):
         self.setLayout(history_v)
     def refresh_attempts(self):
         self.attempts_table.setRowCount(0)
-        for a in list_attempts(self.user['id']):
+        for a in list_attempts(self.user['id'], self.user['username']):
             r = self.attempts_table.rowCount()
             self.attempts_table.insertRow(r)
             self.attempts_table.setItem(r, 0, QTableWidgetItem(a[0]))
