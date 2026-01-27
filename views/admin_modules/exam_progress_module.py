@@ -2,7 +2,7 @@ import os
 import pathlib
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QScrollArea, QTableWidget, QTableWidgetItem, QLabel, QPushButton, QHBoxLayout, QFileDialog
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QScrollArea, QTableWidget, QTableWidgetItem, QLabel, QPushButton, QHBoxLayout, QFileDialog, QGridLayout
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils import get_column_letter
@@ -33,11 +33,11 @@ class AdminScoresOverviewModule(QWidget):
             f"QScrollArea {{ border:1px solid {colors_scroll['border']}; border-radius:8px; background-color:{colors_scroll['card_background']}; }}"
         )
         self.content_widget = QWidget()
-        self.content_layout = QVBoxLayout()
+        self.content_layout = QGridLayout()
+        self.content_layout.setSpacing(20)
         self.content_widget.setLayout(self.content_layout)
         self.scroll.setWidget(self.content_widget)
         lay.addWidget(self.scroll)
-        lay.addStretch()
         self.setLayout(lay)
         self.refresh_overview()
 
@@ -51,23 +51,22 @@ class AdminScoresOverviewModule(QWidget):
     def _clear_layout(self, layout):
         while layout.count():
             item = layout.takeAt(0)
-            w = item.widget()
-            if w is not None:
-                w.deleteLater()
-                continue
-            child_layout = item.layout()
-            if child_layout is not None:
-                self._clear_layout(child_layout)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                self._clear_layout(item.layout())
 
     def refresh_overview(self):
         self._clear_layout(self.content_layout)
         exams = list_exams(include_expired=True)
-        for e in exams:
+        for i, e in enumerate(exams):
             exam_id = int(e[0])
             exam_title = e[1] or ''
             gb = QGroupBox(exam_title or f'Exam {exam_id}')
+            gb.setStyleSheet(f"QGroupBox {{ font-weight: bold; font-size: 14px; border: 1px solid {theme_manager.get_theme_colors()['border']}; border-radius: 8px; margin-top: 12px; padding-top: 10px; }} QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 3px; }}")
             vb = QVBoxLayout()
             tbl = QTableWidget(0, 6)
+            tbl.setMinimumHeight(320)
             tbl.setHorizontalHeaderLabels([
                 tr('admin.users.headers.id'),
                 tr('admin.users.headers.username'),
@@ -76,12 +75,12 @@ class AdminScoresOverviewModule(QWidget):
                 tr('exams.best'),
                 tr('progress.headers.status'),
             ])
-            tbl.setColumnWidth(0, 60)
-            tbl.setColumnWidth(1, 120)
-            tbl.setColumnWidth(2, 140)
+            tbl.setColumnWidth(0, 30)
+            tbl.setColumnWidth(1, 60)
+            tbl.setColumnWidth(2, 60)
             tbl.setColumnWidth(3, 200)
             tbl.setColumnWidth(4, 100)
-            tbl.setColumnWidth(5, 140)
+            tbl.setColumnWidth(5, 100)
             tbl.horizontalHeader().setStretchLastSection(True)
             tbl.setAlternatingRowColors(True)
             tbl.setShowGrid(False)
@@ -114,9 +113,15 @@ class AdminScoresOverviewModule(QWidget):
                 pass
             vb.addWidget(tbl)
             gb.setLayout(vb)
-            self.content_layout.addWidget(gb)
-        self.content_layout.addStretch()
-
+            row = i // 2
+            col = i % 2
+            self.content_layout.addWidget(gb, row, col)
+        
+        # Add a spacer at the bottom if needed to push everything up
+        if exams:
+            last_row = (len(exams) - 1) // 2 + 1
+            self.content_layout.setRowStretch(last_row, 1)
+        
     def export_overview(self):
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents/scores_overview')
         fn, sel = QFileDialog.getSaveFileName(self, tr('admin.scores_overview.export'), suggested, 'Excel (*.xlsx)')

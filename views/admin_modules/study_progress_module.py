@@ -12,7 +12,7 @@ from icon_manager import IconManager
 from theme_manager import theme_manager
 from utils import show_info, show_warn, ask_yes_no
 from language import tr
-from windows.progress_overview_window import ProgressOverviewWindow
+from windows.study_progress_overview_window import ProgressOverviewWindow
 
 from models import (
     list_users,

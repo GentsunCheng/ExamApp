@@ -12,7 +12,7 @@ from models import (
     get_user_progress_tree,
 )
 
-from windows.progress_overview_window import ProgressOverviewWindow
+from windows.study_progress_overview_window import ProgressOverviewWindow
 
 
 class UserProgressModule(QWidget):
