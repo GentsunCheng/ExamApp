@@ -30,7 +30,7 @@ iter_loop()
 
 def is_dark_mode(app):
     palette = app.palette()
-    color = palette.color(QPalette.Window)
+    color = palette.color(QPalette.ColorRole.Window)
     return color.lightness() < 128
 
 class MainWindow(QMainWindow):

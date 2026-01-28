@@ -15,19 +15,6 @@ RESOURCE_PATH = os.path.join(DB_DIR, 'resources')
 DB_VERFILE_PATH = os.path.join(DB_DIR, '.db_version')
 DB_PATH = EXAMS_DB_PATH
 
-ITER_LIST = [
-    (ADMIN_DB_PATH, 'admins', 'edit_at', 'TEXT', 'NULL'),
-    (USERS_DB_PATH, 'users', 'edit_at', 'TEXT', 'NULL'),
-    (ADMIN_DB_PATH, 'admins', 'shadow_delete', 'INTEGER NOT NULL', '0'),
-    (USERS_DB_PATH, 'users', 'shadow_delete', 'INTEGER NOT NULL', '0')
-]
-
-TYPE_DEFAULT_DICT = {
-    'TEXT': 'NULL',
-    'INTEGER': '0',
-    'REAL': '0.0',
-    'BLOB': 'NULL',
-}
 
 def ensure_db():
     if not os.path.exists(DB_DIR):
@@ -36,90 +23,113 @@ def ensure_db():
         os.makedirs(RESOURCE_PATH, exist_ok=True)
     conn = sqlite3.connect(ADMIN_DB_PATH)
     c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS admins (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT, active INTEGER DEFAULT 1, created_at TEXT, full_name TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS admins '
+    '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    'username TEXT UNIQUE, password_hash TEXT, '
+    'active INTEGER DEFAULT 1, created_at TEXT, '
+    'full_name TEXT, edit_at TEXT DEFAULT NULL, '
+    'shadow_delete INTEGER NOT NULL DEFAULT 0)')
     conn.commit()
     conn.close()
     conn = sqlite3.connect(USERS_DB_PATH)
     c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT, role TEXT, active INTEGER DEFAULT 1, created_at TEXT, full_name TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS users '
+    '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    'username TEXT UNIQUE, password_hash TEXT, role TEXT, '
+    'active INTEGER DEFAULT 1, created_at TEXT, full_name TEXT, '
+    'edit_at TEXT DEFAULT NULL, shadow_delete INTEGER NOT NULL DEFAULT 0)')
     conn.commit()
     conn.close()
     conn = sqlite3.connect(EXAMS_DB_PATH)
     c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS exams (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, description TEXT, pass_ratio REAL, time_limit_minutes INTEGER, end_date TEXT, created_at TEXT, random_pick_count INTEGER)')
-    c.execute('CREATE TABLE IF NOT EXISTS questions (id INTEGER PRIMARY KEY AUTOINCREMENT, exam_id INTEGER, type TEXT, text TEXT, options TEXT, correct_answers TEXT, score REAL, pictures TEXT DEFAULT NULL, pool TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS exams '
+    '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    'title TEXT, description TEXT, pass_ratio REAL, '
+    'time_limit_minutes INTEGER, end_date TEXT, '
+    'created_at TEXT, random_pick_count INTEGER)')
+    c.execute('CREATE TABLE IF NOT EXISTS questions '
+    '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    'exam_id INTEGER, type TEXT, text TEXT, options TEXT, '
+    'correct_answers TEXT, score REAL, pictures TEXT DEFAULT NULL, '
+    'pool TEXT)')
     conn.commit()
     conn.close()
     conn = sqlite3.connect(SCORES_DB_PATH)
     c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT UNIQUE, user_id INTEGER, exam_id INTEGER, started_at TEXT, submitted_at TEXT, score REAL, passed INTEGER, total_score REAL, checksum TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS attempt_answers (id INTEGER PRIMARY KEY AUTOINCREMENT, attempt_uuid TEXT, question_id INTEGER, selected TEXT, cheat INTEGER DEFAULT 0)')
+    c.execute('CREATE TABLE IF NOT EXISTS attempts '
+    '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    'uuid TEXT UNIQUE, user_id INTEGER, exam_id INTEGER, '
+    'started_at TEXT, submitted_at TEXT, score REAL, passed INTEGER, '
+    'total_score REAL, checksum TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS attempt_answers '
+    '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    'attempt_uuid TEXT, question_id INTEGER, selected TEXT, '
+    'cheat INTEGER DEFAULT 0)')
     conn.commit()
     conn.close()
     conn = sqlite3.connect(CONFIG_DB_PATH)
     c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE, value TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS sync_targets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, ip TEXT, username TEXT, remote_path TEXT, ssh_password TEXT, is_admin INTEGER DEFAULT 0, active INTEGER DEFAULT 1)')
+    c.execute('CREATE TABLE IF NOT EXISTS settings '
+    '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    'key TEXT UNIQUE, value TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS sync_targets '
+    '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    'name TEXT, ip TEXT, username TEXT, '
+    'remote_path TEXT, ssh_password TEXT, '
+    'is_admin INTEGER DEFAULT 0, active INTEGER DEFAULT 1)')
     conn.commit()
     conn.close()
     conn = sqlite3.connect(PROGRESS_DB_PATH)
     c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS progress_modules (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, created_at TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS progress_tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, module_id INTEGER, title TEXT, description TEXT, sort_order INTEGER DEFAULT 0, created_at TEXT, UNIQUE(module_id, title))')
-    c.execute('CREATE TABLE IF NOT EXISTS user_task_progress (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, task_id INTEGER, status INTEGER DEFAULT 0, updated_at TEXT, updated_by TEXT, UNIQUE(user_id, task_id))')
+    c.execute('CREATE TABLE IF NOT EXISTS progress_modules '
+    '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    'name TEXT UNIQUE, created_at TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS progress_tasks '
+    '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    'module_id INTEGER, title TEXT, description TEXT, '
+    'sort_order INTEGER DEFAULT 0, created_at TEXT, '
+    'UNIQUE(module_id, title))')
+    c.execute('CREATE TABLE IF NOT EXISTS user_task_progress '
+    '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    'user_id INTEGER, task_id INTEGER, status INTEGER DEFAULT 0, '
+    'updated_at TEXT, updated_by TEXT, '
+    'UNIQUE(user_id, task_id))')
     try:
-        c.execute('CREATE INDEX IF NOT EXISTS idx_progress_tasks_module ON progress_tasks (module_id, sort_order, id)')
-        c.execute('CREATE INDEX IF NOT EXISTS idx_user_task_progress_user ON user_task_progress (user_id, task_id)')
+        c.execute('CREATE INDEX IF NOT EXISTS '
+        'idx_progress_tasks_module ON progress_tasks '
+        '(module_id, sort_order, id)')
+        c.execute('CREATE INDEX IF NOT EXISTS '
+        'idx_user_task_progress_user ON user_task_progress '
+        '(user_id, task_id)')
     except Exception as e:
         print(e)
         pass
     conn.commit()
     conn.close()
 
-def iter_columns_model(db_path, table_name, column_name, column_type, default_value=None):
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    c.execute(f'PRAGMA table_info({table_name})')
-    columns = [row[1] for row in c.fetchall()]
-    if column_name not in columns:
-        default_value = TYPE_DEFAULT_DICT.get(column_type, 'NULL') if default_value is None else default_value
-        c.execute(f'ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type} DEFAULT {default_value}')
-        conn.commit()
-    conn.close()
-
-def iter_columns():
-    for iter_data in ITER_LIST:
-        db_path, table_name, column_name, column_type, default_value = iter_data
-        iter_columns_model(db_path, table_name, column_name, column_type, default_value)
 
 def get_admin_conn():
     ensure_db()
-    iter_columns()
     return sqlite3.connect(ADMIN_DB_PATH)
 
 def get_user_conn():
     ensure_db()
-    iter_columns()
     return sqlite3.connect(USERS_DB_PATH)
 
 def get_exam_conn():
     ensure_db()
-    iter_columns()
     return sqlite3.connect(EXAMS_DB_PATH)
 
 def get_score_conn():
     ensure_db()
-    iter_columns()
     return sqlite3.connect(SCORES_DB_PATH)
 
 def get_config_conn():
     ensure_db()
-    iter_columns()
     return sqlite3.connect(CONFIG_DB_PATH)
 
 def get_progress_conn():
     ensure_db()
-    iter_columns()
     return sqlite3.connect(PROGRESS_DB_PATH)
 
 def now_iso():
