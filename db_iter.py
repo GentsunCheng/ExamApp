@@ -28,7 +28,13 @@ __from_iter_dict__ = "__from_iter_dict__"
 
 
 ITER_VERSION_ACTION_MAP = {
-    "origin": {"next_iter_ver": "260128", "action": {"func": simple_iter_dict.__simple_columns_iter__, "param": (__from_iter_dict__,)}}
+    "origin": {
+        "next_iter_ver": "260128", 
+        "action": {
+            "func": simple_iter_dict.__simple_columns_iter__, 
+            "param": (__from_iter_dict__,)
+        }
+    }
 }
 
 
