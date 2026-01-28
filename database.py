@@ -12,6 +12,7 @@ SCORES_DB_PATH = os.path.join(DB_DIR, 'scores.db')
 CONFIG_DB_PATH = os.path.join(DB_DIR, 'config.db')
 PROGRESS_DB_PATH = os.path.join(DB_DIR, 'progress.db')
 RESOURCE_PATH = os.path.join(DB_DIR, 'resources')
+DB_VERFILE_PATH = os.path.join(DB_DIR, '.db_version')
 DB_PATH = EXAMS_DB_PATH
 
 ITER_LIST = [

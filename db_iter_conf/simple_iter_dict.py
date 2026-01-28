@@ -12,6 +12,7 @@ from database import (
     SCORES_DB_PATH,
     CONFIG_DB_PATH,
     PROGRESS_DB_PATH,
+    DB_VERFILE_PATH,
 )
 
 # 版本过度标识

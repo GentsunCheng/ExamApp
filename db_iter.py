@@ -9,6 +9,7 @@ from database import (
     SCORES_DB_PATH,
     CONFIG_DB_PATH,
     PROGRESS_DB_PATH,
+    DB_VERFILE_PATH,
 )
 
 from db_iter_conf import (
@@ -32,8 +33,8 @@ ITER_VERSION_ACTION_MAP = {
 
 
 def version_check_and_iter(db_file_version="origin"):
-    if os.path.exists(os.path.join(DB_DIR, ".db_version")):
-        with open(os.path.join(DB_DIR, ".db_version"), "r") as f:
+    if os.path.exists(DB_VERFILE_PATH):
+        with open(DB_VERFILE_PATH, "r") as f:
             db_file_version = f.read().strip()
     if db_file_version == __current_db_version__:
         print("It's newest version")
@@ -67,7 +68,7 @@ def version_check_and_iter(db_file_version="origin"):
                     a["func"](*a["param"])
     print(f"Iter done: {db_file_version} ---> {target_version}")
     db_file_version = target_version
-    with open(os.path.join(DB_DIR, ".db_version"), "w") as f:
+    with open(DB_VERFILE_PATH, "w") as f:
         f.write(db_file_version)
     return db_file_version
 
