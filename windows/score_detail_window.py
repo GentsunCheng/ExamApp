@@ -39,8 +39,7 @@ class ScoreDetailWindow(QDialog):
 
     def setup_ui(self):
         colors = theme_manager.get_theme_colors()
-        
-        # Exact same base style as ExamWindow
+
         bkg = 'background' + '-color'
         col = 'co' + 'lor'
         bd = 'bor' + 'der'
@@ -67,7 +66,6 @@ class ScoreDetailWindow(QDialog):
         self.main_layout.setContentsMargins(12, 12, 12, 12)
         self.main_layout.setSpacing(12)
 
-        # Left: Navigation Panel (Exactly like ExamWindow)
         self.nav_box = QGroupBox(tr('exam.nav_title'))
         self.nav_layout = QGridLayout()
         self.nav_box.setStyleSheet(
@@ -75,17 +73,14 @@ class ScoreDetailWindow(QDialog):
         )
         self.nav_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self.nav_box.setLayout(self.nav_layout)
-        
-        # Wrap nav_box in a layout to match ExamWindow's structure
+
         left_container = QVBoxLayout()
         left_container.addWidget(self.nav_box)
         left_container.addStretch()
         self.main_layout.addLayout(left_container)
 
-        # Right Panel
         self.right_panel = QVBoxLayout()
-        
-        # Header Info (Replacement for Timer/Progress Bar area)
+
         self.info_container = QFrame()
         self.info_container.setStyleSheet(f"QFrame {{ background-color:{colors['card_background']}; border:1px solid {colors['border']}; border-radius:8px; }}")
         info_layout = QHBoxLayout(self.info_container)
@@ -93,8 +88,7 @@ class ScoreDetailWindow(QDialog):
         
         self.exam_title_label = QLabel()
         self.exam_title_label.setStyleSheet(f"font-weight: bold; color: {colors['primary']}; font-size: 18px;")
-        
-        # Right info container (Score and Time)
+
         right_info_layout = QVBoxLayout()
         right_info_layout.setSpacing(2)
         
@@ -113,7 +107,6 @@ class ScoreDetailWindow(QDialog):
         info_layout.addLayout(right_info_layout)
         self.right_panel.addWidget(self.info_container)
 
-        # Question Content Scroll Area (Exactly like ExamWindow)
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet(f"QScrollArea {{ border:1px solid {colors['border']}; border-radius:8px; background-color: transparent; }}")
@@ -146,13 +139,11 @@ class ScoreDetailWindow(QDialog):
         self.scroll_area.setWidget(scroll_content)
         self.right_panel.addWidget(self.scroll_area)
 
-        # Bottom Buttons (Exactly like ExamWindow)
         hb = QHBoxLayout()
         self.prev_btn = QPushButton(tr('exam.prev'))
         self.next_btn = QPushButton(tr('exam.next'))
         self.close_btn = QPushButton(tr('common.confirm'))
-        
-        # Use same button logic as ExamWindow
+
         self.prev_btn.clicked.connect(self.prev_q)
         self.next_btn.clicked.connect(self.next_q)
         self.close_btn.clicked.connect(self.accept)
@@ -176,13 +167,11 @@ class ScoreDetailWindow(QDialog):
         
         status_text = tr('attempts.pass') if attempt['passed'] else tr('attempts.fail')
         score_info = f"{tr('attempts.score_label')}: {attempt['score']} / {attempt['total_score']} ({status_text})"
-        
-        # Set score label color based on pass status
+
         colors = theme_manager.get_theme_colors()
         score_color = colors['success'] if attempt['passed'] else colors['error']
         self.score_label.setStyleSheet(f"font-weight: bold; color: {score_color}; font-size: 16px;")
 
-        # Time details
         time_info = ""
         try:
             start_dt = datetime.fromisoformat(attempt['started_at'].replace('Z', '+00:00'))
@@ -210,8 +199,7 @@ class ScoreDetailWindow(QDialog):
 
         self.questions = list_questions(attempt['exam_id'])
         self.user_answers = get_attempt_answers(self.attempt_uuid)
-        
-        # Setup navigation buttons (3 columns like ExamWindow)
+
         colors = theme_manager.get_theme_colors()
         for i in range(len(self.questions)):
             row = i // 3
@@ -232,8 +220,12 @@ class ScoreDetailWindow(QDialog):
                 bg = colors['success_light']
                 fg = colors['success']
             else:
-                bg = colors['error_light']
-                fg = colors['error']
+                if self.questions[i]['type'] == 'multiple':
+                    bg = colors['warning_light']
+                    fg = colors['warning']
+                else:
+                    bg = colors['error_light']
+                    fg = colors['error']
                 
             btn.setStyleSheet(
                 f"QPushButton {{ background-color:{bg}; color:{fg}; border-radius:8px; padding:6px 10px; min-width:32px; border:1px solid transparent; font-weight:bold; }}\n"
@@ -333,37 +325,35 @@ class ScoreDetailWindow(QDialog):
 
     def get_option_style(self, q, current_val, user_ans):
         colors = theme_manager.get_theme_colors()
-        
-        # Determine if this option is selected by user
+
         is_selected = False
         if user_ans is not None:
             if isinstance(user_ans, list):
                 is_selected = current_val in user_ans
             else:
                 is_selected = current_val == user_ans
-            
-        # Determine if this option is correct
-        correct_ans = q['correct']
-        is_correct = False
-        if isinstance(correct_ans, list):
-            is_correct = current_val in correct_ans
-        else:
-            is_correct = current_val == correct_ans
-            
+
+        question_correct = grade_question(q, user_ans)
+
         bg = colors['card_background']
         border = colors['input_border']
         text_color = colors['text_primary']
-        
-        if is_correct:
-            # Always show correct answers in green
-            bg = colors['success_light']
-            border = colors['success']
-            text_color = colors['success']
-        elif is_selected:
-            # If selected but not correct, show in red
-            bg = colors['error_light']
-            border = colors['error']
-            text_color = colors['error']
+
+        if is_selected:
+            if question_correct:
+                bg = colors['success_light']
+                border = colors['success']
+                text_color = colors['success']
+            else:
+                # 选错了
+                if q['type'] == 'multiple':
+                    bg = colors['warning_light']
+                    border = colors['warning']
+                    text_color = colors['warning']
+                else:
+                    bg = colors['error_light']
+                    border = colors['error']
+                    text_color = colors['error']
         
         return f"""
             QPushButton {{
@@ -377,4 +367,3 @@ class ScoreDetailWindow(QDialog):
                 min-height: 44px;
             }}
         """
-
