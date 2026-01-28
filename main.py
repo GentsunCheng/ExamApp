@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget, QGraphi
 from PySide6.QtGui import QKeySequence, QShortcut, QPalette
 from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QRect, QParallelAnimationGroup
 from database import ensure_db
+from db_iter import iter_loop
 from models import create_admin_if_absent
 from utils import load_binary
 from theme_manager import theme_manager
@@ -23,6 +24,9 @@ if __versionfile__:
     if os.path.exists(__versionfile__):
         with open(__versionfile__, "r") as f:
             __version__ = f.read().strip()
+
+iter_loop()
+
 
 def is_dark_mode(app):
     palette = app.palette()
