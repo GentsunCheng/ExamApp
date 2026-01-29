@@ -153,15 +153,28 @@ def update_admin_active(admin_id, active):
     conn.commit()
     conn.close()
 
-def update_admin_basic(admin_id, username=None, full_name=None):
+def update_admin_basic(admin_id, username=None, full_name=None, password=None):
     conn = get_admin_conn()
     c = conn.cursor()
-    if username is not None and full_name is not None:
-        c.execute('UPDATE admins SET username=?, full_name=? WHERE id=?', (username, encrypt_text(full_name), admin_id))
-    elif username is not None:
-        c.execute('UPDATE admins SET username=? WHERE id=?', (username, admin_id))
-    elif full_name is not None:
-        c.execute('UPDATE admins SET full_name=? WHERE id=?', (encrypt_text(full_name), admin_id))
+    updates = []
+    params = []
+    if username is not None:
+        updates.append("username=?")
+        params.append(username)
+    if full_name is not None:
+        updates.append("full_name=?")
+        params.append(encrypt_text(full_name))
+    if password is not None and password.strip():
+        updates.append("password_hash=?")
+        params.append(hash_password(password))
+    
+    if not updates:
+        conn.close()
+        return
+        
+    params.append(admin_id)
+    query = f"UPDATE admins SET {', '.join(updates)} WHERE id=?"
+    c.execute(query, tuple(params))
     conn.commit()
     conn.close()
 
@@ -687,15 +700,28 @@ def update_user_active(user_id, active):
     conn.commit()
     conn.close()
 
-def update_user_basic(user_id, username=None, full_name=None):
+def update_user_basic(user_id, username=None, full_name=None, password=None):
     conn = get_user_conn()
     c = conn.cursor()
-    if username is not None and full_name is not None:
-        c.execute('UPDATE users SET username=?, full_name=? WHERE id=?', (username, encrypt_text(full_name), user_id))
-    elif username is not None:
-        c.execute('UPDATE users SET username=? WHERE id=?', (username, user_id))
-    elif full_name is not None:
-        c.execute('UPDATE users SET full_name=? WHERE id=?', (encrypt_text(full_name), user_id))
+    updates = []
+    params = []
+    if username is not None:
+        updates.append("username=?")
+        params.append(username)
+    if full_name is not None:
+        updates.append("full_name=?")
+        params.append(encrypt_text(full_name))
+    if password is not None and password.strip():
+        updates.append("password_hash=?")
+        params.append(hash_password(password))
+    
+    if not updates:
+        conn.close()
+        return
+        
+    params.append(user_id)
+    query = f"UPDATE users SET {', '.join(updates)} WHERE id=?"
+    c.execute(query, tuple(params))
     conn.commit()
     conn.close()
 

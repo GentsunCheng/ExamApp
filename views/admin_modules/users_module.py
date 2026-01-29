@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QRegularExpressionValidator
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout, QLineEdit, QComboBox, QListView, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QFileDialog
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout, QLineEdit, QComboBox, QListView, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QFileDialog, QDialog, QDialogButtonBox
 from icon_manager import IconManager
 from theme_manager import theme_manager
 from language import tr
@@ -155,6 +155,12 @@ class AdminUsersModule(QWidget):
             action_layout.addWidget(delete_btn)
             action_layout.addWidget(demote_btn)
             action_layout.addWidget(active_btn)
+            
+            edit_btn = QPushButton(tr('common.edit'))
+            edit_btn.setIcon(self.icon_manager.get_icon('user_edit'))
+            edit_btn.setStyleSheet("QPushButton { background-color:#409eff; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px; }")
+            edit_btn.clicked.connect(lambda checked, aid=a[0]: self.edit_user(aid, 'admin'))
+            action_layout.addWidget(edit_btn)
             action_widget.setLayout(action_layout)
             self.users_table.setCellWidget(row, 6, action_widget)
         for u in list_users():
@@ -198,6 +204,12 @@ class AdminUsersModule(QWidget):
             active_btn.setStyleSheet("QPushButton { background-color:#e6a23c; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px; }")
             active_btn.clicked.connect(lambda checked, uid=u[0], current_active=u[4]: self.toggle_user_active(uid, current_active))
             action_layout.addWidget(active_btn)
+
+            edit_btn = QPushButton(tr('common.edit'))
+            edit_btn.setIcon(self.icon_manager.get_icon('user_edit'))
+            edit_btn.setStyleSheet("QPushButton { background-color:#409eff; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px; }")
+            edit_btn.clicked.connect(lambda checked, uid=u[0]: self.edit_user(uid, 'user'))
+            action_layout.addWidget(edit_btn)
             action_widget.setLayout(action_layout)
             self.users_table.setCellWidget(row, 6, action_widget)
         try:
@@ -209,6 +221,79 @@ class AdminUsersModule(QWidget):
         except Exception:
             pass
         self.users_table.blockSignals(False)
+
+    def edit_user(self, user_id, role):
+        target = None
+        if role == 'admin':
+            admins = list_admins()
+            for a in admins:
+                if a[0] == user_id:
+                    target = a
+                    break
+        else:
+            users = list_users()
+            for u in users:
+                if u[0] == user_id:
+                    target = u
+                    break
+        
+        if not target:
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr('common.edit'))
+        dialog.setFixedSize(400, 250)
+        layout = QFormLayout()
+
+        username_edit = QLineEdit(target[1])
+        fullname_edit = QLineEdit(target[2] if target[2] else "")
+        password_edit = QLineEdit()
+        password_edit.setPlaceholderText(tr('info.leave_empty_to_keep_original'))
+        password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+
+        layout.addRow(tr('admin.users.headers.username'), username_edit)
+        layout.addRow(tr('admin.users.headers.full_name'), fullname_edit)
+        layout.addRow(tr('admin.users.password_ph'), password_edit)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText(tr('common.ok'))
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(tr('common.cancel'))
+        layout.addWidget(buttons)
+        dialog.setLayout(layout)
+
+        def save_changes():
+            new_username = username_edit.text().strip()
+            new_fullname = fullname_edit.text().strip() or None
+            new_password = password_edit.text().strip() or None
+
+            if not new_username:
+                show_warn(dialog, tr('common.error'), tr('error.username_empty'))
+                return
+
+            if not re.fullmatch(r"[A-Za-z0-9_@.\-]+", new_username):
+                show_warn(dialog, tr('common.error'), tr('error.username_format'))
+                return
+
+            if new_password and not re.fullmatch(r"[\x20-\x7E]+", new_password):
+                show_warn(dialog, tr('common.error'), tr('error.password_format'))
+                return
+
+            try:
+                if role == 'admin':
+                    update_admin_basic(user_id, username=new_username, full_name=new_fullname, password=new_password)
+                else:
+                    update_user_basic(user_id, username=new_username, full_name=new_fullname, password=new_password)
+                
+                self.refresh_users()
+                dialog.accept()
+                show_info(self, tr('common.success'), tr('info.user_updated'))
+            except Exception as e:
+                show_warn(dialog, tr('common.error'), str(e))
+
+        buttons.accepted.connect(save_changes)
+        buttons.rejected.connect(dialog.reject)
+        dialog.exec()
+
     def add_user(self):
         name = self.new_user.text().strip()
         pwd = self.new_pwd.text()
