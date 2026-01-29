@@ -132,8 +132,16 @@ def get_progress_conn():
     ensure_db()
     return sqlite3.connect(PROGRESS_DB_PATH)
 
-def now_iso():
-    return datetime.now().isoformat(timespec='seconds')
+def now_iso(timestamp=False, ms_enable=False):
+    if timestamp and ms_enable:
+        return int(datetime.now().timestamp() * 1000)
+    elif timestamp and not ms_enable:
+        return int(datetime.now().timestamp())
+    elif not timestamp and ms_enable:
+        return datetime.now().isoformat()
+    else:
+        return datetime.now().isoformat(timespec='seconds')
+    
 
 def get_setting(key):
     conn = sqlite3.connect(CONFIG_DB_PATH)

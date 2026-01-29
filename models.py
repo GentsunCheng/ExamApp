@@ -140,6 +140,7 @@ def list_admins():
 def update_admin_active(admin_id, active):
     conn = get_admin_conn()
     c = conn.cursor()
+    current_time = now_iso(timestamp=True)
     if int(active) == 0:
         try:
             c.execute('SELECT COUNT(*) FROM admins WHERE active=1 AND id!=?', (admin_id,))
@@ -149,13 +150,16 @@ def update_admin_active(admin_id, active):
                 raise Exception('至少保留一个启用的管理员')
         except Exception:
             pass
-    c.execute('UPDATE admins SET active=? WHERE id=?', (int(active), admin_id))
+    c.execute(f'UPDATE admins '
+    f'SET active=?, edit_at="{current_time}" WHERE id=?', 
+    (int(active), admin_id))
     conn.commit()
     conn.close()
 
 def update_admin_basic(admin_id, username=None, full_name=None, password=None):
     conn = get_admin_conn()
     c = conn.cursor()
+    current_time = now_iso(timestamp=True)
     updates = []
     params = []
     if username is not None:
@@ -173,6 +177,7 @@ def update_admin_basic(admin_id, username=None, full_name=None, password=None):
         return
         
     params.append(admin_id)
+    updates.append(f"edit_at='{current_time}'")
     query = f"UPDATE admins SET {', '.join(updates)} WHERE id=?"
     c.execute(query, tuple(params))
     conn.commit()
@@ -181,6 +186,7 @@ def update_admin_basic(admin_id, username=None, full_name=None, password=None):
 def delete_admin(admin_id):
     conn = get_admin_conn()
     c = conn.cursor()
+    current_time = now_iso(timestamp=True)
     c.execute('SELECT COUNT(*) FROM admins WHERE id!=?', (admin_id,))
     remain_total = c.fetchone()[0]
     if int(remain_total or 0) <= 0:
@@ -197,11 +203,12 @@ def delete_admin(admin_id):
     c.execute('SELECT username FROM admins WHERE id=?', (admin_id,))
     username = c.fetchone()[0]
     delete_username = f"{str(uuid.uuid4())}_{username}_{DELETE_IDENTIFIER}"
-    c.execute(f'UPDATE admins SET username="{delete_username}", shadow_delete=1 WHERE id=?', (admin_id,))
+    c.execute(f'UPDATE admins SET username="{delete_username}", shadow_delete=1, edit_at="{current_time}" WHERE id=?', (admin_id,))
     conn.commit()
     conn.close()
 
 def demote_admin_to_user(admin_id):
+    current_time = now_iso(timestamp=True)
     aconn = get_admin_conn()
     ac = aconn.cursor()
     ac.execute('SELECT username, password_hash, active, full_name, edit_at FROM admins WHERE id=?', (admin_id,))
@@ -217,13 +224,19 @@ def demote_admin_to_user(admin_id):
         uconn.close()
         raise Exception('用户名已存在于用户库')
     try:
-        uc.execute('INSERT INTO users (username, password_hash, role, active, created_at, full_name, edit_at) VALUES (?,?,?,?,?,?,?)', (username, pwd_hash, 'user', active, now_iso(), full_name_cipher, edit_at))
+        uc.execute('INSERT INTO '
+        'users (username, password_hash, role, active, '
+        'created_at, full_name, edit_at) VALUES '
+        '(?,?,?,?,?,?,?)', 
+        (username, pwd_hash, 'user', active, 
+        now_iso(), full_name_cipher, str(current_time)))
         uconn.commit()
     finally:
         uconn.close()
     delete_admin(admin_id)
 
 def promote_user_to_admin(user_id):
+    current_time = now_iso(timestamp=True)
     uconn = get_user_conn()
     uc = uconn.cursor()
     uc.execute('SELECT username, password_hash, active, full_name, edit_at FROM users WHERE id=?', (user_id,))
@@ -240,7 +253,12 @@ def promote_user_to_admin(user_id):
         uconn.close()
         raise Exception('用户名已存在于管理员库')
     try:
-        ac.execute('INSERT INTO admins (username, password_hash, active, created_at, full_name, edit_at) VALUES (?,?,?,?,?,?)', (username, pwd_hash, active, now_iso(), full_name_cipher, edit_at))
+        ac.execute('INSERT INTO '
+        'admins (username, password_hash, active, '
+        'created_at, full_name, edit_at) VALUES '
+        '(?,?,?,?,?,?)', 
+        (username, pwd_hash, active, 
+        now_iso(), full_name_cipher, str(current_time)))
         aconn.commit()
     finally:
         aconn.close()
@@ -689,20 +707,23 @@ def delete_user(user_id):
 def update_user_role(user_id, role):
     conn = get_user_conn()
     c = conn.cursor()
-    c.execute('UPDATE users SET role=? WHERE id=?', (role, user_id))
+    current_time = now_iso(timestamp=True)
+    c.execute(f'UPDATE users SET role="{role}", edit_at="{current_time}" WHERE id=?', (user_id,))
     conn.commit()
     conn.close()
 
 def update_user_active(user_id, active):
     conn = get_user_conn()
     c = conn.cursor()
-    c.execute('UPDATE users SET active=? WHERE id=?', (active, user_id))
+    current_time = now_iso(timestamp=True)
+    c.execute(f'UPDATE users SET active={int(active)}, edit_at="{current_time}" WHERE id=?', (user_id,))
     conn.commit()
     conn.close()
 
 def update_user_basic(user_id, username=None, full_name=None, password=None):
     conn = get_user_conn()
     c = conn.cursor()
+    current_time = now_iso(timestamp=True)
     updates = []
     params = []
     if username is not None:
@@ -720,6 +741,7 @@ def update_user_basic(user_id, username=None, full_name=None, password=None):
         return
         
     params.append(user_id)
+    updates.append(f"edit_at='{current_time}'")
     query = f"UPDATE users SET {', '.join(updates)} WHERE id=?"
     c.execute(query, tuple(params))
     conn.commit()
