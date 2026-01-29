@@ -25,7 +25,8 @@ __ver_train_dict__ = {
 
 
 __from_iter_dict__ = "__from_iter_dict__"
-
+__all_db__ = [ADMIN_DB_PATH, USERS_DB_PATH, EXAMS_DB_PATH, SCORES_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH]
+__first_boot__ = all(not os.path.exists(db) for db in __all_db__)
 
 ITER_VERSION_ACTION_MAP = {
     "origin": {
@@ -80,6 +81,11 @@ def version_check_and_iter(db_file_version="origin"):
 
 
 def iter_loop():
+    if __first_boot__:
+        os.mkdir(DB_DIR)
+        with open(DB_VERFILE_PATH, "w") as f:
+            f.write(__current_db_version__)
+        return True
     iter_version = "origin"
     can_iter = False
     iter_version_action = list(ITER_VERSION_ACTION_MAP.values())
