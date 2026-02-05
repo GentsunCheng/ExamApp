@@ -9,6 +9,7 @@ from windows.exam_window import ExamWindow
 from views.user_modules.exams_module import UserExamsModule
 from views.user_modules.history_module import UserHistoryModule
 from views.user_modules.progress_module import UserProgressModule
+from views.user_modules.settings_module import UserSettingsModule
 
 class UserView(QWidget):
     def __init__(self, user, parent=None):
@@ -34,6 +35,8 @@ class UserView(QWidget):
             f"QTableWidget::item:hover {{ {bkg}:{colors['border_light']}; }}\n"
             f"QTableWidget::item:selected {{ {bkg}:{colors['primary']}; {col}:{colors['text_inverse']}; }}\n"
             f"QHeaderView::section {{ {bkg}:{colors['border_light']}; {col}:{colors['text_secondary']}; font-weight:600; {pd}:6px 8px; {bd}:none; }}\n"
+            f"QLineEdit {{ {pd}:6px; {bd}:1px solid {colors['border']}; {br}:8px; {bkg}:{colors['input_background']}; {col}:{colors['text_primary']}; }}\n"
+            f"QLineEdit:focus {{ {bd}-color:{colors['primary']}; }}\n"
         )
         self.setStyleSheet(ss_user)
         self.user = user
@@ -44,8 +47,8 @@ class UserView(QWidget):
         topbar.addWidget(title)
         topbar.addStretch()
         name_display = user.get('full_name')
-        user_label = QLabel(tr('user.current_user_prefix') + f'{user["username"]}' + (tr('user.full_name_suffix', name=name_display) if name_display else ''))
-        topbar.addWidget(user_label)
+        self.user_label = QLabel(tr('user.current_user_prefix') + f'{user["username"]}' + (tr('user.full_name_suffix', name=name_display) if name_display else ''))
+        topbar.addWidget(self.user_label)
         logout_btn = QPushButton(tr('common.logout'))
         logout_btn.setIcon(self.icon_manager.get_icon('confirm'))
         logout_btn.clicked.connect(self.handle_logout)
@@ -55,18 +58,38 @@ class UserView(QWidget):
         self.exams_module = UserExamsModule(self.user, self)
         self.history_module = UserHistoryModule(self.user, self)
         self.progress_module = UserProgressModule(self.user, self)
+        self.settings_module = UserSettingsModule(self.user, self)
         self.tabs.addTab(self.exams_module, tr('user.exams_tab'))
         self.tabs.setTabIcon(0, self.icon_manager.get_icon('exam'))
         self.tabs.addTab(self.history_module, tr('user.history_tab'))
         self.tabs.setTabIcon(1, self.icon_manager.get_icon('score'))
         self.tabs.addTab(self.progress_module, tr('user.study_progress_tab'))
         self.tabs.setTabIcon(2, self.icon_manager.get_icon('info'))
+        self.tabs.addTab(self.settings_module, tr('user.settings_tab'))
+        self.tabs.setTabIcon(3, self.icon_manager.get_icon('settings'))
         self.tabs.currentChanged.connect(self.on_tab_changed)
+        
+        # Corner widget for settings
+        from PySide6.QtCore import Qt
+        self.settings_btn = QPushButton()
+        self.settings_btn.setIcon(self.icon_manager.get_icon('settings'))
+        self.settings_btn.setFlat(True)
+        self.settings_btn.setToolTip(tr('user.settings_tab'))
+        self.settings_btn.setCursor(Qt.PointingHandCursor)
+        self.settings_btn.setStyleSheet(f"QPushButton {{ background:transparent; border:none; padding: 4px; }} QPushButton:hover {{ background-color:{colors['border_light']}; border-radius:4px; }}")
+        self.settings_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(3))
+        self.tabs.setCornerWidget(self.settings_btn, Qt.TopRightCorner)
+
         layout.addWidget(self.tabs)
         self.setLayout(layout)
         self._last_tab_index = 0
         self._tab_anim = None
         self._tab_effect = None
+
+    def refresh_user_info(self):
+        name_display = self.user.get('full_name')
+        self.user_label.setText(tr('user.current_user_prefix') + f'{self.user["username"]}' + (tr('user.full_name_suffix', name=name_display) if name_display else ''))
+
 
     def _animate_tab_change(self, new_idx):
         if self._tab_anim is not None:
@@ -119,6 +142,9 @@ class UserView(QWidget):
             self.refresh_attempts()
         elif idx == 2:
             self.refresh_progress()
+        elif idx == 3:
+            # Settings tab doesn't need auto refresh for now
+            pass
     def start_exam(self, exam_id=None):
         try:
             print("[DEBUG] start_exam invoked")
