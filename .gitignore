@@ -47,5 +47,6 @@ node_modules/
 .trae/
 secret_key.py
 pack.sh
+gen_pyarmor.sh
 nuitka-crash-report.xml
 resources/version

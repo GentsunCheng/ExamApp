@@ -133,18 +133,6 @@ case "$CMD" in
         ./"${DIST_DIR}/${APP_NAME}/${APP_NAME}"
     fi
     ;;
-  dmg)
-    if [[ "$PLATFORM" != "macos" ]]; then
-        echo "DMG 仅支持 macOS"
-        exit 1
-    fi
-    rm -rf "${BUILD_DIR}/dmg"
-    mkdir -p "${BUILD_DIR}/dmg"
-    cp -R "${DIST_DIR}/${APP_NAME}.app" "${BUILD_DIR}/dmg/"
-    ln -s /Applications "${BUILD_DIR}/dmg/Applications" || true
-    hdiutil create -volname "${APP_NAME}" -srcfolder "${BUILD_DIR}/dmg" -ov -format UDZO "${DIST_DIR}/${APP_NAME}.dmg"
-    echo "DMG 已创建: ${DIST_DIR}/${APP_NAME}.dmg"
-    ;;
   dev)
     python3 "${MAIN_SCRIPT}"
     ;;
@@ -159,18 +147,6 @@ case "$CMD" in
     for pkg in PySide6 pyyaml Crypto pyarmor; do
       python3 -c "import ${pkg}" 2>/dev/null && echo "✓ ${pkg} 已安装" || echo "✗ ${pkg} 未安装"
     done
-    ;;
-  obfuscate)
-    echo "使用 PyArmor 导出混淆代码..."
-    mkdir -p obf
-    pyarmor gen -O obf -r . || pyarmor obfuscate -r -O obf .
-    echo "混淆代码已导出到: obf/"
-    ;;
-  build-secure)
-    rm -rf "${BUILD_DIR}" "${DIST_DIR}" *.spec
-    echo "使用 PyArmor 打包（包含代码混淆）..."
-    pyarmor pack -e "${PYINSTALLER_ARGS}" "${MAIN_SCRIPT}"
-    echo "安全构建完成"
     ;;
   package)
     echo "创建发布包..."
