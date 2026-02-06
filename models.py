@@ -59,20 +59,22 @@ def verify_encryption_ok():
 def create_user(username, password, role='user', active=1, full_name=None):
     conn = get_user_conn()
     c = conn.cursor()
+    cur_ts = str(now_iso(timestamp=True))
     try:
-        c.execute('INSERT INTO users (username, password_hash, role, active, created_at, full_name) VALUES (?,?,?,?,?,?)', (username, hash_password(password), role, active, now_iso(), encrypt_text(full_name) if full_name is not None else None))
+        c.execute('INSERT INTO users (username, password_hash, role, active, created_at, full_name, edit_at) VALUES (?,?,?,?,?,?,?)', (username, hash_password(password), role, active, now_iso(), encrypt_text(full_name) if full_name is not None else None, cur_ts))
     except Exception:
-        c.execute('INSERT INTO users (username, password_hash, role, active, created_at) VALUES (?,?,?,?,?)', (username, hash_password(password), role, active, now_iso()))
+        c.execute('INSERT INTO users (username, password_hash, role, active, created_at, edit_at) VALUES (?,?,?,?,?,?)', (username, hash_password(password), role, active, now_iso(), cur_ts))
     conn.commit()
     conn.close()
 
 def create_admin(username, password, active=1, full_name=None):
     conn = get_admin_conn()
     c = conn.cursor()
+    cur_ts = str(now_iso(timestamp=True))
     try:
-        c.execute('INSERT INTO admins (username, password_hash, active, created_at, full_name) VALUES (?,?,?,?,?)', (username, hash_password(password), active, now_iso(), encrypt_text(full_name) if full_name is not None else None))
+        c.execute('INSERT INTO admins (username, password_hash, active, created_at, full_name, edit_at) VALUES (?,?,?,?,?,?)', (username, hash_password(password), active, now_iso(), encrypt_text(full_name) if full_name is not None else None, cur_ts))
     except Exception:
-        c.execute('INSERT INTO admins (username, password_hash, active, created_at) VALUES (?,?,?,?)', (username, hash_password(password), active, now_iso()))
+        c.execute('INSERT INTO admins (username, password_hash, active, created_at, edit_at) VALUES (?,?,?,?,?)', (username, hash_password(password), active, now_iso(), cur_ts))
     conn.commit()
     conn.close()
 
@@ -694,13 +696,120 @@ def merge_remote_scores_db(remote_scores_db_path):
     rconn.close()
     lconn.close()
 
+def merge_admin_databases(remote_admin_db_path):
+    lconn = get_admin_conn()
+    lcur = lconn.cursor()
+    rconn = sqlite3.connect(remote_admin_db_path)
+    rcur = rconn.cursor()
+    
+    # 获取除 id 之外的所有列
+    rcur.execute('PRAGMA table_info(admins)')
+    cols = [info[1] for info in rcur.fetchall() if info[1] != 'id']
+    col_str = ', '.join(cols)
+    placeholders = ', '.join(['?'] * len(cols))
+    
+    rcur.execute(f'SELECT {col_str} FROM admins')
+    remote_rows = rcur.fetchall()
+    
+    for row in remote_rows:
+        data = dict(zip(cols, row))
+        username = data['username']
+        remote_edit_at = int(data['edit_at'] or 0)
+        remote_shadow_delete = int(data.get('shadow_delete', 0))
+        
+        # 处理删除同步逻辑：如果远程是已删除记录，尝试同步删除本地活跃记录
+        if remote_shadow_delete == 1:
+            parts = username.split('_')
+            if len(parts) >= 3 and parts[-1] == DELETE_IDENTIFIER:
+                original_username = '_'.join(parts[1:-1])
+                lcur.execute('SELECT id, edit_at FROM admins WHERE username=? AND shadow_delete=0', (original_username,))
+                lrow_active = lcur.fetchone()
+                if lrow_active:
+                    local_id, local_edit_at = lrow_active[0], int(lrow_active[1] or 0)
+                    if remote_edit_at > local_edit_at:
+                        # 远程删除时间更晚，本地也标记为删除
+                        current_time = str(now_iso(timestamp=True))
+                        delete_username = f"{str(uuid.uuid4())}_{original_username}_{DELETE_IDENTIFIER}"
+                        lcur.execute('UPDATE admins SET username=?, shadow_delete=1, edit_at=? WHERE id=?', (delete_username, current_time, local_id))
+        
+        lcur.execute('SELECT edit_at FROM admins WHERE username=?', (username,))
+        lrow = lcur.fetchone()
+        
+        if not lrow:
+            # 不存在则插入
+            lcur.execute(f'INSERT INTO admins ({col_str}) VALUES ({placeholders})', row)
+        else:
+            local_edit_at = int(lrow[0] or 0)
+            if remote_edit_at > local_edit_at:
+                # 远程更晚则更新
+                set_clause = ', '.join([f"{c}=?" for c in cols])
+                lcur.execute(f'UPDATE admins SET {set_clause} WHERE username=?', row + (username,))
+                
+    lconn.commit()
+    rconn.close()
+    lconn.close()
+
+def merge_user_databases(remote_user_db_path):
+    lconn = get_user_conn()
+    lcur = lconn.cursor()
+    rconn = sqlite3.connect(remote_user_db_path)
+    rcur = rconn.cursor()
+    
+    # 获取除 id 之外的所有列
+    rcur.execute('PRAGMA table_info(users)')
+    cols = [info[1] for info in rcur.fetchall() if info[1] != 'id']
+    col_str = ', '.join(cols)
+    placeholders = ', '.join(['?'] * len(cols))
+    
+    rcur.execute(f'SELECT {col_str} FROM users')
+    remote_rows = rcur.fetchall()
+    
+    for row in remote_rows:
+        data = dict(zip(cols, row))
+        username = data['username']
+        remote_edit_at = int(data['edit_at'] or 0)
+        remote_shadow_delete = int(data.get('shadow_delete', 0))
+        
+        # 处理删除同步逻辑：如果远程是已删除记录，尝试同步删除本地活跃记录
+        if remote_shadow_delete == 1:
+            parts = username.split('_')
+            if len(parts) >= 3 and parts[-1] == DELETE_IDENTIFIER:
+                original_username = '_'.join(parts[1:-1])
+                lcur.execute('SELECT id, edit_at FROM users WHERE username=? AND shadow_delete=0', (original_username,))
+                lrow_active = lcur.fetchone()
+                if lrow_active:
+                    local_id, local_edit_at = lrow_active[0], int(lrow_active[1] or 0)
+                    if remote_edit_at > local_edit_at:
+                        # 远程删除时间更晚，本地也标记为删除
+                        current_time = str(now_iso(timestamp=True))
+                        delete_username = f"{str(uuid.uuid4())}_{original_username}_{DELETE_IDENTIFIER}"
+                        lcur.execute('UPDATE users SET username=?, shadow_delete=1, edit_at=? WHERE id=?', (delete_username, current_time, local_id))
+        
+        lcur.execute('SELECT edit_at FROM users WHERE username=?', (username,))
+        lrow = lcur.fetchone()
+        
+        if not lrow:
+            # 不存在则插入
+            lcur.execute(f'INSERT INTO users ({col_str}) VALUES ({placeholders})', row)
+        else:
+            local_edit_at = int(lrow[0] or 0)
+            if remote_edit_at > local_edit_at:
+                # 远程更晚则更新
+                set_clause = ', '.join([f"{c}=?" for c in cols])
+                lcur.execute(f'UPDATE users SET {set_clause} WHERE username=?', row + (username,))
+                
+    lconn.commit()
+    rconn.close()
+    lconn.close()
+
 def delete_user(user_id):
     conn = get_user_conn()
     c = conn.cursor()
+    current_time = now_iso(timestamp=True)
     c.execute('SELECT username FROM users WHERE id=?', (user_id,))
     username = c.fetchone()[0]
     delete_username = f"{str(uuid.uuid4())}_{username}_{DELETE_IDENTIFIER}"
-    c.execute(f'UPDATE users SET username="{delete_username}", shadow_delete=1 WHERE id=?', (user_id,))
+    c.execute(f'UPDATE users SET username="{delete_username}", shadow_delete=1, edit_at="{current_time}" WHERE id=?', (user_id,))
     conn.commit()
     conn.close()
 

@@ -164,21 +164,30 @@ def rsync_push(ip, username, remote_dir, ssh_password=None, include_admin=False)
     p = subprocess.run(cmd, capture_output=True, text=True)
     return p.returncode, p.stdout, p.stderr
 
-def rsync_pull_scores(ip, username, remote_dir, local_dir, ssh_password=None):
-    """Pull scores.db from remote directory to local_dir using rsync"""
+def rsync_pull_file(ip, username, remote_dir, local_dir, filename, ssh_password=None):
+    """Pull a specific file from remote directory to local_dir using rsync"""
     ip_addr, port = _parse_ip_port(ip)
     if not _is_port_open(ip_addr, port):
         return 1, '', f"Connection failed: {ip_addr}:{port} is unreachable."
     os.makedirs(local_dir, exist_ok=True)
     remote_dir = _expand_remote_tilde(remote_dir, ip, username, ssh_password)
-    remote_scores = _remote_join(remote_dir, 'scores.db')
-    exists = _check_remote_file_exists(ip, username, remote_scores, ssh_password)
+    remote_file = _remote_join(remote_dir, filename)
+    exists = _check_remote_file_exists(ip, username, remote_file, ssh_password)
     if not exists:
-        return 1, '', f'Remote file not found: {remote_scores}'
+        return 1, '', f'Remote file not found: {remote_file}'
     ssh_opts = f'ssh -p {port} -o StrictHostKeyChecking=no'
     if ssh_password:
-        cmd = [SSHPASS_PATH, '-p', ssh_password, 'rsync', '-avz', '-e', ssh_opts, f'{username}@{ip_addr}:{remote_scores}', local_dir]
+        cmd = [SSHPASS_PATH, '-p', ssh_password, 'rsync', '-avz', '-e', ssh_opts, f'{username}@{ip_addr}:{remote_file}', local_dir]
     else:
-        cmd = ['rsync', '-avz', '-e', ssh_opts, f'{username}@{ip_addr}:{remote_scores}', local_dir]
+        cmd = ['rsync', '-avz', '-e', ssh_opts, f'{username}@{ip_addr}:{remote_file}', local_dir]
     p = subprocess.run(cmd, capture_output=True, text=True)
     return p.returncode, p.stdout, p.stderr
+
+def rsync_pull_scores(ip, username, remote_dir, local_dir, ssh_password=None):
+    return rsync_pull_file(ip, username, remote_dir, local_dir, 'scores.db', ssh_password)
+
+def rsync_pull_users(ip, username, remote_dir, local_dir, ssh_password=None):
+    return rsync_pull_file(ip, username, remote_dir, local_dir, 'users.db', ssh_password)
+
+def rsync_pull_admins(ip, username, remote_dir, local_dir, ssh_password=None):
+    return rsync_pull_file(ip, username, remote_dir, local_dir, 'admin.db', ssh_password)
