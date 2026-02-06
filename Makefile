@@ -99,6 +99,7 @@ NUITKA_COMPILE_ARGS = \
 	--enable-plugin=pyside6
 
 NUITKA_MACOS_ARGS = \
+	--clang \
 	--macos-create-app-bundle \
     --macos-signed-app-name=top.orii.exam \
 	--macos-app-name=$(APP_NAME) \
@@ -107,12 +108,14 @@ NUITKA_MACOS_ARGS = \
     --macos-app-icon=resources/logo.icns
 
 NUITKA_WINDOWS_ARGS = \
+	--msvc \
     --windows-console-mode=disable \
 	--windows-icon-from-ico=resources/logo.ico \
 	--include-data-file=resources/sshpass_win.exe=resources/sshpass_win.exe \
 	--onefile-windows-splash-screen-image=resources/logo.ico
 
 NUITKA_LINUX_ARGS = \
+	--clang \
 	--include-data-file=resources/sshpass_linux=resources/sshpass_linux \
     --linux-icon=resources/logo.png
 
