@@ -127,18 +127,18 @@ def authenticate(username, password):
     # 再查用户库
     conn_u = get_user_conn()
     cu = conn_u.cursor()
-    cu.execute('SELECT id, username, password_hash, role, active, full_name, shadow_delete FROM users WHERE username=?', (username,))
+    cu.execute('SELECT id, username, password_hash, active, full_name, shadow_delete FROM users WHERE username=?', (username,))
     row = cu.fetchone()
     conn_u.close()
     if not row:
         return None
-    if row[6] == 1:
+    if row[5] == 1:
         return None
-    if row[4] != 1:
+    if row[3] != 1:
         return None
     if not verify_password(password, row[2]):
         return None
-    return {'id': row[0], 'username': row[1], 'role': row[3], 'full_name': decrypt_text(row[5]) if len(row) > 5 else None}
+    return {'id': row[0], 'username': row[1], 'role': 'user', 'full_name': decrypt_text(row[4]) if len(row) > 5 else None}
 
 def list_users():
     conn = get_user_conn()

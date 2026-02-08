@@ -38,7 +38,7 @@ class SyncWorker(QThread):
             base_dir = os.path.join(DB_DIR, 'pulled')
             os.makedirs(base_dir, exist_ok=True)
             pulled = []
-            total_steps = len(self.targets) * 5 if self.targets else 0
+            total_steps = len(self.targets) * 3 if self.targets else 0
             if self.targets:
                 max_workers = min(4, len(self.targets))
                 def pull_one(t):

@@ -89,4 +89,6 @@ class LoginView(QWidget):
         if not u:
             show_warn(self, tr('common.error'), tr('error.bad_credentials'))
             return
+        if u['role'] == 'user':
+            self.user_role = 'user'
         self.on_login(u, self.user_role)
