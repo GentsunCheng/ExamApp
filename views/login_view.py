@@ -7,6 +7,15 @@ from language import tr
 from theme_manager import theme_manager
 
 
+
+class UserRoleSwitchLabel(QLabel):
+    def __init__(self, text, login_view):
+        super().__init__(text)
+        self.login_view = login_view
+    def mousePressEvent(self, event):
+        self.login_view.switch_user_role()
+            
+
 # noinspection PyTypeChecker
 class LoginView(QWidget):
     def __init__(self, on_login):
@@ -36,9 +45,9 @@ class LoginView(QWidget):
         card.setFixedWidth(320)
         card.setStyleSheet(f"QGroupBox {{ border:1px solid {colors['border']}; border-radius:12px; padding:24px; background-color:{colors['card_background']}; }}")
         lay = QVBoxLayout()
-        title = QLabel(tr('login.title'))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet(
+        self.title = UserRoleSwitchLabel(tr('login.title'), self)
+        self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.title.setStyleSheet(
             f"font-size:20px; font-weight:bold; margin-bottom:16px; padding:6px 12px; border-radius:12px; "
             f"background-color:{colors['border_light']}; color:{colors['text_primary']}; border:1px solid {colors['border']};"
         )
@@ -60,7 +69,7 @@ class LoginView(QWidget):
         btn.setDefault(True)
         btn.clicked.connect(self.handle_login)
         self.login_btn = btn
-        lay.addWidget(title)
+        lay.addWidget(self.title)
         lay.addWidget(self.user)
         lay.addWidget(self.pwd)
         lay.addWidget(btn)
@@ -82,6 +91,21 @@ class LoginView(QWidget):
                 lay.addWidget(msg)
         except Exception:
             self._encryption_ok = True
+
+
+    def switch_user_role(self):
+        if self.user_role == 'auto':
+            self.user_role = 'user'
+        elif self.user_role == 'user':
+            self.user_role = 'admin'
+        else:
+            self.user_role = 'auto'
+        if self.user_role == 'auto':
+            self.title.setText(tr(f'login.title'))
+        else:
+            self.title.setText(tr(f'login.title_{self.user_role}'))
+
+
     def handle_login(self):
         if hasattr(self, '_encryption_ok') and not self._encryption_ok:
             return
