@@ -13,11 +13,12 @@ from database import (
 )
 
 from db_iter_conf import (
-    simple_iter_dict
+    simple_iter_dict,
+    admin_user_table_merge
 )
 
 # 当前数据库版本，数据库更新需要更改
-__current_db_version__ = "260128"
+__current_db_version__ = "260208"
 __ver_train_dict__ = {
     # 模块名: 模块版本过度标识
     simple_iter_dict.__name__: simple_iter_dict.VER_TRAIN
@@ -35,7 +36,14 @@ ITER_VERSION_ACTION_MAP = {
             "func": simple_iter_dict.__simple_columns_iter__, 
             "param": (__from_iter_dict__,)
         }
-    }
+    },
+    "260128": {
+            "next_iter_ver": "260208",
+            "action": {
+                "func": admin_user_table_merge.__main_merge_action__,
+                "param": (None,)
+            }
+        }
 }
 
 

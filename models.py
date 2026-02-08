@@ -6,6 +6,7 @@ from datetime import datetime, UTC
 from PIL import Image
 from PySide6.QtGui import QImage
 from database import (
+    get_uid_conn,
     get_admin_conn,
     get_user_conn,
     get_exam_conn,
@@ -32,8 +33,10 @@ DELETE_IDENTIFIER = '␡'
 
 
 def create_admin_if_absent():
+    uid_conn = get_uid_conn()
     conn = get_user_conn()
     c = conn.cursor()
+    uid_c = uid_conn.cursor()
     c.execute('SELECT COUNT(*) FROM users')
     count_user = c.fetchone()[0]
     conn.close()
@@ -43,9 +46,17 @@ def create_admin_if_absent():
     count_admin = c.fetchone()[0]
     if int(count_admin) + int(count_user) == 0:
         try:
-            c.execute('INSERT INTO admins (username, password_hash, active, created_at, full_name) VALUES (?,?,?,?,?)', ('admin', hash_password('admin'), 1, now_iso(), encrypt_text('管理员')))
+            uid_c.execute('INSERT INTO uid_map DEFAULT VALUES')
+            uid_conn.commit()
+            new_id = uid_c.lastrowid
+            uid_conn.close()
+            c.execute('INSERT INTO admins (id, username, password_hash, active, created_at, full_name) VALUES (?,?,?,?,?,?)', (new_id, 'admin', hash_password('admin'), 1, now_iso(), encrypt_text('管理员')))
         except Exception:
-            c.execute('INSERT INTO admins (username, password_hash, active, created_at) VALUES (?,?,?,?)', ('admin', hash_password('admin'), 1, now_iso()))
+            uid_c.execute('INSERT INTO uid_map DEFAULT VALUES')
+            uid_conn.commit()
+            new_id = uid_c.lastrowid
+            uid_conn.close()
+            c.execute('INSERT INTO admins (id, username, password_hash, active, created_at) VALUES (?,?,?,?,?)', (new_id, 'admin', hash_password('admin'), 1, now_iso()))
         conn.commit()
     conn.close()
 
@@ -57,24 +68,44 @@ def verify_encryption_ok():
         return False
 
 def create_user(username, password, role='user', active=1, full_name=None):
+    uid_conn = get_uid_conn()
     conn = get_user_conn()
     c = conn.cursor()
+    uid_c = uid_conn.cursor()
     cur_ts = str(now_iso(timestamp=True))
     try:
-        c.execute('INSERT INTO users (username, password_hash, role, active, created_at, full_name, edit_at) VALUES (?,?,?,?,?,?,?)', (username, hash_password(password), role, active, now_iso(), encrypt_text(full_name) if full_name is not None else None, cur_ts))
+        uid_c.execute('INSERT INTO uid_map DEFAULT VALUES')
+        uid_conn.commit()
+        new_id = uid_c.lastrowid
+        uid_conn.close()
+        c.execute('INSERT INTO users (id, username, password_hash, role, active, created_at, full_name, edit_at) VALUES (?,?,?,?,?,?,?,?)', (new_id, username, hash_password(password), role, active, now_iso(), encrypt_text(full_name) if full_name is not None else None, cur_ts))
     except Exception:
-        c.execute('INSERT INTO users (username, password_hash, role, active, created_at, edit_at) VALUES (?,?,?,?,?,?)', (username, hash_password(password), role, active, now_iso(), cur_ts))
+        uid_c.execute('INSERT INTO uid_map DEFAULT VALUES')
+        uid_conn.commit()
+        new_id = uid_c.lastrowid
+        uid_conn.close()
+        c.execute('INSERT INTO users (id, username, password_hash, role, active, created_at, edit_at) VALUES (?,?,?,?,?,?,?)', (new_id, username, hash_password(password), role, active, now_iso(), cur_ts))
     conn.commit()
     conn.close()
 
 def create_admin(username, password, active=1, full_name=None):
+    uid_conn = get_uid_conn()
     conn = get_admin_conn()
     c = conn.cursor()
+    uid_c = uid_conn.cursor()
     cur_ts = str(now_iso(timestamp=True))
     try:
-        c.execute('INSERT INTO admins (username, password_hash, active, created_at, full_name, edit_at) VALUES (?,?,?,?,?,?)', (username, hash_password(password), active, now_iso(), encrypt_text(full_name) if full_name is not None else None, cur_ts))
+        uid_c.execute('INSERT INTO uid_map DEFAULT VALUES')
+        uid_conn.commit()
+        new_id = uid_c.lastrowid
+        uid_conn.close()
+        c.execute('INSERT INTO admins (id, username, password_hash, active, created_at, full_name, edit_at) VALUES (?,?,?,?,?,?,?)', (new_id, username, hash_password(password), active, now_iso(), encrypt_text(full_name) if full_name is not None else None, cur_ts))
     except Exception:
-        c.execute('INSERT INTO admins (username, password_hash, active, created_at, edit_at) VALUES (?,?,?,?,?)', (username, hash_password(password), active, now_iso(), cur_ts))
+        uid_c.execute('INSERT INTO uid_map DEFAULT VALUES')
+        uid_conn.commit()
+        new_id = uid_c.lastrowid
+        uid_conn.close()
+        c.execute('INSERT INTO admins (id, username, password_hash, active, created_at, edit_at) VALUES (?,?,?,?,?,?)', (new_id, username, hash_password(password), active, now_iso(), cur_ts))
     conn.commit()
     conn.close()
 
@@ -185,17 +216,17 @@ def update_admin_basic(admin_id, username=None, full_name=None, password=None):
     conn.commit()
     conn.close()
 
-def delete_admin(admin_id):
+def delete_admin(admin_id, force=False):
     conn = get_admin_conn()
     c = conn.cursor()
     current_time = now_iso(timestamp=True)
-    c.execute('SELECT COUNT(*) FROM admins WHERE id!=?', (admin_id,))
+    c.execute('SELECT COUNT(*) FROM admins WHERE id!=? AND WHERE shadow_delete=0', (admin_id,))
     remain_total = c.fetchone()[0]
     if int(remain_total or 0) <= 0:
         conn.close()
         raise Exception('至少保留一个管理员')
     try:
-        c.execute('SELECT COUNT(*) FROM admins WHERE active=1 AND id!=?', (admin_id,))
+        c.execute('SELECT COUNT(*) FROM admins WHERE active=1 AND id!=? AND WHERE shadow_delete=0', (admin_id,))
         remain_active = c.fetchone()[0]
         if int(remain_active or 0) <= 0:
             conn.close()
@@ -204,8 +235,11 @@ def delete_admin(admin_id):
         pass
     c.execute('SELECT username FROM admins WHERE id=?', (admin_id,))
     username = c.fetchone()[0]
-    delete_username = f"{str(uuid.uuid4())}_{username}_{DELETE_IDENTIFIER}"
-    c.execute(f'UPDATE admins SET username="{delete_username}", shadow_delete=1, edit_at="{current_time}" WHERE id=?', (admin_id,))
+    if force:
+        c.execute('DELETE FROM admins WHERE id=?', (admin_id,))
+    else:
+        delete_username = f"{str(uuid.uuid4())}_{username}_{DELETE_IDENTIFIER}"
+        c.execute(f'UPDATE admins SET username="{delete_username}", shadow_delete=1, edit_at="{current_time}" WHERE id=?', (admin_id,))
     conn.commit()
     conn.close()
 
@@ -227,15 +261,15 @@ def demote_admin_to_user(admin_id):
         raise Exception('用户名已存在于用户库')
     try:
         uc.execute('INSERT INTO '
-        'users (username, password_hash, role, active, '
+        'users (id, username, password_hash, role, active, '
         'created_at, full_name, edit_at) VALUES '
-        '(?,?,?,?,?,?,?)', 
-        (username, pwd_hash, 'user', active, 
+        '(?,?,?,?,?,?,?,?)',
+        (admin_id, username, pwd_hash, 'user', active,
         now_iso(), full_name_cipher, str(current_time)))
         uconn.commit()
     finally:
         uconn.close()
-    delete_admin(admin_id)
+    delete_admin(admin_id, force=True)
 
 def promote_user_to_admin(user_id):
     current_time = now_iso(timestamp=True)
@@ -256,10 +290,10 @@ def promote_user_to_admin(user_id):
         raise Exception('用户名已存在于管理员库')
     try:
         ac.execute('INSERT INTO '
-        'admins (username, password_hash, active, '
+        'admins (id, username, password_hash, active, '
         'created_at, full_name, edit_at) VALUES '
-        '(?,?,?,?,?,?)', 
-        (username, pwd_hash, active, 
+        '(?,?,?,?,?,?,?)',
+        (user_id, username, pwd_hash, active,
         now_iso(), full_name_cipher, str(current_time)))
         aconn.commit()
     finally:
@@ -701,10 +735,9 @@ def merge_admin_databases(remote_admin_db_path):
     lcur = lconn.cursor()
     rconn = sqlite3.connect(remote_admin_db_path)
     rcur = rconn.cursor()
-    
-    # 获取除 id 之外的所有列
+
     rcur.execute('PRAGMA table_info(admins)')
-    cols = [info[1] for info in rcur.fetchall() if info[1] != 'id']
+    cols = [info[1] for info in rcur.fetchall()]
     col_str = ', '.join(cols)
     placeholders = ', '.join(['?'] * len(cols))
     
@@ -755,9 +788,8 @@ def merge_user_databases(remote_user_db_path):
     rconn = sqlite3.connect(remote_user_db_path)
     rcur = rconn.cursor()
     
-    # 获取除 id 之外的所有列
     rcur.execute('PRAGMA table_info(users)')
-    cols = [info[1] for info in rcur.fetchall() if info[1] != 'id']
+    cols = [info[1] for info in rcur.fetchall()]
     col_str = ', '.join(cols)
     placeholders = ', '.join(['?'] * len(cols))
     

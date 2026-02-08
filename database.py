@@ -5,6 +5,7 @@ from datetime import datetime
 from crypto_util import encrypt_probe, verify_probe
 
 DB_DIR = os.path.join(str(pathlib.Path.home()), '.exam_system')
+UID_DB_PATH = os.path.join(DB_DIR, 'uid.db')
 ADMIN_DB_PATH = os.path.join(DB_DIR, 'admin.db')
 USERS_DB_PATH = os.path.join(DB_DIR, 'users.db')
 EXAMS_DB_PATH = os.path.join(DB_DIR, 'exams.db')
@@ -21,10 +22,16 @@ def ensure_db():
         os.makedirs(DB_DIR, exist_ok=True)
     if not os.path.exists(RESOURCE_PATH):
         os.makedirs(RESOURCE_PATH, exist_ok=True)
+    conn = sqlite3.connect(UID_DB_PATH)
+    c = conn.cursor()
+    c.execute('CREATE TABLE IF NOT EXISTS uid_map '
+    '(id INTEGER PRIMARY KEY AUTOINCREMENT)')
+    conn.commit()
+    conn.close()
     conn = sqlite3.connect(ADMIN_DB_PATH)
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS admins '
-    '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    '(id INTEGER PRIMARY KEY, '
     'username TEXT UNIQUE, password_hash TEXT, '
     'active INTEGER DEFAULT 1, created_at TEXT, '
     'full_name TEXT, edit_at TEXT DEFAULT NULL, '
@@ -34,7 +41,7 @@ def ensure_db():
     conn = sqlite3.connect(USERS_DB_PATH)
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS users '
-    '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    '(id INTEGER PRIMARY KEY, '
     'username TEXT UNIQUE, password_hash TEXT, role TEXT, '
     'active INTEGER DEFAULT 1, created_at TEXT, full_name TEXT, '
     'edit_at TEXT DEFAULT NULL, shadow_delete INTEGER NOT NULL DEFAULT 0)')
@@ -107,6 +114,10 @@ def ensure_db():
     conn.commit()
     conn.close()
 
+
+def get_uid_conn():
+    ensure_db()
+    return sqlite3.connect(UID_DB_PATH)
 
 def get_admin_conn():
     ensure_db()

@@ -3,7 +3,8 @@ import sys
 import subprocess
 import socket
 from database import (
-    DB_DIR, 
+    DB_DIR,
+    UID_DB_PATH,
     ADMIN_DB_PATH, 
     USERS_DB_PATH, 
     EXAMS_DB_PATH, 
@@ -141,7 +142,7 @@ def rsync_push(ip, username, remote_dir, ssh_password=None, include_admin=False)
     if ip_addr == get_local_ip() or ip_addr == '127.0.0.1':
         return 304, f"Skip local device: {ip_addr}:{port}", ''
     remote_dir = _expand_remote_tilde(remote_dir, ip, username, ssh_password)
-    local_files = [SCORES_DB_PATH, EXAMS_DB_PATH, USERS_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH, RESOURCE_PATH, DB_VERFILE_PATH]
+    local_files = [SCORES_DB_PATH, EXAMS_DB_PATH, UID_DB_PATH, USERS_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH, RESOURCE_PATH, DB_VERFILE_PATH]
     if include_admin:
         local_files.append(ADMIN_DB_PATH)
     else:
