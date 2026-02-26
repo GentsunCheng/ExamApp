@@ -45,6 +45,7 @@ logs/
 node_modules/
 *.db
 .trae/
+conf/
 secret_key.py
 pack.sh
 gen_pyarmor.sh
