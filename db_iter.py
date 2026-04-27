@@ -38,12 +38,12 @@ ITER_VERSION_ACTION_MAP = {
         }
     },
     "260128": {
-            "next_iter_ver": "260208",
-            "action": {
-                "func": admin_user_table_merge.__main_merge_action__,
-                "param": (None,)
-            }
+        "next_iter_ver": "260208",
+        "action": {
+            "func": admin_user_table_merge.__main_merge_action__,
+            "param": (None,)
         }
+    }
 }
 
 
