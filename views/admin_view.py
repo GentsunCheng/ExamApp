@@ -11,6 +11,7 @@ from views.admin_modules.sync_module import AdminSyncModule
 from views.admin_modules.scores_module import AdminScoresModule
 from views.admin_modules.study_progress_module import AdminProgressModule
 from views.admin_modules.exam_progress_module import AdminScoresOverviewModule
+from views.admin_modules.knowledge_module import AdminKnowledgeModule
 
 
 class AdminView(QWidget):
@@ -51,6 +52,9 @@ class AdminView(QWidget):
         self.tabs.addTab(AdminScoresModule(self), tr('admin.scores_tab'))
         self.tabs.addTab(AdminScoresOverviewModule(self), tr('admin.exam_progress_tab'))
         self.tabs.addTab(AdminProgressModule(self), tr('admin.study_progress_tab'))
+        self.knowledge_module = AdminKnowledgeModule({'id': 0, 'username': 'admin'})
+        self.tabs.addTab(self.knowledge_module, tr('knowledge.tab'))
+        self.tabs.setTabIcon(6, self.icon_manager.get_icon('file'))
         self.tabs.setTabIcon(0, self.icon_manager.get_icon('user'))
         self.tabs.setTabIcon(1, self.icon_manager.get_icon('exam'))
         self.tabs.setTabIcon(2, self.icon_manager.get_icon('sync'))
@@ -140,6 +144,9 @@ class AdminView(QWidget):
         elif isinstance(w, AdminProgressModule):
             if hasattr(w, 'refresh_users_and_view'):
                 w.refresh_users_and_view()
+        elif isinstance(w, AdminKnowledgeModule):
+            if hasattr(w, 'refresh_knowledge'):
+                w.refresh_knowledge()
 
     def handle_logout(self):
         p = self.parent()

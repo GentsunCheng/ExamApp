@@ -10,6 +10,7 @@ from views.user_modules.exams_module import UserExamsModule
 from views.user_modules.history_module import UserHistoryModule
 from views.user_modules.progress_module import UserProgressModule
 from views.user_modules.settings_module import UserSettingsModule
+from views.user_modules.knowledge_module import KnowledgeBaseModule
 
 class UserView(QWidget):
     def __init__(self, user, parent=None):
@@ -59,6 +60,7 @@ class UserView(QWidget):
         self.history_module = UserHistoryModule(self.user, self)
         self.progress_module = UserProgressModule(self.user, self)
         self.settings_module = UserSettingsModule(self.user, self)
+        self.knowledge_module = KnowledgeBaseModule(self.user, self)
         self.tabs.addTab(self.exams_module, tr('user.exams_tab'))
         self.tabs.setTabIcon(0, self.icon_manager.get_icon('exam'))
         self.tabs.addTab(self.history_module, tr('user.history_tab'))
@@ -67,6 +69,8 @@ class UserView(QWidget):
         self.tabs.setTabIcon(2, self.icon_manager.get_icon('info'))
         self.tabs.addTab(self.settings_module, tr('user.settings_tab'))
         self.tabs.setTabIcon(3, self.icon_manager.get_icon('settings'))
+        self.tabs.addTab(self.knowledge_module, tr('knowledge.tab'))
+        self.tabs.setTabIcon(4, self.icon_manager.get_icon('file'))
         self.tabs.currentChanged.connect(self.on_tab_changed)
         
         # Corner widget for settings

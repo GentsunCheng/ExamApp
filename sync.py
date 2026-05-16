@@ -200,6 +200,9 @@ def rsync_pull_progress(ip, username, remote_dir, local_dir, ssh_password=None):
 def rsync_pull_exams(ip, username, remote_dir, local_dir, ssh_password=None):
     return rsync_pull_file(ip, username, remote_dir, local_dir, 'exams.db', ssh_password)
 
+def rsync_pull_knowledge(ip, username, remote_dir, local_dir, ssh_password=None):
+    return rsync_pull_file(ip, username, remote_dir, local_dir, 'knowledge.db', ssh_password)
+
 def rsync_pull_files_dir(ip, username, remote_dir, local_dir, ssh_password=None):
     """Pull entire files/ directory from remote using rsync"""
     ip_addr, port = _parse_ip_port(ip)

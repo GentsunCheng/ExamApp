@@ -13,6 +13,7 @@ from database import (
     get_score_conn,
     get_config_conn,
     get_progress_conn,
+    get_kb_conn,
     now_iso,
     ensure_key_probe,
     verify_db_encryption_key,
@@ -1244,3 +1245,175 @@ def get_user_progress_tree(user_id):
         except Exception:
             pass
     return result
+
+
+# ===== 知识库 =====
+
+def save_knowledge_file(source_path, user_id, username, category, keywords):
+    """保存文件到知识库，返回文件元数据"""
+    if not os.path.exists(source_path):
+        return None
+    sha1 = hashlib.sha1()
+    with open(source_path, 'rb') as f:
+        while True:
+            chunk = f.read(8192)
+            if not chunk:
+                break
+            sha1.update(chunk)
+    sha1_hex = sha1.hexdigest()
+    dest = os.path.join(FILES_DIR, sha1_hex)
+    if not os.path.exists(dest):
+        shutil.copy2(source_path, dest)
+    original_name = os.path.basename(source_path)
+    conn = get_kb_conn()
+    c = conn.cursor()
+    # 检查 sha1 是否已存在
+    c.execute('SELECT id FROM knowledge_base WHERE sha1=?', (sha1_hex,))
+    existing = c.fetchone()
+    now = now_iso()
+    if existing:
+        # 如果已删除则恢复
+        file_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f'kb:{existing[0]}'))
+        c.execute("UPDATE knowledge_base SET deleted=0, edit_at=? WHERE id=?", (now, existing[0]))
+    else:
+        c.execute('INSERT INTO knowledge_base (user_id, username, filename, sha1, category, keywords, uploaded_at, edit_at) VALUES (?,?,?,?,?,?,?,?)',
+                  (user_id, username, original_name, sha1_hex, category, keywords, now, now))
+        conn.commit()
+        # 为刚插入的记录生成 uuid
+        c.execute('SELECT id FROM knowledge_base WHERE uuid IS NULL ORDER BY id DESC LIMIT 1')
+        row = c.fetchone()
+        if row:
+            file_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f'kb:{row[0]}'))
+            c.execute("UPDATE knowledge_base SET uuid=? WHERE id=?", (file_uuid, row[0]))
+    conn.commit()
+    conn.close()
+    return {'sha1': sha1_hex, 'filename': original_name}
+
+
+def list_knowledge_files(keyword=None, category=None, uploader=None, show_deleted=False):
+    """查询知识库文件，支持按关键词/分类/上传者筛选"""
+    conn = get_kb_conn()
+    c = conn.cursor()
+    conditions = []
+    params = []
+    if not show_deleted:
+        conditions.append('deleted=0')
+    if keyword:
+        conditions.append('(filename LIKE ? OR keywords LIKE ?)')
+        params.extend([f'%{keyword}%', f'%{keyword}%'])
+    if category:
+        conditions.append('category=?')
+        params.append(category)
+    if uploader:
+        conditions.append('(username LIKE ? OR user_id=?)')
+        params.extend([f'%{uploader}%', uploader])
+    where = ' WHERE ' + ' AND '.join(conditions) if conditions else ''
+    c.execute(f'SELECT id, uuid, user_id, username, filename, sha1, category, keywords, uploaded_at, edit_at, deleted FROM knowledge_base{where} ORDER BY id DESC')
+    rows = c.fetchall()
+    conn.close()
+    return [{
+        'id': r[0],
+        'uuid': r[1],
+        'user_id': r[2],
+        'username': r[3],
+        'filename': r[4],
+        'sha1': r[5],
+        'category': r[6] or '',
+        'keywords': r[7] or '',
+        'uploaded_at': r[8],
+        'edit_at': r[9],
+        'deleted': r[10],
+    } for r in rows]
+
+
+def list_knowledge_categories():
+    """获取所有分类（排除已删除）"""
+    conn = get_kb_conn()
+    c = conn.cursor()
+    c.execute('SELECT DISTINCT category FROM knowledge_base WHERE category!=\'\' AND deleted=0 ORDER BY category')
+    rows = c.fetchall()
+    conn.close()
+    return [r[0] for r in rows]
+
+
+def list_knowledge_uploaders():
+    """获取所有上传者用户名（排除已删除）"""
+    conn = get_kb_conn()
+    c = conn.cursor()
+    c.execute('SELECT DISTINCT username FROM knowledge_base WHERE deleted=0 ORDER BY username')
+    rows = c.fetchall()
+    conn.close()
+    return [r[0] for r in rows]
+
+
+def delete_knowledge_file(kb_id, user_id=None, is_admin=False):
+    """软删除知识库记录（标记 deleted=1）"""
+    conn = get_kb_conn()
+    c = conn.cursor()
+    c.execute('SELECT user_id FROM knowledge_base WHERE id=?', (kb_id,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return False
+    if not is_admin and row[0] != user_id:
+        conn.close()
+        return False
+    now = now_iso()
+    c.execute('UPDATE knowledge_base SET deleted=1, edit_at=? WHERE id=?', (now, kb_id))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def get_knowledge_file_path(sha1):
+    """获取知识库文件的完整路径"""
+    p = os.path.join(FILES_DIR, sha1)
+    return p if os.path.exists(p) else None
+
+
+def merge_knowledge_databases(remote_kb_path):
+    """合并远程 knowledge.db（按 uuid 和 edit_at 去重）"""
+    if not os.path.exists(remote_kb_path):
+        return
+    lconn = get_kb_conn()
+    rconn = sqlite3.connect(remote_kb_path)
+    lc = lconn.cursor()
+    rc = rconn.cursor()
+    try:
+        rc.execute('SELECT id, uuid, user_id, username, filename, sha1, category, keywords, uploaded_at, edit_at, deleted FROM knowledge_base')
+        remote_rows = rc.fetchall()
+    except Exception:
+        rconn.close()
+        return
+
+    for row in remote_rows:
+        (rid, ruuid, user_id, username, filename, sha1, category, keywords,
+         uploaded_at, edit_at, deleted) = row
+        if not ruuid:
+            ruuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f'kb:{rid}'))
+        # 查本地是否有同 uuid
+        lc.execute('SELECT id, edit_at, deleted FROM knowledge_base WHERE uuid=?', (ruuid,))
+        local = lc.fetchone()
+        now = now_iso()
+        if local:
+            local_id, local_edit_at, local_deleted = local
+            # 比较 edit_at：保留最新的
+            remote_time = edit_at or ''
+            local_time = local_edit_at or ''
+            if remote_time > local_time:
+                lc.execute('''UPDATE knowledge_base SET
+                    user_id=?, username=?, filename=?, sha1=?, category=?,
+                    keywords=?, uploaded_at=?, edit_at=?, deleted=?
+                    WHERE id=?''',
+                    (user_id, username, filename, sha1, category, keywords,
+                     uploaded_at, edit_at, deleted, local_id))
+        else:
+            # 新记录直接插入
+            lc.execute('''INSERT INTO knowledge_base
+                (uuid, user_id, username, filename, sha1, category, keywords, uploaded_at, edit_at, deleted)
+                VALUES (?,?,?,?,?,?,?,?,?,?)''',
+                (ruuid, user_id, username, filename, sha1, category, keywords,
+                 uploaded_at or now, edit_at or now, deleted))
+    lconn.commit()
+    rconn.close()
+    lconn.close()

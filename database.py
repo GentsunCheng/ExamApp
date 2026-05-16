@@ -12,6 +12,7 @@ EXAMS_DB_PATH = os.path.join(DB_DIR, 'exams.db')
 SCORES_DB_PATH = os.path.join(DB_DIR, 'scores.db')
 CONFIG_DB_PATH = os.path.join(DB_DIR, 'config.db')
 PROGRESS_DB_PATH = os.path.join(DB_DIR, 'progress.db')
+KB_DB_PATH = os.path.join(DB_DIR, 'knowledge.db')
 FILES_DIR = os.path.join(DB_DIR, 'files')
 RESOURCE_PATH = os.path.join(DB_DIR, 'resources')
 DB_VERFILE_PATH = os.path.join(DB_DIR, '.db_version')
@@ -129,6 +130,17 @@ def ensure_db():
     except Exception:
         pass
 
+    conn = sqlite3.connect(KB_DB_PATH)
+    c = conn.cursor()
+    c.execute('CREATE TABLE IF NOT EXISTS knowledge_base '
+    '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    'uuid TEXT UNIQUE, '
+    'user_id INTEGER, username TEXT, '
+    'filename TEXT, sha1 TEXT, '
+    'category TEXT DEFAULT \'\', keywords TEXT DEFAULT \'\', '
+    'uploaded_at TEXT, edit_at TEXT, '
+    'deleted INTEGER DEFAULT 0)')
+    conn.commit()
 
 def get_uid_conn():
     ensure_db()
@@ -157,6 +169,10 @@ def get_config_conn():
 def get_progress_conn():
     ensure_db()
     return sqlite3.connect(PROGRESS_DB_PATH)
+
+def get_kb_conn():
+    ensure_db()
+    return sqlite3.connect(KB_DB_PATH)
 
 def now_iso(timestamp=False, ms_enable=False):
     if timestamp and ms_enable:

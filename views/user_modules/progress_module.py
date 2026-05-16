@@ -144,7 +144,7 @@ class UserProgressModule(QWidget):
         self.content_layout.addStretch()
 
     def upload_file(self, user_id, task_id):
-        file_filter = "文档文件 (*.doc *.docx *.xls *.xlsx *.ppt *.pptx *.pdf *.png *.jpg *.jpeg *.gif *.bmp *.txt);;所有文件 (*)"
+        file_filter = "文档文件 (*.doc *.docx *.xls *.xlsx *.ppt *.pptx *.pdf *.png *.jpg *.jpeg *.gif *.bmp *.txt *.md *.csv *.json *.xml *.yaml *.yml *.log *.rtf);;所有文件 (*)"
         paths, _ = QFileDialog.getOpenFileNames(self, tr('progress.upload_file'), '', file_filter)
         if not paths:
             return
