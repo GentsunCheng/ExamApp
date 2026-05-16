@@ -1,9 +1,5 @@
 import os
-import platform
-import subprocess
 import locale
-import re
-import importlib
 
 _LANG = None
 
@@ -20,63 +16,16 @@ def _normalize(code):
     return 'zh-Hans'
 
 def get_system_language_codes():
-    sysname = platform.system()
     out = []
-    if sysname == 'Darwin':
-        try:
-            p = subprocess.run(['defaults', 'read', '-g', 'AppleLanguages'], capture_output=True, text=True, timeout=1)
-            s = p.stdout or ''
-            out = re.findall(r'"([^"]+)"', s)
-        except Exception:
-            out = []
-        if not out:
-            try:
-                loc = locale.getdefaultlocale()
-                if loc and loc[0]:
-                    out = [loc[0]]
-            except Exception:
-                pass
-            env = os.environ.get('LANG')
-            if env:
-                out.append(env)
-    elif sysname == 'Windows':
-        try:
-            ctypes = importlib.import_module('ctypes')
-            langid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
-            m = locale.windows_locale
-            code = m.get(langid)
-            if code:
-                out = [code]
-        except Exception:
-            out = []
-        if not out:
-            try:
-                winreg = importlib.import_module('winreg')
-                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Control Panel\International') as k:
-                    name, _ = winreg.QueryValueEx(k, 'LocaleName')
-                    if name:
-                        out = [name]
-            except Exception:
-                pass
-        if not out:
-            try:
-                loc = locale.getdefaultlocale()
-                if loc and loc[0]:
-                    out = [loc[0]]
-            except Exception:
-                pass
-    else:
-        for v in ('LANGUAGE', 'LC_ALL', 'LC_MESSAGES', 'LANG'):
-            val = os.environ.get(v)
-            if val:
-                out.append(val)
-        if not out:
-            try:
-                loc = locale.getdefaultlocale()
-                if loc and loc[0]:
-                    out = [loc[0]]
-            except Exception:
-                pass
+    try:
+        loc = locale.getdefaultlocale()
+        if loc and loc[0]:
+            out = [loc[0]]
+    except Exception:
+        pass
+    env = os.environ.get('LANG')
+    if env:
+        out.append(env)
     return out or ['zh-Hans']
 
 def detect_language():
@@ -109,6 +58,7 @@ _DICT = {
         'common.confirm': '确认',
         'common.ok': '确定',
         'common.cancel': '取消',
+        'common.close': '关闭',
         'common.confirm_delete_target': '确定要删除该目标吗？',
         'login.title': '登录',
         'login.title_user': '用户登录',
@@ -372,6 +322,15 @@ _DICT = {
         'progress.export_user.title': '导出用户学习进度',
         'progress.export_user.done': '用户进度已导出: {path}',
         'progress.overview.title': '学习进度概览 - {user}',
+        'progress.files': '文件',
+        'progress.upload_file': '上传文件',
+        'progress.view_files': '查看文件',
+        'progress.file_list': '文件列表',
+        'progress.no_files': '无文件',
+        'progress.file_uploaded': '文件已上传',
+        'progress.file_deleted': '文件已删除',
+        'progress.confirm_delete_file': '确定要删除该文件吗？',
+        'progress.file_size': '大小',
         'exam.in_progress': '考试进行中, 总分: {total}',
         'exam.nav_title': '题览',
         'exam.prev': '上一题',
@@ -408,6 +367,7 @@ _DICT = {
         'common.confirm': 'Confirm',
         'common.ok': 'OK',
         'common.cancel': 'Cancel',
+        'common.close': 'Close',
         'common.confirm_delete_target': 'Are you sure you want to delete this target?',
         'login.title': 'Login',
         'login.title_user': 'User Login',
@@ -653,6 +613,15 @@ _DICT = {
         'progress.export_user.title': 'Export User Progress',
         'progress.export_user.done': 'User progress exported: {path}',
         'progress.overview.title': 'Progress Overview - {user}',
+        'progress.files': 'Files',
+        'progress.upload_file': 'Upload File',
+        'progress.view_files': 'View Files',
+        'progress.file_list': 'File List',
+        'progress.no_files': 'No Files',
+        'progress.file_uploaded': 'File uploaded',
+        'progress.file_deleted': 'File deleted',
+        'progress.confirm_delete_file': 'Are you sure to delete this file?',
+        'progress.file_size': 'Size',
         'admin.targets.set_admin': 'Set as admin device',
         'admin.targets.unset_admin': 'Unset admin device',
         'admin.targets.disable': 'Disable device',

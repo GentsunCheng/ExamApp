@@ -1,17 +1,21 @@
 import os
 import pathlib
+import json
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils import get_column_letter
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QComboBox, QPushButton, QFileDialog, QScrollArea, QTableWidget, QTableWidgetItem, QCheckBox, QMessageBox, QAbstractItemView
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QComboBox, QPushButton, QFileDialog, QScrollArea, QTableWidget, QTableWidgetItem, QCheckBox, QMessageBox, QAbstractItemView, QDialog, QLabel
 
 from icon_manager import IconManager
 from theme_manager import theme_manager
 from utils import show_info, show_warn, ask_yes_no
 from language import tr
+from database import FILES_DIR
 from windows.study_progress_overview_window import ProgressOverviewWindow
 
 from models import (
@@ -333,17 +337,19 @@ class AdminProgressModule(QWidget):
         for md in tree:
             gb = QGroupBox(md.get('module_name') or '')
             vb = QVBoxLayout()
-            tbl = QTableWidget(0, 4)
+            tbl = QTableWidget(0, 5)
             tbl.setHorizontalHeaderLabels([
                 tr('progress.headers.task_title'),
                 tr('progress.headers.description'),
                 tr('progress.headers.order'),
                 tr('progress.headers.status'),
+                tr('progress.files'),
             ])
-            tbl.setColumnWidth(0, 240)
-            tbl.setColumnWidth(1, 520)
-            tbl.setColumnWidth(2, 80)
+            tbl.setColumnWidth(0, 200)
+            tbl.setColumnWidth(1, 400)
+            tbl.setColumnWidth(2, 60)
             tbl.setColumnWidth(3, 120)
+            tbl.setColumnWidth(4, 160)
             tbl.horizontalHeader().setStretchLastSection(True)
             tbl.setAlternatingRowColors(True)
             tbl.setShowGrid(False)
@@ -374,10 +380,88 @@ class AdminProgressModule(QWidget):
                 self._apply_status_style(cb, status)
                 cb.currentIndexChanged.connect(self.on_status_changed)
                 tbl.setCellWidget(r, 3, cb)
+
+                # Files column
+                files_widget = QWidget()
+                files_layout = QHBoxLayout()
+                files_layout.setContentsMargins(4, 2, 4, 2)
+                files_layout.setSpacing(4)
+                task_files = t.get('files') or []
+                task_id = int(t.get('task_id') or 0)
+
+                if task_files:
+                    lbl_count = QLabel(f"{len(task_files)}")
+                    lbl_count.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                    lbl_count.setStyleSheet("QLabel { background-color:#67c23a; color:#fff; border-radius:8px; padding:2px 6px; font-size:11px; font-weight:bold; }")
+                    files_layout.addWidget(lbl_count)
+
+                    btn_view = QPushButton(tr('progress.view_files'))
+                    btn_view.setStyleSheet("QPushButton { background-color:#409eff; color:#fff; padding:4px 8px; font-size:11px; border-radius:6px; }")
+                    btn_view.clicked.connect(lambda checked, uid=user_id, tid=task_id, ft=task_files: self.admin_view_files(uid, tid, ft))
+                    files_layout.addWidget(btn_view)
+                else:
+                    lbl_no = QLabel(tr('progress.no_files'))
+                    lbl_no.setStyleSheet("color:#909399; font-size:11px;")
+                    files_layout.addWidget(lbl_no)
+
+                files_widget.setLayout(files_layout)
+                tbl.setCellWidget(r, 4, files_widget)
+
             vb.addWidget(tbl)
             gb.setLayout(vb)
             self.content_layout.addWidget(gb)
         self.content_layout.addStretch()
+
+    def admin_view_files(self, user_id, task_id, task_files):
+        if not task_files:
+            show_info(self, tr('common.hint'), tr('progress.no_files'))
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle(tr('progress.file_list'))
+        dlg.resize(520, 380)
+        colors = theme_manager.get_theme_colors()
+        dlg.setStyleSheet(f"QDialog {{ background-color:{colors['card_background']}; }}")
+        layout = QVBoxLayout()
+
+        for fmeta in task_files:
+            row = QHBoxLayout()
+            lbl_name = QLabel(fmeta.get('original_name', ''))
+            size_str = self._format_size(fmeta.get('size', 0))
+            lbl_size = QLabel(f'({size_str})')
+            lbl_size.setStyleSheet(f"color:{colors['text_secondary']}; font-size:12px;")
+
+            btn_open = QPushButton('打开')
+            btn_open.setStyleSheet("QPushButton { background-color:#409eff; color:#fff; padding:4px 12px; font-size:12px; border-radius:6px; }")
+            sha1 = fmeta.get('sha1', '')
+            btn_open.clicked.connect(lambda checked, s=sha1: self.admin_open_file(s))
+
+            row.addWidget(lbl_name)
+            row.addWidget(lbl_size)
+            row.addStretch()
+            row.addWidget(btn_open)
+            layout.addLayout(row)
+
+        close_btn = QPushButton(tr('common.close'))
+        close_btn.setStyleSheet("QPushButton { background-color:#909399; color:#fff; padding:6px 16px; font-size:13px; border-radius:6px; }")
+        close_btn.clicked.connect(dlg.accept)
+        layout.addWidget(close_btn, 0, Qt.AlignmentFlag.AlignRight)
+
+        dlg.setLayout(layout)
+        dlg.exec()
+
+    def admin_open_file(self, sha1):
+        path = os.path.join(FILES_DIR, sha1)
+        if os.path.exists(path):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+
+    @staticmethod
+    def _format_size(size_bytes):
+        if size_bytes < 1024:
+            return f'{size_bytes} B'
+        elif size_bytes < 1024 * 1024:
+            return f'{size_bytes / 1024:.1f} KB'
+        else:
+            return f'{size_bytes / (1024 * 1024):.1f} MB'
 
     def on_status_changed(self, _index):
         cb = self.sender()

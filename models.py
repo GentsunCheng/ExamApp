@@ -17,6 +17,7 @@ from database import (
     ensure_key_probe,
     verify_db_encryption_key,
     RESOURCE_PATH,
+    FILES_DIR,
 )
 from utils import hash_password, verify_password
 import sqlite3
@@ -30,6 +31,48 @@ except Exception:
     SECRET_KEY = 'example'
 
 DELETE_IDENTIFIER = '␡'
+
+import hashlib
+import os
+import shutil
+import mimetypes
+
+
+def save_task_file(source_path):
+    """保存任务附件到 FILES_DIR，返回文件元数据 dict"""
+    if not os.path.exists(source_path):
+        return None
+    sha1 = hashlib.sha1()
+    with open(source_path, 'rb') as f:
+        while True:
+            chunk = f.read(8192)
+            if not chunk:
+                break
+            sha1.update(chunk)
+    sha1_hex = sha1.hexdigest()
+    dest = os.path.join(FILES_DIR, sha1_hex)
+    if not os.path.exists(dest):
+        shutil.copy2(source_path, dest)
+    stat = os.stat(dest)
+    original_name = os.path.basename(source_path)
+    mime_type, _ = mimetypes.guess_type(original_name)
+    if not mime_type:
+        mime_type = 'application/octet-stream'
+    return {
+        'sha1': sha1_hex,
+        'original_name': original_name,
+        'size': stat.st_size,
+        'mime': mime_type,
+        'uploaded_at': str(now_iso(timestamp=True)),
+    }
+
+
+def delete_task_file(sha1):
+    """从 FILES_DIR 删除指定 SHA1 的文件"""
+    path = os.path.join(FILES_DIR, sha1)
+    if os.path.exists(path):
+        os.remove(path)
+
 
 
 def create_admin_if_absent():
@@ -1092,26 +1135,28 @@ def delete_progress_task(task_id):
     conn.commit()
     conn.close()
 
-def set_user_task_progress(user_id, task_id, status, updated_by=None):
+def set_user_task_progress(user_id, task_id, status, updated_by=None, files=None):
     status_int = int(status)
     if status_int not in (PROGRESS_STATUS_NOT_STARTED, PROGRESS_STATUS_IN_PROGRESS, PROGRESS_STATUS_COMPLETED):
         raise Exception('无效的任务状态')
     conn = get_progress_conn()
     c = conn.cursor()
     c.execute('DELETE FROM user_task_progress WHERE user_id=? AND task_id=?', (int(user_id), int(task_id)))
-    c.execute('INSERT INTO user_task_progress (user_id, task_id, status, updated_at, updated_by) VALUES (?,?,?,?,?)', (int(user_id), int(task_id), status_int, now_iso(), updated_by))
+    files_json = json.dumps(files) if files else None
+    c.execute('INSERT INTO user_task_progress (user_id, task_id, status, updated_at, updated_by, files) VALUES (?,?,?,?,?,?)', (int(user_id), int(task_id), status_int, now_iso(), updated_by, files_json))
     conn.commit()
     conn.close()
 
 def get_user_task_progress_map(user_id):
     conn = get_progress_conn()
     c = conn.cursor()
-    c.execute('SELECT task_id, status, updated_at, updated_by FROM user_task_progress WHERE user_id=?', (int(user_id),))
+    c.execute('SELECT task_id, status, updated_at, updated_by, files FROM user_task_progress WHERE user_id=?', (int(user_id),))
     rows = c.fetchall()
     conn.close()
     out = {}
     for r in rows:
-        out[int(r[0])] = {'status': int(r[1] or 0), 'updated_at': r[2], 'updated_by': r[3]}
+        files_data = json.loads(r[4]) if r[4] else None
+        out[int(r[0])] = {'status': int(r[1] or 0), 'updated_at': r[2], 'updated_by': r[3], 'files': files_data}
     return out
 
 def get_user_progress_tree(user_id):
@@ -1130,7 +1175,7 @@ def get_user_progress_tree(user_id):
         md = modules_map.get(mid)
         if md is None:
             continue
-        st = status_map.get(tid, {'status': PROGRESS_STATUS_NOT_STARTED, 'updated_at': None, 'updated_by': None})
+        st = status_map.get(tid, {'status': PROGRESS_STATUS_NOT_STARTED, 'updated_at': None, 'updated_by': None, 'files': None})
         md['tasks'].append({
             'task_id': tid,
             'title': t[2],
@@ -1139,6 +1184,7 @@ def get_user_progress_tree(user_id):
             'status': int(st.get('status') or 0),
             'updated_at': st.get('updated_at'),
             'updated_by': st.get('updated_by'),
+            'files': st.get('files'),
         })
     for md in result:
         try:

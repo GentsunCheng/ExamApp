@@ -12,6 +12,7 @@ from database import (
     CONFIG_DB_PATH, 
     PROGRESS_DB_PATH,
     RESOURCE_PATH,
+    FILES_DIR,
     DB_VERFILE_PATH,
 )
 
@@ -142,7 +143,7 @@ def rsync_push(ip, username, remote_dir, ssh_password=None, include_admin=False)
     if ip_addr == get_local_ip() or ip_addr == '127.0.0.1':
         return 304, f"Skip local device: {ip_addr}:{port}", ''
     remote_dir = _expand_remote_tilde(remote_dir, ip, username, ssh_password)
-    local_files = [SCORES_DB_PATH, EXAMS_DB_PATH, UID_DB_PATH, USERS_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH, RESOURCE_PATH, DB_VERFILE_PATH]
+    local_files = [SCORES_DB_PATH, EXAMS_DB_PATH, UID_DB_PATH, USERS_DB_PATH, CONFIG_DB_PATH, PROGRESS_DB_PATH, RESOURCE_PATH, FILES_DIR, DB_VERFILE_PATH]
     if include_admin:
         local_files.append(ADMIN_DB_PATH)
     else:
@@ -192,3 +193,38 @@ def rsync_pull_users(ip, username, remote_dir, local_dir, ssh_password=None):
 
 def rsync_pull_admins(ip, username, remote_dir, local_dir, ssh_password=None):
     return rsync_pull_file(ip, username, remote_dir, local_dir, 'admin.db', ssh_password)
+
+def rsync_pull_progress(ip, username, remote_dir, local_dir, ssh_password=None):
+    return rsync_pull_file(ip, username, remote_dir, local_dir, 'progress.db', ssh_password)
+
+def rsync_pull_files_dir(ip, username, remote_dir, local_dir, ssh_password=None):
+    """Pull entire files/ directory from remote using rsync"""
+    ip_addr, port = _parse_ip_port(ip)
+    if not _is_port_open(ip_addr, port):
+        return 1, '', f"Connection failed: {ip_addr}:{port} is unreachable."
+    os.makedirs(local_dir, exist_ok=True)
+    remote_dir = _expand_remote_tilde(remote_dir, ip, username, ssh_password)
+    remote_files = _remote_join(remote_dir, 'files') + '/'
+    ssh_opts = f'ssh -p {port} -o StrictHostKeyChecking=no'
+    if ssh_password:
+        cmd = [SSHPASS_PATH, '-p', ssh_password, 'rsync', '-avz', '-e', ssh_opts, f'{username}@{ip_addr}:{remote_files}', local_dir]
+    else:
+        cmd = ['rsync', '-avz', '-e', ssh_opts, f'{username}@{ip_addr}:{remote_files}', local_dir]
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    return p.returncode, p.stdout, p.stderr
+
+def merge_pulled_files(pulled_files_dir):
+    """Merge pulled files into local FILES_DIR"""
+    import shutil
+    os.makedirs(FILES_DIR, exist_ok=True)
+    copied = 0
+    if not os.path.exists(pulled_files_dir):
+        return copied
+    for fname in os.listdir(pulled_files_dir):
+        src = os.path.join(pulled_files_dir, fname)
+        if os.path.isfile(src):
+            dst = os.path.join(FILES_DIR, fname)
+            if not os.path.exists(dst):
+                shutil.copy2(src, dst)
+                copied += 1
+    return copied

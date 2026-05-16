@@ -17,7 +17,7 @@ from models import (
     update_sync_target_active,
     get_exam_title
 )
-from sync import rsync_push, rsync_pull_scores, rsync_pull_users, rsync_pull_admins
+from sync import rsync_push, rsync_pull_scores, rsync_pull_users, rsync_pull_admins, rsync_pull_progress, rsync_pull_files_dir, merge_pulled_files
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils import get_column_letter
@@ -53,6 +53,11 @@ class SyncWorker(QThread):
                     code_u, out_u, err_u = rsync_pull_users(ip, t[3], t[4], dest_dir, ssh_password)
                     # Pull admin.db
                     code_a, out_a, err_a = rsync_pull_admins(ip, t[3], t[4], dest_dir, ssh_password)
+                    # Pull progress.db
+                    code_p, out_p, err_p = rsync_pull_progress(ip, t[3], t[4], dest_dir, ssh_password)
+                    # Pull files/ directory
+                    files_dest = os.path.join(dest_dir, 'files')
+                    code_f, out_f, err_f = rsync_pull_files_dir(ip, t[3], t[4], files_dest, ssh_password)
                     
                     pulled_files = []
                     if code_s == 0:
@@ -64,12 +69,17 @@ class SyncWorker(QThread):
                     if code_a == 0:
                         rp = os.path.join(dest_dir, 'admin.db')
                         if os.path.exists(rp): pulled_files.append(('admin', rp))
+                    if code_p == 0:
+                        rp = os.path.join(dest_dir, 'progress.db')
+                        if os.path.exists(rp): pulled_files.append(('progress', rp))
+                    if code_f == 0 and os.path.exists(files_dest):
+                        pulled_files.append(('files', files_dest))
                     
                     if not pulled_files:
                         msg = f'{t[1]} ({ip}) 拉取失败: {err_s or "未知错误"}'
                         return t, 1, err_s, msg, []
                     
-                    msg = f'{t[1]} ({ip}) 拉取成功 ({len(pulled_files)}个文件)'
+                    msg = f'{t[1]} ({ip}) 拉取成功 ({len(pulled_files)}个文件/目录)'
                     return t, 0, None, msg, pulled_files
                 with ThreadPoolExecutor(max_workers=max_workers) as ex:
                     future_map = {ex.submit(pull_one, t): t for t in self.targets}
@@ -109,6 +119,19 @@ class SyncWorker(QThread):
                                     merge_msg = f'{t[1]} ({t[2]}) 管理员表已合并'
                             except Exception as me:
                                 merge_msg = f'{t[1]} ({t[2]}) {db_type} 合并失败: {str(me)}'
+                            self.progress.emit(merge_msg)
+                            if total_steps:
+                                self.progress_step.emit(1)
+                            results.append(merge_msg)
+                # 合并拉取的文件
+                for t, pf in pulled:
+                    for db_type, rp in pf:
+                        if db_type == 'files':
+                            try:
+                                copied = merge_pulled_files(rp)
+                                merge_msg = f'{t[1]} ({t[2]}) 文件已合并 ({copied}个新文件)'
+                            except Exception as me:
+                                merge_msg = f'{t[1]} ({t[2]}) 文件合并失败: {str(me)}'
                             self.progress.emit(merge_msg)
                             if total_steps:
                                 self.progress_step.emit(1)
@@ -431,7 +454,7 @@ class AdminSyncModule(QWidget):
         self.sync_worker.error.connect(self.on_sync_error)
         self.sync_worker.progress.connect(self.append_sync_log)
         self.sync_worker.progress.connect(self.update_progress_message)
-        total_steps = len(active_targets) * 5
+        total_steps = len(active_targets) * 6
         self.progress_total = total_steps
         self.progress_done = 0
         self.sync_worker.progress_step.connect(self.on_progress_step)

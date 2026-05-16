@@ -12,6 +12,7 @@ EXAMS_DB_PATH = os.path.join(DB_DIR, 'exams.db')
 SCORES_DB_PATH = os.path.join(DB_DIR, 'scores.db')
 CONFIG_DB_PATH = os.path.join(DB_DIR, 'config.db')
 PROGRESS_DB_PATH = os.path.join(DB_DIR, 'progress.db')
+FILES_DIR = os.path.join(DB_DIR, 'files')
 RESOURCE_PATH = os.path.join(DB_DIR, 'resources')
 DB_VERFILE_PATH = os.path.join(DB_DIR, '.db_version')
 DB_PATH = EXAMS_DB_PATH
@@ -22,6 +23,8 @@ def ensure_db():
         os.makedirs(DB_DIR, exist_ok=True)
     if not os.path.exists(RESOURCE_PATH):
         os.makedirs(RESOURCE_PATH, exist_ok=True)
+    if not os.path.exists(FILES_DIR):
+        os.makedirs(FILES_DIR, exist_ok=True)
     conn = sqlite3.connect(UID_DB_PATH)
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS uid_map '
@@ -100,6 +103,7 @@ def ensure_db():
     '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
     'user_id INTEGER, task_id INTEGER, status INTEGER DEFAULT 0, '
     'updated_at TEXT, updated_by TEXT, '
+    'files TEXT DEFAULT NULL, '
     'UNIQUE(user_id, task_id))')
     try:
         c.execute('CREATE INDEX IF NOT EXISTS '
@@ -113,6 +117,16 @@ def ensure_db():
         pass
     conn.commit()
     conn.close()
+
+    # 兜底：为已有数据库添加 files 列
+    try:
+        conn = sqlite3.connect(PROGRESS_DB_PATH)
+        c = conn.cursor()
+        c.execute('ALTER TABLE user_task_progress ADD COLUMN files TEXT DEFAULT NULL')
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
 
 def get_uid_conn():

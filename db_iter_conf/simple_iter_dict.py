@@ -25,6 +25,9 @@ ITER_DICT = {
         (USERS_DB_PATH, 'users', 'edit_at', 'TEXT', 'NULL'),
         (ADMIN_DB_PATH, 'admins', 'shadow_delete', 'INTEGER NOT NULL', '0'),
         (USERS_DB_PATH, 'users', 'shadow_delete', 'INTEGER NOT NULL', '0')
+    ],
+    "260208": [
+        (PROGRESS_DB_PATH, 'user_task_progress', 'files', 'TEXT', 'NULL')
     ]
 }
 
