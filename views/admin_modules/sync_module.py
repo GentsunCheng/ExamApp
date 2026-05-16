@@ -17,7 +17,7 @@ from models import (
     update_sync_target_active,
     get_exam_title
 )
-from sync import rsync_push, rsync_pull_scores, rsync_pull_users, rsync_pull_admins, rsync_pull_progress, rsync_pull_files_dir, merge_pulled_files
+from sync import rsync_push, rsync_pull_scores, rsync_pull_users, rsync_pull_admins, rsync_pull_progress, rsync_pull_exams, rsync_pull_files_dir, merge_pulled_files
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils import get_column_letter
@@ -55,6 +55,8 @@ class SyncWorker(QThread):
                     code_a, out_a, err_a = rsync_pull_admins(ip, t[3], t[4], dest_dir, ssh_password)
                     # Pull progress.db
                     code_p, out_p, err_p = rsync_pull_progress(ip, t[3], t[4], dest_dir, ssh_password)
+                    # Pull exams.db
+                    code_ex, out_ex, err_ex = rsync_pull_exams(ip, t[3], t[4], dest_dir, ssh_password)
                     # Pull files/ directory
                     files_dest = os.path.join(dest_dir, 'files')
                     code_f, out_f, err_f = rsync_pull_files_dir(ip, t[3], t[4], files_dest, ssh_password)
@@ -72,6 +74,9 @@ class SyncWorker(QThread):
                     if code_p == 0:
                         rp = os.path.join(dest_dir, 'progress.db')
                         if os.path.exists(rp): pulled_files.append(('progress', rp))
+                    if code_ex == 0:
+                        rp = os.path.join(dest_dir, 'exams.db')
+                        if os.path.exists(rp): pulled_files.append(('exams', rp))
                     if code_f == 0 and os.path.exists(files_dest):
                         pulled_files.append(('files', files_dest))
                     
@@ -99,7 +104,7 @@ class SyncWorker(QThread):
                             self.error.emit(error_msg)
             if pulled:
                 try:
-                    from models import merge_remote_scores_db, merge_user_databases, merge_admin_databases
+                    from models import merge_remote_scores_db, merge_user_databases, merge_admin_databases, merge_exam_databases
                 except Exception as e:
                     err_msg = f'合并模块加载失败: {str(e)}'
                     results.append(err_msg)
@@ -117,6 +122,9 @@ class SyncWorker(QThread):
                                 elif db_type == 'admin':
                                     merge_admin_databases(rp)
                                     merge_msg = f'{t[1]} ({t[2]}) 管理员表已合并'
+                                elif db_type == 'exams':
+                                    merge_exam_databases(rp)
+                                    merge_msg = f'{t[1]} ({t[2]}) 考试表已合并'
                             except Exception as me:
                                 merge_msg = f'{t[1]} ({t[2]}) {db_type} 合并失败: {str(me)}'
                             self.progress.emit(merge_msg)
@@ -204,15 +212,16 @@ class SyncWorker(QThread):
                         dest_dir = os.path.join(base_dir, ip)
                         os.makedirs(dest_dir, exist_ok=True)
                         
-                        # Pull scores, users, admin
+                        # Pull scores, users, admin, exams
                         rsync_pull_scores(ip, t[3], t[4], dest_dir, ssh_password)
                         rsync_pull_users(ip, t[3], t[4], dest_dir, ssh_password)
                         rsync_pull_admins(ip, t[3], t[4], dest_dir, ssh_password)
+                        rsync_pull_exams(ip, t[3], t[4], dest_dir, ssh_password)
                         
                         result = f'{t[1]} ({ip}) 拉取完成'
                         
                         try:
-                            from models import merge_remote_scores_db, merge_user_databases, merge_admin_databases
+                            from models import merge_remote_scores_db, merge_user_databases, merge_admin_databases, merge_exam_databases
                             
                             s_path = os.path.join(dest_dir, 'scores.db')
                             if os.path.exists(s_path):
@@ -228,6 +237,11 @@ class SyncWorker(QThread):
                             if os.path.exists(a_path):
                                 merge_admin_databases(a_path)
                                 result += ' (管理员表已合并)'
+                                
+                            e_path = os.path.join(dest_dir, 'exams.db')
+                            if os.path.exists(e_path):
+                                merge_exam_databases(e_path)
+                                result += ' (考试表已合并)'
                                 
                         except Exception as me:
                             result += f' (部分合并失败: {str(me)})'

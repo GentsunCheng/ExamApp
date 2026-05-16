@@ -80,6 +80,19 @@ class UserExamsModule(QWidget):
         r = rows[0].row()
         it = tbl.item(r, 0)
         return int(it.text()) if it and it.text() else None
+    def get_selected_exam_uuid(self):
+        tbl = getattr(self, 'exams_table_user', None)
+        if tbl is None:
+            return None
+        sm = tbl.selectionModel()
+        if sm is None:
+            return None
+        rows = sm.selectedRows()
+        if len(rows) != 1:
+            return None
+        r = rows[0].row()
+        it = tbl.item(r, 0)
+        return it.data(Qt.ItemDataRole.UserRole) if it else None
     def refresh_exams(self):
         tbl = getattr(self, 'exams_table_user', None)
         if tbl is None:
@@ -107,11 +120,13 @@ class UserExamsModule(QWidget):
         for e in exams_sorted:
             r = tbl.rowCount()
             tbl.insertRow(r)
-            tbl.setItem(r, 0, QTableWidgetItem(str(e[0])))
+            it_id = QTableWidgetItem(str(e[0]))
+            it_id.setData(Qt.ItemDataRole.UserRole, e[6] or '')
+            tbl.setItem(r, 0, it_id)
             tbl.setItem(r, 1, QTableWidgetItem(e[1] or ''))
             tbl.setItem(r, 2, QTableWidgetItem(e[2] or ''))
             tbl.setItem(r, 3, QTableWidgetItem(str(e[4])))
-            stats = get_exam_stats(int(e[0]))
+            stats = get_exam_stats(e[6] or '')
             tbl.setItem(r, 4, QTableWidgetItem(e[5] if e[5] else tr('common.permanent')))
             tbl.setItem(r, 5, QTableWidgetItem(f"{int(float(e[3])*100)}%"))
             tbl.setItem(r, 6, QTableWidgetItem(str(stats['count']) if stats else '0'))

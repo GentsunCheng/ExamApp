@@ -7,13 +7,13 @@ from theme_manager import theme_manager
 from icon_manager import IconManager
 from exam_interface import ModernTimer, ModernProgressBar
 from language import tr
-from models import start_attempt, save_answer, submit_attempt, list_exams, grade_question, build_exam_questions_for_attempt, get_pic
+from models import start_attempt, save_answer, submit_attempt, list_exams, grade_question, build_exam_questions_for_attempt, get_pic, get_exam_uuid, make_exam_uuid
 from PySide6.QtWidgets import QMessageBox
 from utils import show_info, show_warn, ask_yes_no
 
 class ExamWindow(QMainWindow):
     instance = None
-    def __init__(self, user, exam_id, parent=None):
+    def __init__(self, user, exam_id, exam_uuid=None, parent=None):
         super().__init__(parent)
         self.opt_buttons = []
         self.icon_manager = IconManager()
@@ -44,7 +44,8 @@ class ExamWindow(QMainWindow):
         self.cheatting = False
         self.user = user
         self.exam_id = exam_id
-        self.questions = build_exam_questions_for_attempt(exam_id)
+        self.exam_uuid = exam_uuid if exam_uuid else get_exam_uuid(exam_id)
+        self.questions = build_exam_questions_for_attempt(self.exam_uuid)
         try:
             random.shuffle(self.questions)
         except Exception:

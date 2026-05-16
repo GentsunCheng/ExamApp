@@ -38,6 +38,23 @@ import shutil
 import mimetypes
 
 
+def make_exam_uuid(exam_id):
+    """使用 exam.id 作为种子生成确定性 UUID v5"""
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"exam:{exam_id}"))
+
+
+def get_exam_uuid(exam_id):
+    """从 exams 表查询 uuid，若不存在则用 id 生成"""
+    conn = get_exam_conn()
+    c = conn.cursor()
+    c.execute('SELECT uuid FROM exams WHERE id=?', (exam_id,))
+    row = c.fetchone()
+    conn.close()
+    if row and row[0]:
+        return row[0]
+    return make_exam_uuid(exam_id)
+
+
 def save_task_file(source_path):
     """保存任务附件到 FILES_DIR，返回文件元数据 dict"""
     if not os.path.exists(source_path):
@@ -348,7 +365,8 @@ def promote_user_to_admin(user_id):
 def add_exam(title, description, pass_ratio, time_limit_minutes, end_date, random_pick_count=0):
     conn = get_exam_conn()
     c = conn.cursor()
-    c.execute('INSERT INTO exams (title, description, pass_ratio, time_limit_minutes, end_date, created_at, random_pick_count) VALUES (?,?,?,?,?,?,?)', (encrypt_text(title), encrypt_text(description) if description is not None else None, float(pass_ratio), int(time_limit_minutes), end_date, now_iso(), int(random_pick_count)))
+    exam_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"exam:{uuid.uuid4()}"))
+    c.execute('INSERT INTO exams (uuid, title, description, pass_ratio, time_limit_minutes, end_date, created_at, random_pick_count) VALUES (?,?,?,?,?,?,?,?)', (exam_uuid, encrypt_text(title), encrypt_text(description) if description is not None else None, float(pass_ratio), int(time_limit_minutes), end_date, now_iso(), int(random_pick_count)))
     conn.commit()
     conn.close()
 
@@ -356,14 +374,14 @@ def list_exams(include_expired=False):
     conn = get_exam_conn()
     c = conn.cursor()
     if include_expired:
-        c.execute('SELECT id, title, description, pass_ratio, time_limit_minutes, end_date FROM exams ORDER BY id DESC')
+        c.execute('SELECT id, title, description, pass_ratio, time_limit_minutes, end_date, uuid FROM exams ORDER BY id DESC')
     else:
-        c.execute('SELECT id, title, description, pass_ratio, time_limit_minutes, end_date FROM exams WHERE (end_date>=? OR end_date IS NULL) ORDER BY id DESC', (datetime.now(UTC).isoformat(),))
+        c.execute('SELECT id, title, description, pass_ratio, time_limit_minutes, end_date, uuid FROM exams WHERE (end_date>=? OR end_date IS NULL) ORDER BY id DESC', (datetime.now(UTC).isoformat(),))
     rows = c.fetchall()
     conn.close()
     out = []
     for r in rows:
-        out.append((r[0], decrypt_text(r[1]) if r[1] else None, decrypt_text(r[2]) if r[2] else None, r[3], r[4], r[5]))
+        out.append((r[0], decrypt_text(r[1]) if r[1] else None, decrypt_text(r[2]) if r[2] else None, r[3], r[4], r[5], r[6]))
     return out
 
 def get_exam_title(exam_id):
@@ -374,17 +392,17 @@ def get_exam_title(exam_id):
     conn.close()
     return decrypt_text(row[0]) if row else None
 
-def add_question(exam_id, qtype, text, options, correct_answers, score):
+def add_question(exam_uuid, qtype, text, options, correct_answers, score):
     conn = get_exam_conn()
     c = conn.cursor()
-    c.execute('INSERT INTO questions (exam_id, type, text, options, correct_answers, score) VALUES (?,?,?,?,?,?)', (exam_id, qtype, encrypt_text(text), encrypt_json(options or []), encrypt_json(correct_answers), float(score)))
+    c.execute('INSERT INTO questions (exam_uuid, type, text, options, correct_answers, score) VALUES (?,?,?,?,?,?)', (exam_uuid, qtype, encrypt_text(text), encrypt_json(options or []), encrypt_json(correct_answers), float(score)))
     conn.commit()
     conn.close()
 
-def list_questions(exam_id):
+def list_questions(exam_uuid):
     conn = get_exam_conn()
     c = conn.cursor()
-    c.execute('SELECT id, type, text, options, correct_answers, score, pictures FROM questions WHERE exam_id=? ORDER BY id', (exam_id,))
+    c.execute('SELECT id, type, text, options, correct_answers, score, pictures FROM questions WHERE exam_uuid=? ORDER BY id', (exam_uuid,))
     rows = c.fetchall()
     conn.close()
     result = []
@@ -400,29 +418,29 @@ def list_questions(exam_id):
         })
     return result
 
-def get_exam_stats(exam_id):
+def get_exam_stats(exam_uuid):
     conn = get_exam_conn()
     c = conn.cursor()
-    c.execute('SELECT COUNT(*), COALESCE(SUM(score), 0) FROM questions WHERE exam_id=?', (exam_id,))
+    c.execute('SELECT COUNT(*), COALESCE(SUM(score), 0) FROM questions WHERE exam_uuid=?', (exam_uuid,))
     row = c.fetchone()
     conn.close()
     cnt = int(row[0]) if row and row[0] is not None else 0
     total = float(row[1]) if row and row[1] is not None else 0.0
     return {'count': cnt, 'total_score': total}
 
-def import_questions_from_json(exam_id, payload):
+def import_questions_from_json(exam_uuid, payload):
     conn = get_exam_conn()
     c = conn.cursor()
     for q in payload:
         pool = (q.get('pool') or q.get('category') or 'mandatory')
-        c.execute('INSERT INTO questions (exam_id, type, text, options, correct_answers, score, pictures, pool) VALUES (?,?,?,?,?,?,?,?)', (exam_id, q.get('type'), encrypt_text(q.get('text')), encrypt_json(q.get('options') or []), encrypt_json(q.get('correct') or []), float(q.get('score', 1)), q.get('pictures'), pool))
+        c.execute('INSERT INTO questions (exam_uuid, type, text, options, correct_answers, score, pictures, pool) VALUES (?,?,?,?,?,?,?,?)', (exam_uuid, q.get('type'), encrypt_text(q.get('text')), encrypt_json(q.get('options') or []), encrypt_json(q.get('correct') or []), float(q.get('score', 1)), q.get('pictures'), pool))
     conn.commit()
     conn.close()
 
-def clear_exam_questions(exam_id):
+def clear_exam_questions(exam_uuid):
     conn = get_exam_conn()
     c = conn.cursor()
-    c.execute("SELECT pictures FROM questions WHERE exam_id = ?", (exam_id,))
+    c.execute("SELECT pictures FROM questions WHERE exam_uuid = ?", (exam_uuid,))
     rows = c.fetchall()
     pic_list = []
     for row in rows:
@@ -433,11 +451,13 @@ def clear_exam_questions(exam_id):
         picture_path = os.path.join(RESOURCE_PATH, p)
         if os.path.exists(picture_path):
             os.remove(picture_path)
-    c.execute('DELETE FROM questions WHERE exam_id=?', (exam_id,))
+    c.execute('DELETE FROM questions WHERE exam_uuid=?', (exam_uuid,))
     conn.commit()
     conn.close()
 
 def delete_exam(exam_id):
+    # 获取 exam_uuid
+    exam_uuid = get_exam_uuid(exam_id)
     # 删除成绩库中的关联记录
     scon = get_score_conn()
     sc = scon.cursor()
@@ -451,7 +471,7 @@ def delete_exam(exam_id):
     # 删除题库中的题目与试卷
     econn = get_exam_conn()
     ec = econn.cursor()
-    ec.execute("SELECT pictures FROM questions WHERE exam_id = ?", (exam_id,))
+    ec.execute("SELECT pictures FROM questions WHERE exam_uuid = ?", (exam_uuid,))
     rows = ec.fetchall()
     pic_list = []
     for row in rows:
@@ -462,7 +482,7 @@ def delete_exam(exam_id):
         picture_path = os.path.join(RESOURCE_PATH, p)
         if os.path.exists(picture_path):
             os.remove(picture_path)
-    ec.execute('DELETE FROM questions WHERE exam_id=?', (exam_id,))
+    ec.execute('DELETE FROM questions WHERE exam_uuid=?', (exam_uuid,))
     ec.execute('DELETE FROM exams WHERE id=?', (exam_id,))
     econn.commit()
     econn.close()
@@ -545,9 +565,10 @@ def submit_attempt(attempt_uuid):
         conn.close()
         return 0.0, 0
     exam_id = row[0]
+    exam_uuid = get_exam_uuid(exam_id)
     started_at = row[2]
     attempt_total = float(row[3] or 0.0)
-    qs = list_questions(exam_id)
+    qs = list_questions(exam_uuid)
     total = 0.0
     c.execute('SELECT question_id, selected, cheat FROM attempt_answers WHERE attempt_uuid=?', (attempt_uuid,))
     answers = {}
@@ -772,6 +793,37 @@ def merge_remote_scores_db(remote_scores_db_path):
     lconn.commit()
     rconn.close()
     lconn.close()
+
+def merge_exam_databases(remote_exams_db_path):
+    """Merge exams.db by uuid: if uuid exists locally, keep local; if new uuid from remote, insert it."""
+    lconn = get_exam_conn()
+    lcur = lconn.cursor()
+    rconn = sqlite3.connect(remote_exams_db_path)
+    rcur = rconn.cursor()
+
+    # 1. Merge exams table: compare by uuid, insert only new ones
+    rcur.execute('SELECT id, uuid, title, description, pass_ratio, time_limit_minutes, end_date, created_at, random_pick_count FROM exams')
+    remote_exams = rcur.fetchall()
+    new_uuids = []
+    for exam_row in remote_exams:
+        exam_uuid = exam_row[1]
+        lcur.execute('SELECT COUNT(*) FROM exams WHERE uuid=?', (exam_uuid,))
+        if lcur.fetchone()[0] == 0:
+            lcur.execute('INSERT INTO exams (uuid, title, description, pass_ratio, time_limit_minutes, end_date, created_at, random_pick_count) VALUES (?,?,?,?,?,?,?,?)',
+                         (exam_row[1], exam_row[2], exam_row[3], exam_row[4], exam_row[5], exam_row[6], exam_row[7], exam_row[8]))
+            new_uuids.append(exam_uuid)
+
+    # 2. Merge questions table: insert questions belonging to newly added exams
+    if new_uuids:
+        for exam_uuid in new_uuids:
+            rcur.execute('SELECT exam_uuid, type, text, options, correct_answers, score, pictures, pool FROM questions WHERE exam_uuid=?', (exam_uuid,))
+            for q_row in rcur.fetchall():
+                lcur.execute('INSERT INTO questions (exam_uuid, type, text, options, correct_answers, score, pictures, pool) VALUES (?,?,?,?,?,?,?,?)', q_row)
+
+    lconn.commit()
+    rconn.close()
+    lconn.close()
+
 
 def merge_admin_databases(remote_admin_db_path):
     lconn = get_admin_conn()
@@ -1004,13 +1056,13 @@ def list_sync_targets():
             out.append((r[0], r[1], r[2], r[3], r[4], decrypt_text(r[5]) if r[5] else None, 0, 1))
         return out
 
-def list_questions_by_pool(exam_id, pool):
+def list_questions_by_pool(exam_uuid, pool):
     conn = get_exam_conn()
     c = conn.cursor()
     try:
-        c.execute('SELECT id, type, text, options, correct_answers, score, pictures FROM questions WHERE exam_id=? AND (pool=? OR (pool IS NULL AND ?="mandatory")) ORDER BY id', (exam_id, pool, pool))
+        c.execute('SELECT id, type, text, options, correct_answers, score, pictures FROM questions WHERE exam_uuid=? AND (pool=? OR (pool IS NULL AND ?="mandatory")) ORDER BY id', (exam_uuid, pool, pool))
     except Exception:
-        c.execute('SELECT id, type, text, options, correct_answers, score, pictures FROM questions WHERE exam_id=? ORDER BY id', (exam_id,))
+        c.execute('SELECT id, type, text, options, correct_answers, score, pictures FROM questions WHERE exam_uuid=? ORDER BY id', (exam_uuid,))
     rows = c.fetchall()
     conn.close()
     out = []
@@ -1018,11 +1070,11 @@ def list_questions_by_pool(exam_id, pool):
         out.append({'id': r[0], 'type': r[1], 'text': decrypt_text(r[2]) if r[2] else '', 'options': decrypt_json(r[3]) or [], 'correct': decrypt_json(r[4]) or [], 'score': r[5], 'pictures': r[6]})
     return out
 
-def get_exam_random_pick_count(exam_id):
+def get_exam_random_pick_count(exam_uuid):
     conn = get_exam_conn()
     c = conn.cursor()
     try:
-        c.execute('SELECT random_pick_count FROM exams WHERE id=?', (exam_id,))
+        c.execute('SELECT random_pick_count FROM exams WHERE uuid=?', (exam_uuid,))
         row = c.fetchone()
         conn.close()
         return int(row[0]) if row and row[0] is not None else 0
@@ -1040,10 +1092,10 @@ def update_exam_random_pick_count(exam_id, count):
         pass
     conn.close()
 
-def build_exam_questions_for_attempt(exam_id):
-    mandatory = list_questions_by_pool(exam_id, 'mandatory')
-    random_pool = list_questions_by_pool(exam_id, 'random')
-    pick = get_exam_random_pick_count(exam_id)
+def build_exam_questions_for_attempt(exam_uuid):
+    mandatory = list_questions_by_pool(exam_uuid, 'mandatory')
+    random_pool = list_questions_by_pool(exam_uuid, 'random')
+    pick = get_exam_random_pick_count(exam_uuid)
     if pick <= 0:
         sampled = random_pool
     else:

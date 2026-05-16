@@ -142,6 +142,7 @@ class AdminExamsModule(QWidget):
             r = tbl.rowCount()
             tbl.insertRow(r)
             it_id = QTableWidgetItem(str(e[0]))
+            it_id.setData(Qt.ItemDataRole.UserRole, e[6])  # store uuid
             it_id.setFlags(it_id.flags() & ~Qt.ItemFlag.ItemIsEditable)
             tbl.setItem(r, 0, it_id)
             tbl.setItem(r, 1, QTableWidgetItem(e[1] or ''))
@@ -154,7 +155,8 @@ class AdminExamsModule(QWidget):
             tbl.setItem(r, 4, it_end)
             tbl.setItem(r, 5, QTableWidgetItem(e[2] or ''))
             try:
-                stats = get_exam_stats(int(e[0]))
+                exam_uuid = e[6] or ''
+                stats = get_exam_stats(exam_uuid)
             except Exception:
                 stats = {'count': 0, 'total_score': 0}
             it_cnt = QTableWidgetItem(str(int(stats['count']) if stats and 'count' in stats else 0))
@@ -170,8 +172,9 @@ class AdminExamsModule(QWidget):
             btn_clear.setIcon(self.icon_manager.get_icon('delete'))
             btn_del = QPushButton(tr('common.delete'))
             btn_del.setIcon(self.icon_manager.get_icon('exam_delete'))
+            exam_uuid = e[6] or ''
             exam_id = e[0]
-            btn_clear.clicked.connect(lambda _, x=exam_id: self.clear_exam(x))
+            btn_clear.clicked.connect(lambda _, x=exam_uuid: self.clear_exam(x))
             btn_del.clicked.connect(lambda _, x=exam_id: self.delete_exam(x))
             hb.addWidget(btn_clear)
             hb.addWidget(btn_del)
@@ -227,9 +230,19 @@ class AdminExamsModule(QWidget):
             return None
         it = tbl.item(r, 0)
         return int(it.text()) if it and it.text() else None
+    def get_selected_exam_uuid(self):
+        tbl = getattr(self, 'exams_table', None)
+        if tbl is None:
+            return None
+        r = tbl.currentRow()
+        if r < 0:
+            return None
+        it = tbl.item(r, 0)
+        return it.data(Qt.ItemDataRole.UserRole) if it else None
     def import_questions(self):
         exam_id = self.get_selected_exam_id()
-        if not exam_id:
+        exam_uuid = self.get_selected_exam_uuid()
+        if not exam_id or not exam_uuid:
             show_warn(self, tr('common.error'), tr('error.select_exam'))
             return
         suggested = os.path.join(str(pathlib.Path.home()), 'Documents')
@@ -410,7 +423,7 @@ class AdminExamsModule(QWidget):
                 detail = '\n'.join(errs[:20]) if errs else tr('admin.import.error.no_valid')
                 show_warn(self, tr('common.error'), detail)
                 return
-            import_questions_from_json(exam_id, valid)
+            import_questions_from_json(exam_uuid, valid)
             self.refresh_exams()
             cnt_single = sum(1 for d in valid if d.get('type') == 'single')
             cnt_multiple = sum(1 for d in valid if d.get('type') == 'multiple')

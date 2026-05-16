@@ -54,12 +54,13 @@ def ensure_db():
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS exams '
     '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+    'uuid TEXT UNIQUE, '
     'title TEXT, description TEXT, pass_ratio REAL, '
     'time_limit_minutes INTEGER, end_date TEXT, '
     'created_at TEXT, random_pick_count INTEGER)')
     c.execute('CREATE TABLE IF NOT EXISTS questions '
     '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
-    'exam_id INTEGER, type TEXT, text TEXT, options TEXT, '
+    'exam_uuid TEXT, type TEXT, text TEXT, options TEXT, '
     'correct_answers TEXT, score REAL, pictures TEXT DEFAULT NULL, '
     'pool TEXT)')
     conn.commit()

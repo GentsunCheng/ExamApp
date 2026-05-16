@@ -28,6 +28,10 @@ ITER_DICT = {
     ],
     "260208": [
         (PROGRESS_DB_PATH, 'user_task_progress', 'files', 'TEXT', 'NULL')
+    ],
+    "260516": [
+        (EXAMS_DB_PATH, 'exams', 'uuid', 'TEXT', 'NULL'),
+        (EXAMS_DB_PATH, 'questions', 'exam_uuid', 'TEXT', 'NULL')
     ]
 }
 

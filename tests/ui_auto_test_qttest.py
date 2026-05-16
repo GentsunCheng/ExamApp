@@ -28,6 +28,7 @@ from models import (
     submit_attempt,
     list_sync_targets,
     list_questions,
+    make_exam_uuid,
     delete_admin,
     delete_sync_target,
     delete_exam,
@@ -374,16 +375,17 @@ def test_admin_scores_module(win, tabs):
     exams = list_exams(include_expired=True)
     ex = next(e for e in exams if e[1] == title)
     exam_id = ex[0]
-    add_question(exam_id, 'single', '1+1=?', [{'key': 'A', 'text': '2'}, {'key': 'B', 'text': '3'}], ['A'], 2.0)
+    exam_uuid = ex[6] or make_exam_uuid(exam_id)
+    add_question(exam_uuid, 'single', '1+1=?', [{'key': 'A', 'text': '2'}, {'key': 'B', 'text': '3'}], ['A'], 2.0)
     # Use bob (created by import above)
     bob = CTX.get('bob_uname')
     assert bob is not None
     usr = next(u for u in list_users() if u[1] == bob)
     user_id = usr[0]
     from models import get_exam_stats
-    total = int(get_exam_stats(exam_id)['total_score'])
+    total = int(get_exam_stats(exam_uuid)['total_score'])
     at = start_attempt(user_id, exam_id, total)
-    save_answer(at, next(q['id'] for q in list_questions(exam_id)), ['A'])
+    save_answer(at, next(q['id'] for q in list_questions(exam_uuid)), ['A'])
     submit_attempt(at)
 
     scores_mod.refresh_scores()
@@ -462,7 +464,8 @@ def test_user_flow():
     add_exam(title, 'desc', 0.6, 10, None)
     ex = next(e for e in list_exams(include_expired=True) if e[1] == title)
     exam_id = ex[0]
-    add_question(exam_id, 'single', '2+2=?', [{'key': 'A', 'text': '4'}, {'key': 'B', 'text': '5'}], ['A'], 2.0)
+    exam_uuid = ex[6] or make_exam_uuid(exam_id)
+    add_question(exam_uuid, 'single', '2+2=?', [{'key': 'A', 'text': '4'}, {'key': 'B', 'text': '5'}], ['A'], 2.0)
     log(f'[TEST] created exam {title} with one question')
     # logout to login as temp user
     admin.handle_logout()

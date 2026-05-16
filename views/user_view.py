@@ -4,7 +4,7 @@ from icon_manager import IconManager
 from theme_manager import theme_manager
 from language import tr
 from utils import *
-from models import list_questions
+from models import list_questions, get_exam_uuid, make_exam_uuid
 from windows.exam_window import ExamWindow
 from views.user_modules.exams_module import UserExamsModule
 from views.user_modules.history_module import UserHistoryModule
@@ -162,12 +162,13 @@ class UserView(QWidget):
         if not exam_id:
             show_warn(self, tr('common.error'), tr('error.select_exam'))
             return
+        exam_uuid = self.exams_module.get_selected_exam_uuid() or get_exam_uuid(int(exam_id))
         try:
             import sys
             print("[DEBUG] calling list_questions", file=sys.stderr)
         except Exception:
             pass
-        qs = list_questions(int(exam_id))
+        qs = list_questions(exam_uuid)
         try:
             print(f"[DEBUG] questions_count={len(qs) if qs else 0}")
         except Exception:
@@ -178,7 +179,7 @@ class UserView(QWidget):
         try:
             if self._exam_windows is None:
                 self._exam_windows = []
-            win = ExamWindow(self.user, exam_id, self)
+            win = ExamWindow(self.user, exam_id, exam_uuid, self)
             self._exam_windows.append(win)
             win.show()
             try:

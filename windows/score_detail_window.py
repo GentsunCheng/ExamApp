@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QKeySequence, QShortcut
 from theme_manager import theme_manager
 from language import tr
-from models import get_attempt, get_attempt_answers, list_questions, get_exam_title, grade_question, get_pic
+from models import get_attempt, get_attempt_answers, list_questions, get_exam_title, get_exam_uuid, grade_question, get_pic
 import json
 from datetime import datetime
 
@@ -197,7 +197,8 @@ class ScoreDetailWindow(QDialog):
         self.score_label.setText(score_info)
         self.time_label.setText(time_info)
 
-        self.questions = list_questions(attempt['exam_id'])
+        exam_uuid = get_exam_uuid(attempt['exam_id'])
+        self.questions = list_questions(exam_uuid)
         self.user_answers = get_attempt_answers(self.attempt_uuid)
 
         colors = theme_manager.get_theme_colors()

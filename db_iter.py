@@ -14,14 +14,16 @@ from database import (
 
 from db_iter_conf import (
     simple_iter_dict,
-    admin_user_table_merge
+    admin_user_table_merge,
+    exam_uuid_migration
 )
 
 # 当前数据库版本，数据库更新需要更改
-__current_db_version__ = "260516"
+__current_db_version__ = "260518"
 __ver_train_dict__ = {
     # 模块名: 模块版本过度标识
-    simple_iter_dict.__name__: simple_iter_dict.VER_TRAIN
+    simple_iter_dict.__name__: simple_iter_dict.VER_TRAIN,
+    exam_uuid_migration.__name__: exam_uuid_migration.VER_TRAIN
 }
 
 
@@ -50,6 +52,19 @@ ITER_VERSION_ACTION_MAP = {
             "func": simple_iter_dict.__simple_columns_iter__,
             "param": (__from_iter_dict__,)
         }
+    },
+    "260516": {
+        "next_iter_ver": "260518",
+        "action": [
+            {
+                "func": simple_iter_dict.__simple_columns_iter__,
+                "param": (__from_iter_dict__,)
+            },
+            {
+                "func": exam_uuid_migration.__exam_uuid_migrate__,
+                "param": (None,)
+            }
+        ]
     }
 }
 
@@ -76,18 +91,18 @@ def version_check_and_iter(db_file_version="origin"):
     else:
         print("Unknown error")
         return None
-    if isinstance(action["func"], types.FunctionType) and isinstance(action["param"], tuple):
-        if __from_iter_dict__ in action["param"]:
-            action["func"](simple_iter_dict.ITER_DICT[db_file_version])
-        else:
-            action["func"](*action["param"])
-    elif isinstance(action, list):
+    if isinstance(action, list):
         for a in action:
             if isinstance(a["func"], types.FunctionType) and isinstance(a["param"], tuple):
                 if __from_iter_dict__ in a["param"]:
                     a["func"](simple_iter_dict.ITER_DICT[db_file_version])
                 else:
                     a["func"](*a["param"])
+    elif isinstance(action["func"], types.FunctionType) and isinstance(action["param"], tuple):
+        if __from_iter_dict__ in action["param"]:
+            action["func"](simple_iter_dict.ITER_DICT[db_file_version])
+        else:
+            action["func"](*action["param"])
     print(f"Iter done: {db_file_version} ---> {target_version}")
     db_file_version = target_version
     with open(DB_VERFILE_PATH, "w") as f:
