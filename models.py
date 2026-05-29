@@ -56,6 +56,14 @@ def get_exam_uuid(exam_id):
     return make_exam_uuid(exam_id)
 
 
+def get_file_path(sha1):
+    """根据 SHA1 在 FILES_DIR 中查找文件（支持带扩展名的文件）"""
+    for fname in os.listdir(FILES_DIR):
+        if fname.startswith(sha1):
+            return os.path.join(FILES_DIR, fname)
+    return None
+
+
 def save_task_file(source_path):
     """保存任务附件到 FILES_DIR，返回文件元数据 dict"""
     if not os.path.exists(source_path):
@@ -68,7 +76,8 @@ def save_task_file(source_path):
                 break
             sha1.update(chunk)
     sha1_hex = sha1.hexdigest()
-    dest = os.path.join(FILES_DIR, sha1_hex)
+    _, ext = os.path.splitext(source_path)
+    dest = os.path.join(FILES_DIR, sha1_hex + ext)
     if not os.path.exists(dest):
         shutil.copy2(source_path, dest)
     stat = os.stat(dest)
@@ -87,8 +96,8 @@ def save_task_file(source_path):
 
 def delete_task_file(sha1):
     """从 FILES_DIR 删除指定 SHA1 的文件"""
-    path = os.path.join(FILES_DIR, sha1)
-    if os.path.exists(path):
+    path = get_file_path(sha1)
+    if path and os.path.exists(path):
         os.remove(path)
 
 
@@ -1261,7 +1270,8 @@ def save_knowledge_file(source_path, user_id, username, category, keywords):
                 break
             sha1.update(chunk)
     sha1_hex = sha1.hexdigest()
-    dest = os.path.join(FILES_DIR, sha1_hex)
+    _, ext = os.path.splitext(source_path)
+    dest = os.path.join(FILES_DIR, sha1_hex + ext)
     if not os.path.exists(dest):
         shutil.copy2(source_path, dest)
     original_name = os.path.basename(source_path)
@@ -1367,8 +1377,7 @@ def delete_knowledge_file(kb_id, user_id=None, is_admin=False):
 
 def get_knowledge_file_path(sha1):
     """获取知识库文件的完整路径"""
-    p = os.path.join(FILES_DIR, sha1)
-    return p if os.path.exists(p) else None
+    return get_file_path(sha1)
 
 
 def merge_knowledge_databases(remote_kb_path):

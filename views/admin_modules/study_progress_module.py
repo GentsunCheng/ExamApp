@@ -450,8 +450,9 @@ class AdminProgressModule(QWidget):
         dlg.exec()
 
     def admin_open_file(self, sha1):
-        path = os.path.join(FILES_DIR, sha1)
-        if os.path.exists(path):
+        from models import get_file_path
+        path = get_file_path(sha1)
+        if path and os.path.exists(path):
             QDesktopServices.openUrl(QUrl.fromLocalFile(path))
 
     @staticmethod

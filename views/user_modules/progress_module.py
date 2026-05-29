@@ -15,6 +15,7 @@ from models import (
     set_user_task_progress,
     save_task_file,
     delete_task_file,
+    get_file_path,
 )
 from database import FILES_DIR
 
@@ -227,8 +228,8 @@ class UserProgressModule(QWidget):
         dlg.exec()
 
     def open_file(self, sha1):
-        path = os.path.join(FILES_DIR, sha1)
-        if os.path.exists(path):
+        path = get_file_path(sha1)
+        if path and os.path.exists(path):
             QDesktopServices.openUrl(QUrl.fromLocalFile(path))
 
     def delete_file_from_task(self, user_id, task_id, sha1, dialog):
