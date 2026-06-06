@@ -4,19 +4,21 @@ from icon_manager import IconManager
 from theme_manager import theme_manager
 from language import tr
 from utils import show_info, show_warn
-from models import list_attempts_with_user
+from models import list_attempts_with_user, has_unreviewed_essay
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils import get_column_letter
 from models import get_exam_title
 from windows.score_detail_window import ScoreDetailWindow
+from windows.review_window import ReviewWindow
 import os
 import pathlib
 
 
 class AdminScoresModule(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, user=None):
         super().__init__(parent)
+        self.user = user or {'id': 0, 'username': 'admin'}
         self.icon_manager = IconManager()
         lay = QVBoxLayout()
         gb = QGroupBox(tr('scores.group'))
@@ -41,6 +43,9 @@ class AdminScoresModule(QWidget):
         btn_export_scores.setIcon(self.icon_manager.get_icon('exam_export'))
         btn_export_scores.clicked.connect(self.export_scores_to_excel)
         hb.addWidget(btn_export_scores)
+        btn_review = QPushButton(tr('admin.review.title'))
+        btn_review.clicked.connect(self.open_review)
+        hb.addWidget(btn_review)
         vb.addLayout(hb)
         gb.setLayout(vb)
         lay.addWidget(gb)
@@ -52,6 +57,10 @@ class AdminScoresModule(QWidget):
         lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lab.setStyleSheet(f"QLabel {{ background-color:{bg}; color:{fg}; border-radius:10px; padding:2px 8px; font-size:12px; }}")
         return lab
+    def open_review(self):
+        dlg = ReviewWindow(self.user, self)
+        dlg.exec()
+        self.refresh_scores()
     def refresh_scores(self):
         self.scores_table = getattr(self, 'scores_table', QTableWidget(0, 8))
         self.scores_table.setRowCount(0)
@@ -67,11 +76,16 @@ class AdminScoresModule(QWidget):
             self.scores_table.setItem(r, 5, QTableWidgetItem(a[5] or ''))
             self.scores_table.setItem(r, 6, QTableWidgetItem(a[6] or tr('scores.not_submitted')))
             is_valid = (len(a) > 10 and a[10] == 1)
-            passed_text = '数据异常' if not is_valid else ('通过' if a[8] == 1 else '未通过')
-            badge_bg = '#fff3cd' if not is_valid else ('#e1f3d8' if a[8] == 1 else '#fde2e2')
-            badge_fg = '#8a6d3b' if not is_valid else ('#67c23a' if a[8] == 1 else '#f56c6c')
-            total = int(a[9] or 0)
-            self.scores_table.setCellWidget(r, 7, self.make_tag(f'{a[7]} / {total} / {passed_text}', badge_bg, badge_fg))
+            pending = has_unreviewed_essay(a[0])
+            if pending:
+                total = int(a[9] or 0)
+                self.scores_table.setCellWidget(r, 7, self.make_tag(f'{a[7]} / {total} / {tr("exam.pending_review")}', '#e6f0ff', '#409eff'))
+            else:
+                passed_text = '数据异常' if not is_valid else ('通过' if a[8] == 1 else '未通过')
+                badge_bg = '#fff3cd' if not is_valid else ('#e1f3d8' if a[8] == 1 else '#fde2e2')
+                badge_fg = '#8a6d3b' if not is_valid else ('#67c23a' if a[8] == 1 else '#f56c6c')
+                total = int(a[9] or 0)
+                self.scores_table.setCellWidget(r, 7, self.make_tag(f'{a[7]} / {total} / {passed_text}', badge_bg, badge_fg))
             for c in (3,4):
                 it = self.scores_table.item(r, c)
                 if it:

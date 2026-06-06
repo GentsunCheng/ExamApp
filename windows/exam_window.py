@@ -1,7 +1,7 @@
 import json
 import random
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QGridLayout, QScrollArea, QLineEdit
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QGridLayout, QScrollArea, QLineEdit, QTextEdit
 from PySide6.QtGui import QKeySequence, QShortcut, QPixmap, QGuiApplication
 from theme_manager import theme_manager
 from icon_manager import IconManager
@@ -57,6 +57,8 @@ class ExamWindow(QMainWindow):
         self.attempt_uuid = start_attempt(user['id'], exam_id, self.total_score)
         self.current_index = 0
         self.fill_input = None
+        self.essay_input = None
+        self.exam_passed = False
         self.pic_width = self.get_resolution() / 2
         self.setWindowTitle(tr('exam.in_progress', total=self.total_score))
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
@@ -209,6 +211,9 @@ class ExamWindow(QMainWindow):
             elif q['type'] == 'fill':
                 if not sel or len(sel) == 0 or not sel[0]:
                     return False
+            elif q['type'] == 'essay':
+                if not sel or len(sel) == 0 or not sel[0]:
+                    return False
             else:
                 if not sel:
                     return False
@@ -218,6 +223,15 @@ class ExamWindow(QMainWindow):
         if getattr(self, '_submitted', False):
             return
         q = self.questions[self.current_index]
+        sel = [text] if text.strip() else []
+        self.answers[q['id']] = sel
+        self.update_buttons_state()
+
+    def on_essay_text_changed(self):
+        if getattr(self, '_submitted', False):
+            return
+        q = self.questions[self.current_index]
+        text = self.essay_input.toPlainText() if self.essay_input else ''
         sel = [text] if text.strip() else []
         self.answers[q['id']] = sel
         self.update_buttons_state()
@@ -263,6 +277,14 @@ class ExamWindow(QMainWindow):
                         else:
                             style_bg = warn_bg
                             style_fg = warn_fg
+                    elif q['type'] == 'essay':
+                        # 简答题提交后：未通过显示待批阅蓝色，已通过则不显示
+                        if getattr(self, 'exam_passed', False):
+                            style_bg = base_bg
+                            style_fg = base_fg
+                        else:
+                            style_bg = colors.get('primary_light', '#e6f0ff')
+                            style_fg = colors['primary']
                     else:
                         style_bg = bad_bg
                         style_fg = bad_fg
@@ -321,9 +343,15 @@ class ExamWindow(QMainWindow):
         while self.opts_layout.count():
             child = self.opts_layout.takeAt(0)
             if child.widget():
-                child.widget().deleteLater()
+                child.widget().setParent(None)
+            elif child.layout():
+                while child.layout().count():
+                    c2 = child.layout().takeAt(0)
+                    if c2.widget():
+                        c2.widget().setParent(None)
         self.opt_buttons = []
         self.fill_input = None
+        self.essay_input = None
         # 构建选项按钮
         colors = theme_manager.get_theme_colors()
         btn_style = (
@@ -351,6 +379,24 @@ class ExamWindow(QMainWindow):
             fill_layout.addWidget(fill_label)
             fill_layout.addWidget(self.fill_input, 1)
             self.opts_layout.addLayout(fill_layout)
+        elif q['type'] == 'essay':
+            essay_label = QLabel(tr('exam.essay_answer') + ': ')
+            essay_label.setStyleSheet(f"font-size:16px; color:{colors['text_primary']};")
+            self.essay_input = QTextEdit()
+            self.essay_input.setPlaceholderText(tr('exam.essay_placeholder'))
+            self.essay_input.setStyleSheet(
+                f"QTextEdit {{ padding:12px 16px; border:1px solid {colors['input_border']}; "
+                f"border-radius:12px; font-size:16px; background-color:{colors['input_background']}; "
+                f"color:{colors['text_primary']}; }}\n"
+                f"QTextEdit:focus {{ border-color:{colors['primary']}; }}"
+            )
+            self.essay_input.setMinimumHeight(120)
+            sel = self.answers.get(q['id'])
+            if sel and len(sel) > 0:
+                self.essay_input.setPlainText(str(sel[0]))
+            self.essay_input.textChanged.connect(lambda: self.on_essay_text_changed())
+            self.opts_layout.addWidget(essay_label)
+            self.opts_layout.addWidget(self.essay_input, 1)
         elif q['type'] == 'truefalse':
             for label, val in [(tr('exam.true'), True), (tr('exam.false'), False)]:
                 btn = QPushButton(label)
@@ -425,6 +471,12 @@ class ExamWindow(QMainWindow):
                 if text:
                     selected = [text]
             return selected
+        if q['type'] == 'essay':
+            if self.essay_input is not None:
+                text = self.essay_input.toPlainText().strip()
+                if text:
+                    selected = [text]
+            return selected
         for b in getattr(self, 'opt_buttons', []):
             if b.isChecked():
                 if q['type'] == 'truefalse':
@@ -482,6 +534,7 @@ class ExamWindow(QMainWindow):
         except Exception:
             pass
         score, passed = submit_attempt(self.attempt_uuid)
+        self.exam_passed = bool(passed)
         show_info(self, tr('exam.result'), f'{tr("exam.score_label")}:{score} {tr("exam.pass_text") if passed==1 else tr("exam.fail_text")}')
         try:
             self.setWindowTitle(tr('exam.finished_title', score=score, total=self.total_score, passed=(tr('exam.pass_text') if passed==1 else tr('exam.fail_text'))))
@@ -541,6 +594,18 @@ class ExamWindow(QMainWindow):
                         f"font-size:14px; color:{colors['success']}; padding:8px 4px; font-weight:bold;"
                     )
                     self.opts_layout.addWidget(correct_label)
+            return
+
+        if q['type'] == 'essay':
+            if self.essay_input is not None:
+                self.essay_input.setReadOnly(True)
+                # 已通过时不显示"待批阅"标签
+                if not getattr(self, 'exam_passed', False):
+                    pending_label = QLabel(tr('exam.pending_review'))
+                    pending_label.setStyleSheet(
+                        f"font-size:14px; color:{colors['primary']}; padding:8px 4px; font-weight:bold;"
+                    )
+                    self.opts_layout.addWidget(pending_label)
             return
 
         # 禁止修改

@@ -2,7 +2,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem
 from theme_manager import theme_manager
 from language import tr
-from models import list_attempts, get_exam_title
+from models import list_attempts, get_exam_title, has_unreviewed_essay
 from PySide6.QtGui import QColor
 from windows.score_detail_window import ScoreDetailWindow
 
@@ -37,8 +37,12 @@ class UserHistoryModule(QWidget):
             self.attempts_table.setItem(r, 3, QTableWidgetItem(a[4] or ''))
             passed_text = tr('attempts.data_invalid') if (len(a) > 8 and a[8] == 0) else (tr('attempts.pass') if a[6]==1 else tr('attempts.fail'))
             total = int(a[7] or 0)
-            ucell = QTableWidgetItem(f'{a[5]} / {total} / {passed_text}')
-            if len(a) > 8 and a[8] == 0:
+            pending = has_unreviewed_essay(a[0])
+            if pending:
+                ucell = QTableWidgetItem(f'{a[5]} / {total} / {tr("exam.pending_review")}')
+                ucell.setBackground(QColor("#e6f0ff"))
+                ucell.setForeground(QColor("#409eff"))
+            elif len(a) > 8 and a[8] == 0:
                 ucell.setBackground(QColor('#fff3cd'))
                 ucell.setForeground(QColor('#8a6d3b'))
             else:

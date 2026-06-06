@@ -297,6 +297,8 @@ class AdminExamsModule(QWidget):
                         qtype = 'truefalse'
                     elif tval in ('填空', 'fill'):
                         qtype = 'fill'
+                    elif tval in ('简答', 'essay'):
+                        qtype = 'essay'
                     else:
                         continue
                     text = (str(row[icontent]).strip() if row[icontent] is not None else '')
@@ -326,7 +328,7 @@ class AdminExamsModule(QWidget):
                             options.append({'key': key, 'text': str(val).strip()})
                             cidx += 1
                             key_index += 1
-                        if not options and qtype not in ('truefalse', 'fill'):
+                        if not options and qtype not in ('truefalse', 'fill', 'essay'):
                             continue
                     sc = 1.0
                     if iscore >= 0 and iscore < len(row):
@@ -376,7 +378,7 @@ class AdminExamsModule(QWidget):
                 base_index = len(valid)
                 for idx, q in enumerate(lst, start=1):
                     t = (q.get('type') or '').strip().lower()
-                    if t not in ('single','multiple','truefalse','fill'):
+                    if t not in ('single','multiple','truefalse','fill','essay'):
                         errs.append(f'{pool_name} {tr("common.question")} {idx} {tr("error.invalid_type")}')
                         continue
                     corr = q.get('correct') or []
@@ -400,6 +402,9 @@ class AdminExamsModule(QWidget):
                             errs.append(f'{pool_name} {tr("common.question")} {idx} {tr("error.invalid_correct")}')
                             continue
                         q['correct'] = [str(c).strip() for c in corr if str(c).strip()]
+                    elif t == 'essay':
+                        # 简答题：无预设正确答案，correct留空
+                        q['correct'] = []
                     else:
                         if not corr or len(corr) != 1 or not isinstance(corr[0], bool):
                             errs.append(f'{pool_name} {tr("common.question")} {idx} {tr("error.tf_need_one")}')
@@ -437,12 +442,13 @@ class AdminExamsModule(QWidget):
             cnt_multiple = sum(1 for d in valid if d.get('type') == 'multiple')
             cnt_tf = sum(1 for d in valid if d.get('type') == 'truefalse')
             cnt_fill = sum(1 for d in valid if d.get('type') == 'fill')
+            cnt_essay = sum(1 for d in valid if d.get('type') == 'essay')
             cnt_mand = sum(1 for d in valid if (d.get('pool') or 'mandatory') == 'mandatory')
             cnt_rand = sum(1 for d in valid if (d.get('pool') or 'mandatory') == 'random')
             extra = ''
             if errs:
                 extra = f'\n{tr("admin.import.extra_prefix")}:\n' + '\n'.join(errs[:10])
-            show_info(self, tr('common.success'), tr('admin.import.success', single=cnt_single, multiple=cnt_multiple, truefalse=cnt_tf, fill=cnt_fill, mandatory=cnt_mand, random=cnt_rand, extra=extra))
+            show_info(self, tr('common.success'), tr('admin.import.success', single=cnt_single, multiple=cnt_multiple, truefalse=cnt_tf, fill=cnt_fill, essay=cnt_essay, mandatory=cnt_mand, random=cnt_rand, extra=extra))
         except Exception as e:
             show_warn(self, tr('common.error'), str(e))
     def clear_exam(self, exam_id):
@@ -479,6 +485,7 @@ class AdminExamsModule(QWidget):
                 {"type":"multiple","text":"以下哪些是Linux常见包管理器?","options":[{"key":"A","text":"apt"},{"key":"B","text":"ls"},{"key":"C","text":"yum"},{"key":"D","text":"pacman"}],"correct":["A","C","D"],"score":3},
                 {"type":"truefalse","text":"Python中的list是可变对象","correct":[True],"score":1},
                 {"type":"fill","text":"Python中按字节读取文件的函数是?","correct":["read"],"score":2},
+                {"type":"essay","text":"请简述Python中__init__方法的作用","correct":[],"score":5},
                 {"type":"single","text":"查看当前工作目录的Linux命令是?","options":[{"key":"A","text":"pwd"},{"key":"B","text":"cd"},{"key":"C","text":"ls"},{"key":"D","text":"echo"}],"correct":["A"],"score":2},
                 {"type":"multiple","text":"以下哪些工具可用于创建Python虚拟环境?","options":[{"key":"A","text":"venv"},{"key":"B","text":"virtualenv"},{"key":"C","text":"pip"},{"key":"D","text":"conda"}],"correct":["A","B","D"],"score":3}
             ]
@@ -505,6 +512,8 @@ class AdminExamsModule(QWidget):
                         ws.append(['单选', item['text'], ','.join(item['correct']), item['score']] + [opt['text'] for opt in item.get('options', [])])
                     elif item['type'] == 'fill':
                         ws.append(['填空', item['text'], ' / '.join(str(c) for c in item['correct']), item['score']])
+                    elif item['type'] == 'essay':
+                        ws.append(['简答', item['text'], '', item['score']])
                     else:
                         ws.append(['多选', item['text'], ','.join(item['correct']), item['score']] + [opt['text'] for opt in item.get('options', [])])
 

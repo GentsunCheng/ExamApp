@@ -580,16 +580,21 @@ def submit_attempt(attempt_uuid):
     attempt_total = float(row[3] or 0.0)
     qs = list_questions(exam_uuid)
     total = 0.0
-    c.execute('SELECT question_id, selected, cheat FROM attempt_answers WHERE attempt_uuid=?', (attempt_uuid,))
+    c.execute('SELECT question_id, selected, cheat, reviewed, manual_score FROM attempt_answers WHERE attempt_uuid=?', (attempt_uuid,))
     answers = {}
+    manual_scores = {}
     for r in c.fetchall():
         val = decrypt_json(r[1])
         answers[r[0]] = val if val is not None else []
+        manual_scores[r[0]] = float(r[4] or 0.0) if r[3] == 1 else 0.0
         if r[2] == 1:
             cheat = True
             break
     for q in qs:
-        total += float(q['score']) if grade_question(q, answers.get(q['id'])) else 0.0
+        if q['type'] == 'essay':
+            total += min(manual_scores.get(q['id'], 0.0), float(q['score']))
+        else:
+            total += float(q['score']) if grade_question(q, answers.get(q['id'])) else 0.0
     # 从题库查询通过比例
     econn = get_exam_conn()
     ec = econn.cursor()
@@ -625,6 +630,9 @@ def grade_question(q, sel):
         user_ans = str(sel[0]).strip().lower()
         correct_list = [str(a).strip().lower() for a in (q.get('correct') or [])]
         return user_ans in correct_list
+    if q['type'] == 'essay':
+        # 简答题不能自动评分
+        return False
     return False
 
 def list_attempts(user_id=None, username=None):
@@ -670,14 +678,19 @@ def list_attempts(user_id=None, username=None):
 def get_attempt_answers(attempt_uuid):
     conn = get_score_conn()
     c = conn.cursor()
-    c.execute('SELECT question_id, selected, cheat FROM attempt_answers WHERE attempt_uuid=?', (attempt_uuid,))
+    c.execute('SELECT question_id, selected, cheat, reviewed, reviewed_by, reviewed_at, manual_score, review_comment FROM attempt_answers WHERE attempt_uuid=?', (attempt_uuid,))
     rows = c.fetchall()
     conn.close()
     result = {}
     for r in rows:
         result[r[0]] = {
             'selected': decrypt_json(r[1]),
-            'cheat': bool(r[2])
+            'cheat': bool(r[2]),
+            'reviewed': bool(r[3]),
+            'reviewed_by': r[4],
+            'reviewed_at': r[5],
+            'manual_score': float(r[6] or 0.0),
+            'review_comment': decrypt_text(r[7]) if r[7] else None,
         }
     return result
 
@@ -702,6 +715,147 @@ def get_attempt(attempt_uuid):
         'total_score': r[7],
         'valid': valid
     }
+
+
+def save_manual_review(attempt_uuid, question_id, reviewed_by, manual_score, review_comment=None):
+    """保存管理员对简答题的批阅"""
+    conn = get_score_conn()
+    c = conn.cursor()
+    c.execute('UPDATE attempt_answers SET reviewed=1, reviewed_by=?, reviewed_at=?, manual_score=?, review_comment=? WHERE attempt_uuid=? AND question_id=?',
+              (reviewed_by, now_iso(), float(manual_score), encrypt_text(review_comment) if review_comment else None, attempt_uuid, question_id))
+    conn.commit()
+    conn.close()
+
+
+def recalculate_attempt_score(attempt_uuid):
+    """重新计算一次attempt的总分（含简答题人工评分）并更新通过状态"""
+    conn = get_score_conn()
+    c = conn.cursor()
+    c.execute('SELECT exam_id, user_id, started_at, total_score FROM attempts WHERE uuid=?', (attempt_uuid,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return 0.0, 0
+    exam_id = row[0]
+    exam_uuid = get_exam_uuid(exam_id)
+    started_at = row[2]
+    attempt_total = float(row[3] or 0.0)
+
+    qs = list_questions(exam_uuid)
+    c.execute('SELECT question_id, selected, cheat, reviewed, manual_score FROM attempt_answers WHERE attempt_uuid=?', (attempt_uuid,))
+    answers = {}
+    manual_scores = {}
+    for r in c.fetchall():
+        val = decrypt_json(r[1])
+        answers[r[0]] = val if val is not None else []
+        manual_scores[r[0]] = float(r[4] or 0.0) if r[3] == 1 else 0.0
+
+    total = 0.0
+    for q in qs:
+        if q['type'] == 'essay':
+            total += min(manual_scores.get(q['id'], 0.0), float(q['score']))
+        else:
+            total += float(q['score']) if grade_question(q, answers.get(q['id'])) else 0.0
+
+    # 查询通过比例
+    econn = get_exam_conn()
+    ec = econn.cursor()
+    ec.execute('SELECT pass_ratio FROM exams WHERE id=?', (exam_id,))
+    pass_ratio = ec.fetchone()[0]
+    econn.close()
+
+    denom = attempt_total if attempt_total > 0 else sum(float(q['score']) for q in qs)
+    passed = 1 if (denom > 0 and total / denom >= pass_ratio) else 0
+
+    c.execute('SELECT started_at, submitted_at FROM attempts WHERE uuid=?', (attempt_uuid,))
+    attempt_row = c.fetchone()
+    sub_ts = attempt_row[1]
+
+    c.execute('UPDATE attempts SET score=?, passed=? WHERE uuid=?', (total, passed, attempt_uuid))
+    try:
+        checksum = hmac.new(SECRET_KEY.encode('utf-8'), ('|'.join([str(attempt_uuid), str(row[1]), str(exam_id), str(started_at), str(sub_ts) if sub_ts else '-', str(total), str(passed), str(attempt_total)])).encode('utf-8'), hashlib.sha256).hexdigest()
+        c.execute('UPDATE attempts SET checksum=? WHERE uuid=?', (checksum, attempt_uuid))
+    except Exception:
+        pass
+    conn.commit()
+    conn.close()
+    return total, passed
+
+
+def get_unreviewed_essays(exam_id=None):
+    """获取所有待批阅的简答题答案"""
+    score_conn = get_score_conn()
+    sc = score_conn.cursor()
+    exam_conn = get_exam_conn()
+    ec = exam_conn.cursor()
+
+    if exam_id:
+        ec.execute('SELECT id, uuid FROM exams WHERE id=?', (exam_id,))
+    else:
+        ec.execute('SELECT id, uuid FROM exams')
+    exams = ec.fetchall()
+
+    results = []
+    for eid, euuid in exams:
+        questions = list_questions(euuid)
+        essay_qs = [q for q in questions if q['type'] == 'essay']
+        if not essay_qs:
+            continue
+        essay_q_ids = [q['id'] for q in essay_qs]
+
+        placeholders = ','.join(['?'] * len(essay_q_ids))
+        sc.execute(f'''
+            SELECT aa.id, aa.attempt_uuid, aa.question_id, aa.selected,
+                   a.user_id
+            FROM attempt_answers aa
+            JOIN attempts a ON aa.attempt_uuid = a.uuid
+            WHERE aa.question_id IN ({placeholders})
+              AND a.exam_id = ?
+              AND aa.reviewed = 0
+        ''', tuple(essay_q_ids) + (eid,))
+
+        q_map = {q['id']: q for q in essay_qs}
+        for r in sc.fetchall():
+            results.append({
+                'answer_id': r[0],
+                'attempt_uuid': r[1],
+                'question_id': r[2],
+                'selected': decrypt_json(r[3]) or [],
+                'exam_id': eid,
+                'user_id': r[4],
+                'question': q_map.get(r[2]),
+            })
+
+    exam_conn.close()
+    score_conn.close()
+    return results
+
+
+def has_unreviewed_essay(attempt_uuid):
+    """检查一次考试尝试是否有未批阅的简答题"""
+    score_conn = get_score_conn()
+    sc = score_conn.cursor()
+    sc.execute('SELECT exam_id FROM attempts WHERE uuid=?', (attempt_uuid,))
+    row = sc.fetchone()
+    if not row:
+        score_conn.close()
+        return False
+    exam_id = row[0]
+    exam_uuid = get_exam_uuid(exam_id)
+    questions = list_questions(exam_uuid)
+    essay_ids = [q['id'] for q in questions if q['type'] == 'essay']
+    if not essay_ids:
+        score_conn.close()
+        return False
+    placeholders = ','.join(['?'] * len(essay_ids))
+    sc.execute(f'SELECT reviewed FROM attempt_answers WHERE attempt_uuid=? AND question_id IN ({placeholders})', (attempt_uuid, *essay_ids))
+    for r in sc.fetchall():
+        if r[0] == 0:
+            score_conn.close()
+            return True
+    score_conn.close()
+    return False
+
 
 def list_attempts_with_user():
     # 先取成绩
@@ -803,9 +957,14 @@ def merge_remote_scores_db(remote_scores_db_path):
         if lcur.fetchone()[0] == 0:
             lcur.execute('INSERT INTO attempts (uuid, user_id, exam_id, started_at, submitted_at, score, passed, total_score, checksum) VALUES (?,?,?,?,?,?,?,?,?)', a)
             rcur2 = rconn.cursor()
-            rcur2.execute('SELECT question_id, selected FROM attempt_answers WHERE attempt_uuid=?', (a[0],))
-            for aa in rcur2.fetchall():
-                lcur.execute('INSERT INTO attempt_answers (attempt_uuid, question_id, selected) VALUES (?,?,?)', (a[0], aa[0], aa[1]))
+            try:
+                rcur2.execute('SELECT question_id, selected, cheat, reviewed, reviewed_by, reviewed_at, manual_score, review_comment FROM attempt_answers WHERE attempt_uuid=?', (a[0],))
+                for aa in rcur2.fetchall():
+                    lcur.execute('INSERT INTO attempt_answers (attempt_uuid, question_id, selected, cheat, reviewed, reviewed_by, reviewed_at, manual_score, review_comment) VALUES (?,?,?,?,?,?,?,?,?)', (a[0], aa[0], aa[1], aa[2], aa[3], aa[4], aa[5], aa[6], aa[7]))
+            except Exception:
+                rcur2.execute('SELECT question_id, selected FROM attempt_answers WHERE attempt_uuid=?', (a[0],))
+                for aa in rcur2.fetchall():
+                    lcur.execute('INSERT INTO attempt_answers (attempt_uuid, question_id, selected) VALUES (?,?,?)', (a[0], aa[0], aa[1]))
     lconn.commit()
     rconn.close()
     lconn.close()

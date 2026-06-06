@@ -32,6 +32,14 @@ ITER_DICT = {
     "260516": [
         (EXAMS_DB_PATH, 'exams', 'uuid', 'TEXT', 'NULL'),
         (EXAMS_DB_PATH, 'questions', 'exam_uuid', 'TEXT', 'NULL')
+    ],
+    "260518": [],
+    "260606": [
+        (SCORES_DB_PATH, 'attempt_answers', 'reviewed', 'INTEGER', '0'),
+        (SCORES_DB_PATH, 'attempt_answers', 'reviewed_by', 'INTEGER', 'NULL'),
+        (SCORES_DB_PATH, 'attempt_answers', 'reviewed_at', 'TEXT', 'NULL'),
+        (SCORES_DB_PATH, 'attempt_answers', 'manual_score', 'REAL', '0.0'),
+        (SCORES_DB_PATH, 'attempt_answers', 'review_comment', 'TEXT', 'NULL')
     ]
 }
 

@@ -145,7 +145,7 @@ class MainWindow(QMainWindow):
         if role == 'auto':
             role = user['role']
         if role == 'admin':
-            self.admin_view = AdminView(self)
+            self.admin_view = AdminView(user, self)
             self._switch_with_fade(self.admin_view)
         else:
             self.user_view = UserView(user, self)

@@ -162,6 +162,7 @@ class ScoreDetailWindow(QDialog):
             return
 
         exam_title = get_exam_title(attempt['exam_id'])
+        self.exam_passed = attempt['passed']
         self.exam_title_label.setText(exam_title or tr('attempts.detail_title'))
         self.setWindowTitle(f"{tr('attempts.detail_title')} - {exam_title}")
         
@@ -213,8 +214,26 @@ class ScoreDetailWindow(QDialog):
             user_ans = ans_data['selected'] if ans_data else None
             is_correct = grade_question(self.questions[i], user_ans)
             is_cheat = ans_data['cheat'] if ans_data else False
-            
-            if is_cheat:
+
+            if self.questions[i]['type'] == 'essay' and ans_data and ans_data['reviewed']:
+                # 已批阅的简答题：按得分率着色
+                manual_score = ans_data.get('manual_score', 0.0)
+                q_score = float(self.questions[i].get('score', 1))
+                if manual_score >= q_score / 2:
+                    bg = colors['success_light']
+                    fg = colors['success']
+                else:
+                    bg = colors['error_light']
+                    fg = colors['error']
+            elif self.questions[i]['type'] == 'essay':
+                if getattr(self, 'exam_passed', False):
+                    bg = colors['card_background']
+                    fg = colors['text_primary']
+                else:
+                    # 未批阅简答题显示蓝色
+                    bg = colors.get('primary_light', '#e6f0ff')
+                    fg = colors['primary']
+            elif is_cheat:
                 bg = colors['warning_light']
                 fg = colors['warning']
             elif is_correct:
@@ -335,6 +354,52 @@ class ScoreDetailWindow(QDialog):
                     f"font-size:14px; color:{colors['success']}; padding:8px 4px; font-weight:bold;"
                 )
                 self.opts_layout.addWidget(correct_label)
+        elif q['type'] == 'essay':
+            colors = theme_manager.get_theme_colors()
+            user_text = str(user_ans[0]) if user_ans and len(user_ans) > 0 and user_ans[0] else ''
+            ans_data = self.user_answers.get(q['id'])
+            is_reviewed = ans_data['reviewed'] if ans_data else False
+            manual_score = ans_data['manual_score'] if ans_data else 0.0
+
+            answer_label = QLabel(tr('exam.essay_answer') + ': ' + user_text)
+            if is_reviewed:
+                answer_label.setStyleSheet(
+                    f"font-size:16px; padding:12px 16px; border:2px solid {colors['success']}; "
+                    f"border-radius:12px; background-color:{colors['success_light']}; "
+                    f"color:{colors['success']}; min-height:44px;"
+                )
+                score_label = QLabel(f"{tr('exam.review_score')}: {manual_score} / {q['score']}")
+                score_label.setStyleSheet(
+                    f"font-size:14px; color:{colors['success']}; padding:8px 4px; font-weight:bold;"
+                )
+                self.opts_layout.addWidget(answer_label)
+                self.opts_layout.addWidget(score_label)
+                if ans_data.get('review_comment'):
+                    comment_label = QLabel(f"{tr('exam.review_comment')}: {ans_data['review_comment']}")
+                    comment_label.setStyleSheet(
+                        f"font-size:14px; color:{colors['text_secondary']}; padding:4px 4px;"
+                    )
+                    self.opts_layout.addWidget(comment_label)
+            else:
+                if getattr(self, 'exam_passed', False):
+                    answer_label.setStyleSheet(
+                        f"font-size:16px; padding:12px 16px; border:2px solid {colors['input_border']}; "
+                        f"border-radius:12px; background-color:{colors['card_background']}; "
+                        f"color:{colors['text_primary']}; min-height:44px;"
+                    )
+                    self.opts_layout.addWidget(answer_label)
+                else:
+                    answer_label.setStyleSheet(
+                        f"font-size:16px; padding:12px 16px; border:2px solid {colors['primary']}; "
+                        f"border-radius:12px; background-color:{colors.get('primary_light', '#e6f0ff')}; "
+                        f"color:{colors['primary']}; min-height:44px;"
+                    )
+                    self.opts_layout.addWidget(answer_label)
+                    pending_label = QLabel(tr('exam.pending_review'))
+                    pending_label.setStyleSheet(
+                        f"font-size:14px; color:{colors['primary']}; padding:8px 4px; font-weight:bold;"
+                    )
+                    self.opts_layout.addWidget(pending_label)
         else:
             raw_opts = q['options'] or []
             for i, opt in enumerate(raw_opts):

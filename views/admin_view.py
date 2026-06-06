@@ -15,8 +15,9 @@ from views.admin_modules.knowledge_module import AdminKnowledgeModule
 
 
 class AdminView(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, user, parent=None):
         super().__init__(parent)
+        self.user = user
         self.icon_manager = IconManager()
         colors = theme_manager.get_theme_colors()
         bkg = 'background' + '-color'
@@ -49,7 +50,7 @@ class AdminView(QWidget):
         self.tabs.addTab(AdminUsersModule(self), tr('admin.users_tab'))
         self.tabs.addTab(AdminExamsModule(self), tr('admin.exams_tab'))
         self.tabs.addTab(AdminSyncModule(self), tr('admin.sync_tab'))
-        self.tabs.addTab(AdminScoresModule(self), tr('admin.scores_tab'))
+        self.tabs.addTab(AdminScoresModule(self, user), tr('admin.scores_tab'))
         self.tabs.addTab(AdminScoresOverviewModule(self), tr('admin.exam_progress_tab'))
         self.tabs.addTab(AdminProgressModule(self), tr('admin.study_progress_tab'))
         self.knowledge_module = AdminKnowledgeModule({'id': 0, 'username': 'admin'})
