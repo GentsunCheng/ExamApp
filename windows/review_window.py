@@ -10,7 +10,7 @@ from theme_manager import theme_manager
 from language import tr
 from models import (
     get_unreviewed_essays, save_manual_review, recalculate_attempt_score,
-    get_exam_title, list_exams
+    get_exam_title, get_user_name
 )
 
 
@@ -42,21 +42,6 @@ class ReviewWindow(QDialog):
             }}
             QPushButton:hover {{ background-color:{colors['button_primary_hover']}; }}
             QPushButton:disabled {{ background-color:{colors['border_light']}; }}
-            QTableWidget {{ 
-                background-color:{colors['card_background']}; 
-                color:{colors['text_primary']}; 
-                border:1px solid {colors['border']}; 
-                border-radius:8px; 
-                font-size:13px;
-            }}
-            QTableWidget::item {{ padding:6px; }}
-            QHeaderView::section {{ 
-                background-color:{colors['background']}; 
-                color:{colors['text_primary']}; 
-                border:1px solid {colors['border']}; 
-                padding:6px; 
-                font-weight:bold;
-            }}
             QTextEdit {{ 
                 background-color:{colors['card_background']}; 
                 color:{colors['text_primary']}; 
@@ -84,18 +69,56 @@ class ReviewWindow(QDialog):
         left_layout.setContentsMargins(0, 0, 0, 0)
 
         self.count_label = QLabel()
+        self.count_label.setStyleSheet(
+            f"font-size:15px; font-weight:bold; color:{colors['primary']}; padding:4px 0;"
+        )
         left_layout.addWidget(self.count_label)
 
-        self.table = QTableWidget(0, 3)
+        self.table = QTableWidget(0, 4)
+        self.table.setAlternatingRowColors(True)
         self.table.setHorizontalHeaderLabels([
-            tr('attempts.uuid'), tr('attempts.exam_title'), tr('common.question')
+            tr('attempts.uuid'), tr('scores.headers.username'),
+            tr('attempts.exam_title'), tr('common.question')
         ])
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.setColumnWidth(0, 200)
-        self.table.setColumnWidth(1, 150)
+        self.table.setColumnWidth(0, 100)
+        self.table.setColumnWidth(1, 120)
+        self.table.setColumnWidth(2, 140)
+        self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.itemSelectionChanged.connect(self.on_selection_changed)
+        self.table.setStyleSheet(f"""
+            QTableWidget {{
+                background-color:{colors['card_background']};
+                color:{colors['text_primary']};
+                border:1px solid {colors['border']};
+                border-radius:8px;
+                font-size:13px;
+                gridline-color: {colors['border_light']};
+                outline: none;
+            }}
+            QTableWidget::item {{
+                padding:8px 10px;
+                border-bottom: 1px solid {colors['border_light']};
+            }}
+            QTableWidget::item:hover {{
+                background-color: {colors['border_light']};
+            }}
+            QTableWidget::item:selected {{
+                background-color: {colors['primary']};
+                color: {colors['text_inverse']};
+            }}
+            QHeaderView::section {{
+                background-color: {colors['background']};
+                color: {colors['text_primary']};
+                border: none;
+                border-bottom: 2px solid {colors['primary']};
+                padding: 10px 10px;
+                font-weight: bold;
+                font-size: 13px;
+            }}
+        """)
         left_layout.addWidget(self.table)
 
         self.refresh_btn = QPushButton(tr('common.refresh'))
@@ -181,14 +204,21 @@ class ReviewWindow(QDialog):
         for item in self.items:
             r = self.table.rowCount()
             self.table.insertRow(r)
+            self.table.setRowHeight(r, 36)
+            uuid_item = QTableWidgetItem(item['attempt_uuid'][:8] + '...')
+            uuid_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(r, 0, uuid_item)
+            username = get_user_name(item.get('user_id'))
+            name_item = QTableWidgetItem(username)
+            name_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(r, 1, name_item)
             exam_title = get_exam_title(int(item['exam_id'])) if item.get('exam_id') else ''
-            self.table.setItem(r, 0, QTableWidgetItem(item['attempt_uuid'][:8] + '...'))
-            self.table.setItem(r, 1, QTableWidgetItem(exam_title or ''))
+            self.table.setItem(r, 2, QTableWidgetItem(exam_title or ''))
             q = item.get('question') or {}
             q_text = q.get('text', '')[:50] + ('...' if len(q.get('text', '')) > 50 else '')
-            self.table.setItem(r, 2, QTableWidgetItem(q_text))
+            self.table.setItem(r, 3, QTableWidgetItem(q_text))
 
-        self.count_label.setText(f"{tr('admin.review.title')}: {len(self.items)} {tr('admin.review.empty') if len(self.items) == 0 else ''}")
+        self.count_label.setText(f"{tr('admin.review.title')}: {len(self.items)} 条待批阅")
         self.clear_detail()
 
     def on_selection_changed(self):

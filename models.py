@@ -210,6 +210,24 @@ def authenticate(username, password):
         return None
     return {'id': row[0], 'username': row[1], 'role': 'user', 'full_name': decrypt_text(row[4]) if len(row) > 5 else None}
 
+
+def get_user_name(user_id):
+    """根据用户ID获取用户名（含姓名）"""
+    conn = get_user_conn()
+    c = conn.cursor()
+    try:
+        c.execute('SELECT username, full_name FROM users WHERE id=?', (user_id,))
+        row = c.fetchone()
+        conn.close()
+        if row:
+            full_name = decrypt_text(row[1]) if row[1] else None
+            return f"{row[0]} ({full_name})" if full_name else row[0]
+    except Exception:
+        pass
+    conn.close()
+    return str(user_id)
+
+
 def list_users():
     conn = get_user_conn()
     c = conn.cursor()
