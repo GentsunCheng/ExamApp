@@ -309,6 +309,32 @@ class ScoreDetailWindow(QDialog):
                 btn = QPushButton(label)
                 btn.setStyleSheet(self.get_option_style(q, val, user_ans))
                 self.opts_layout.addWidget(btn)
+        elif q['type'] == 'fill':
+            colors = theme_manager.get_theme_colors()
+            user_text = str(user_ans[0]) if user_ans and len(user_ans) > 0 and user_ans[0] else ''
+            correct = grade_question(q, user_ans)
+            if correct:
+                bg = colors['success_light']
+                border = colors['success']
+                fg = colors['success']
+            else:
+                bg = colors['error_light']
+                border = colors['error']
+                fg = colors['error']
+            answer_label = QLabel(tr('exam.fill_answer') + ': ' + user_text)
+            answer_label.setStyleSheet(
+                f"font-size:16px; padding:12px 16px; border:2px solid {border}; "
+                f"border-radius:12px; background-color:{bg}; color:{fg}; min-height:44px;"
+            )
+            self.opts_layout.addWidget(answer_label)
+            if not correct:
+                correct_label = QLabel(
+                    tr('exam.fill_correct_answer') + ': ' + ' / '.join(str(a) for a in (q.get('correct') or []))
+                )
+                correct_label.setStyleSheet(
+                    f"font-size:14px; color:{colors['success']}; padding:8px 4px; font-weight:bold;"
+                )
+                self.opts_layout.addWidget(correct_label)
         else:
             raw_opts = q['options'] or []
             for i, opt in enumerate(raw_opts):

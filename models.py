@@ -619,6 +619,12 @@ def grade_question(q, sel):
         return sel is not None and sorted(sel) == sorted(q['correct'])
     if q['type'] == 'truefalse':
         return sel is not None and sel == q['correct']
+    if q['type'] == 'fill':
+        if sel is None or len(sel) == 0 or not sel[0]:
+            return False
+        user_ans = str(sel[0]).strip().lower()
+        correct_list = [str(a).strip().lower() for a in (q.get('correct') or [])]
+        return user_ans in correct_list
     return False
 
 def list_attempts(user_id=None, username=None):

@@ -1,7 +1,7 @@
 import json
 import random
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QGridLayout, QScrollArea
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGroupBox, QGridLayout, QScrollArea, QLineEdit
 from PySide6.QtGui import QKeySequence, QShortcut, QPixmap, QGuiApplication
 from theme_manager import theme_manager
 from icon_manager import IconManager
@@ -56,6 +56,7 @@ class ExamWindow(QMainWindow):
             self.total_score += q["score"]
         self.attempt_uuid = start_attempt(user['id'], exam_id, self.total_score)
         self.current_index = 0
+        self.fill_input = None
         self.pic_width = self.get_resolution() / 2
         self.setWindowTitle(tr('exam.in_progress', total=self.total_score))
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
@@ -205,10 +206,21 @@ class ExamWindow(QMainWindow):
             elif q['type'] == 'multiple':
                 if not sel or len(sel) == 0:
                     return False
+            elif q['type'] == 'fill':
+                if not sel or len(sel) == 0 or not sel[0]:
+                    return False
             else:
                 if not sel:
                     return False
         return True
+
+    def on_fill_text_changed(self, text):
+        if getattr(self, '_submitted', False):
+            return
+        q = self.questions[self.current_index]
+        sel = [text] if text.strip() else []
+        self.answers[q['id']] = sel
+        self.update_buttons_state()
 
     def update_buttons_state(self):
         self.prev_btn.setEnabled(self.current_index > 0)
@@ -311,6 +323,7 @@ class ExamWindow(QMainWindow):
             if child.widget():
                 child.widget().deleteLater()
         self.opt_buttons = []
+        self.fill_input = None
         # 构建选项按钮
         colors = theme_manager.get_theme_colors()
         btn_style = (
@@ -319,7 +332,26 @@ class ExamWindow(QMainWindow):
             f"QPushButton:hover {{ background-color:{colors['border_light']}; }}\n"
             f"QPushButton:checked {{ background-color:{colors['primary']}; color:{colors['text_inverse']}; border-color:{colors['primary']}; }}"
         )
-        if q['type'] == 'truefalse':
+        if q['type'] == 'fill':
+            fill_layout = QHBoxLayout()
+            fill_label = QLabel(tr('exam.fill_answer') + ': ')
+            fill_label.setStyleSheet(f"font-size:16px; color:{colors['text_primary']};")
+            self.fill_input = QLineEdit()
+            self.fill_input.setPlaceholderText(tr('exam.fill_placeholder'))
+            self.fill_input.setStyleSheet(
+                f"QLineEdit {{ padding:12px 16px; border:1px solid {colors['input_border']}; "
+                f"border-radius:12px; font-size:16px; background-color:{colors['input_background']}; "
+                f"color:{colors['text_primary']}; min-height:44px; }}\n"
+                f"QLineEdit:focus {{ border-color:{colors['primary']}; }}"
+            )
+            sel = self.answers.get(q['id'])
+            if sel and len(sel) > 0:
+                self.fill_input.setText(str(sel[0]))
+            self.fill_input.textChanged.connect(lambda text: self.on_fill_text_changed(text))
+            fill_layout.addWidget(fill_label)
+            fill_layout.addWidget(self.fill_input, 1)
+            self.opts_layout.addLayout(fill_layout)
+        elif q['type'] == 'truefalse':
             for label, val in [(tr('exam.true'), True), (tr('exam.false'), False)]:
                 btn = QPushButton(label)
                 btn.setCheckable(True)
@@ -387,6 +419,12 @@ class ExamWindow(QMainWindow):
     def collect_selected(self):
         q = self.questions[self.current_index]
         selected = []
+        if q['type'] == 'fill':
+            if self.fill_input is not None:
+                text = self.fill_input.text().strip()
+                if text:
+                    selected = [text]
+            return selected
         for b in getattr(self, 'opt_buttons', []):
             if b.isChecked():
                 if q['type'] == 'truefalse':
@@ -478,6 +516,33 @@ class ExamWindow(QMainWindow):
         sel_list = info['selected'] or []
         sel = set(str(s) for s in sel_list)
         correct_set = set(str(s) for s in (q.get('correct') or []))
+
+        if q['type'] == 'fill':
+            # 禁用输入框
+            if self.fill_input is not None:
+                self.fill_input.setReadOnly(True)
+                if info['correct']:
+                    border_color = ok_border
+                    bg_color = ok_bg
+                else:
+                    border_color = bad_border
+                    bg_color = bad_bg
+                self.fill_input.setStyleSheet(
+                    f"QLineEdit {{ padding:12px 16px; border:2px solid {border_color}; "
+                    f"border-radius:12px; font-size:16px; background-color:{bg_color}; "
+                    f"color:{info['correct'] and ok_fg or bad_fg}; min-height:44px; }}"
+                )
+                # 显示正确答案
+                if not info['correct']:
+                    correct_label = QLabel(
+                        tr('exam.fill_correct_answer') + ': ' + ' / '.join(str(a) for a in (q.get('correct') or []))
+                    )
+                    correct_label.setStyleSheet(
+                        f"font-size:14px; color:{colors['success']}; padding:8px 4px; font-weight:bold;"
+                    )
+                    self.opts_layout.addWidget(correct_label)
+            return
+
         # 禁止修改
         for b in getattr(self, 'opt_buttons', []):
             b.setEnabled(False)
