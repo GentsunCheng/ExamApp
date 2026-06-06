@@ -42,14 +42,16 @@ class UserHistoryModule(QWidget):
                 ucell = QTableWidgetItem(f'{a[5]} / {total} / {tr("exam.pending_review")}')
                 ucell.setBackground(QColor("#e6f0ff"))
                 ucell.setForeground(QColor("#409eff"))
-            elif len(a) > 8 and a[8] == 0:
-                ucell.setBackground(QColor('#fff3cd'))
-                ucell.setForeground(QColor('#8a6d3b'))
             else:
-                if a[6] == 1:
-                    ucell.setBackground(QColor("#6bc041"))
+                ucell = QTableWidgetItem(f'{a[5]} / {total} / {passed_text}')
+                if len(a) > 8 and a[8] == 0:
+                    ucell.setBackground(QColor('#fff3cd'))
+                    ucell.setForeground(QColor('#8a6d3b'))
                 else:
-                    ucell.setBackground(QColor("#e75c5c"))
+                    if a[6] == 1:
+                        ucell.setBackground(QColor("#6bc041"))
+                    else:
+                        ucell.setBackground(QColor("#e75c5c"))
             self.attempts_table.setItem(r, 4, ucell)
         try:
             for r in range(self.attempts_table.rowCount()):
