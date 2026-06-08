@@ -7,4 +7,5 @@ qtawesome
 Pillow
 PyMuPDF
 python-docx
+python-pptx
 markdown

@@ -4,8 +4,10 @@
   - 文本类: txt, md, csv, log, json, xml, yaml, yml, rtf  → QTextBrowser
   - PDF    : pdf                                           → PyMuPDF 渲染为图片
   - 文档   : docx                                          → python-docx 提取文本
+  - 幻灯片 : pptx                                          → python-pptx 提取文本和图片
   - 表格   : xlsx                                          → openpyxl 转 HTML 表格
   - 图片   : png, jpg, jpeg, gif, bmp                      → QLabel + QPixmap
+  - 音视频 : mp4, avi, mov, mp3, wav 等                    → QMediaPlayer + QVideoWidget
   - 其他   : 降级为系统默认程序打开
 """
 
@@ -13,15 +15,13 @@ import os
 import shutil
 import logging
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap, QImage, QFont
+from PySide6.QtCore import Qt, QUrl, QTimer
+from PySide6.QtGui import QPixmap, QImage, QFont, QDesktopServices
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTextBrowser,
     QScrollArea, QPushButton, QTabWidget, QWidget, QSizePolicy,
-    QFileDialog,
+    QFileDialog, QSlider,
 )
-from PySide6.QtCore import QUrl
-from PySide6.QtGui import QDesktopServices
 
 from theme_manager import theme_manager
 from language import tr
@@ -35,15 +35,17 @@ _MD_EXTS = {'.md'}
 _IMAGE_EXTS = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'}
 _PDF_EXTS = {'.pdf'}
 _DOCX_EXTS = {'.docx'}
+_PPTX_EXTS = {'.pptx'}
 _XLSX_EXTS = {'.xlsx'}
+_MEDIA_EXTS = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.mp3', '.wav', '.ogg', '.flac', '.aac', '.wma', '.m4a'}
 # 降级为系统打开的格式
-_FALLBACK_EXTS = {'.doc', '.xls', '.ppt', '.pptx', '.mp4', '.mp3', '.avi', '.mov', '.wav', '.zip', '.rar', '.7z'}
+_FALLBACK_EXTS = {'.doc', '.xls', '.ppt', '.zip', '.rar', '.7z'}
 
 
 def is_supported_format(file_path):
     """判断文件是否可在应用内查看"""
     ext = os.path.splitext(file_path)[1].lower()
-    return ext in _TEXT_EXTS | _MD_EXTS | _IMAGE_EXTS | _PDF_EXTS | _DOCX_EXTS | _XLSX_EXTS
+    return ext in _TEXT_EXTS | _MD_EXTS | _IMAGE_EXTS | _PDF_EXTS | _DOCX_EXTS | _PPTX_EXTS | _XLSX_EXTS | _MEDIA_EXTS
 
 
 def open_file_in_viewer(file_path, parent=None, original_name=None):
@@ -148,8 +150,12 @@ class FileViewerDialog(QDialog):
             return self._build_pdf_viewer()
         elif self.ext in _DOCX_EXTS:
             return self._build_docx_viewer()
+        elif self.ext in _PPTX_EXTS:
+            return self._build_pptx_viewer()
         elif self.ext in _XLSX_EXTS:
             return self._build_xlsx_viewer()
+        elif self.ext in _MEDIA_EXTS:
+            return self._build_media_viewer()
         else:
             label = QLabel(tr('viewer.unsupported_format', ext=self.ext))
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -483,6 +489,287 @@ class FileViewerDialog(QDialog):
         )
         browser.setHtml(html_content)
         return browser
+
+    # ------------------------------------------------------------------ #
+    #  PPTX 文件渲染 (python-pptx)
+    # ------------------------------------------------------------------ #
+    def _build_pptx_viewer(self):
+        try:
+            from pptx import Presentation
+            from pptx.util import Inches, Pt
+        except ImportError:
+            fallback_label = QLabel(tr('viewer.pptx_not_installed'))
+            fallback_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            fallback_label.setStyleSheet(f"color: {self.colors['warning']}; padding: 40px;")
+            return fallback_label
+
+        prs = Presentation(self.file_path)
+        bg = self.colors['card_background']
+        fg = self.colors['text_primary']
+        border = self.colors['border']
+        primary = self.colors['primary']
+
+        container = QWidget()
+        container_layout = QVBoxLayout()
+        container_layout.setContentsMargins(8, 8, 8, 8)
+        container_layout.setSpacing(12)
+        container_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        for slide_num, slide in enumerate(prs.slides, start=1):
+            # 幻灯片容器
+            slide_widget = QWidget()
+            slide_layout = QVBoxLayout()
+            slide_layout.setContentsMargins(16, 12, 16, 12)
+            slide_layout.setSpacing(6)
+
+            slide_layout.addWidget(QLabel(
+                f"<b style='color:{fg}; font-size:15px;'>{tr('viewer.pptx_slide', num=slide_num)}</b>"
+            ))
+
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    for para in shape.text_frame.paragraphs:
+                        text = para.text.strip()
+                        if not text:
+                            continue
+                        font_size = None
+                        is_bold = False
+                        if para.runs:
+                            font = para.runs[0].font
+                            # 估算字号：PPTX 默认 18pt
+                            try:
+                                font_size = font.size.pt if font.size else None
+                            except Exception:
+                                font_size = None
+                            is_bold = font.bold or False
+                        size_px = font_size or 14
+                        weight = 'bold' if is_bold else 'normal'
+                        text_color = fg
+                        label = QLabel(text)
+                        label.setWordWrap(True)
+                        label.setStyleSheet(
+                            f"color: {text_color}; font-size: {size_px}px; "
+                            f"font-weight: {weight}; padding: 1px 0;"
+                        )
+                        slide_layout.addWidget(label)
+
+                elif shape.shape_type == 13:  # Picture
+                    try:
+                        image = shape.image
+                        image_bytes = image.blob
+                        pixmap = QPixmap()
+                        pixmap.loadFromData(image_bytes)
+                        if not pixmap.isNull():
+                            # 限制最大宽度 600px
+                            if pixmap.width() > 600:
+                                pixmap = pixmap.scaledToWidth(
+                                    600, Qt.TransformationMode.SmoothTransformation
+                                )
+                            img_label = QLabel()
+                            img_label.setPixmap(pixmap)
+                            img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                            slide_layout.addWidget(img_label)
+                    except Exception:
+                        pass
+
+            if slide_layout.count() > 1:
+                slide_widget.setLayout(slide_layout)
+                slide_widget.setStyleSheet(
+                    f"background-color: {bg}; "
+                    f"border: 1px solid {border}; border-radius: 8px; "
+                    f"margin: 4px 0;"
+                )
+                container_layout.addWidget(slide_widget)
+
+        container_layout.addStretch()
+        container.setLayout(container_layout)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(container)
+        scroll.setStyleSheet(
+            f"QScrollArea {{ border: 1px solid {border}; border-radius: 6px; "
+            f"background-color: {self.colors['background']}; }}"
+        )
+        prs.close()
+        return scroll
+
+    # ------------------------------------------------------------------ #
+    #  音视频文件播放 (QMediaPlayer)
+    # ------------------------------------------------------------------ #
+    def _build_media_viewer(self):
+        try:
+            from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+            from PySide6.QtMultimediaWidgets import QVideoWidget
+        except ImportError:
+            fallback_label = QLabel(tr('viewer.multimedia_not_installed'))
+            fallback_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            fallback_label.setStyleSheet(f"color: {self.colors['warning']}; padding: 40px;")
+            return fallback_label
+
+        is_video = self.ext in {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm'}
+
+        media_widget = QWidget()
+        media_layout = QVBoxLayout()
+        media_layout.setContentsMargins(0, 0, 0, 0)
+        media_layout.setSpacing(4)
+
+        # 播放器
+        self._media_player = QMediaPlayer()
+        self._audio_output = QAudioOutput()
+        self._media_player.setAudioOutput(self._audio_output)
+
+        if is_video:
+            self._video_widget = QVideoWidget()
+            self._video_widget.setStyleSheet(
+                f"background-color: #000; border: 1px solid {self.colors['border']}; "
+                f"border-radius: 6px;"
+            )
+            self._media_player.setVideoOutput(self._video_widget)
+            self._video_widget.setMinimumHeight(400)
+            media_layout.addWidget(self._video_widget, 1)
+        else:
+            # 音频：显示装饰信息
+            info_label = QLabel(tr('viewer.audio_playing', name=self.original_name))
+            info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            info_label.setStyleSheet(
+                f"color: {self.colors['text_primary']}; font-size: 16px; "
+                f"padding: 60px 20px; "
+                f"border: 1px solid {self.colors['border']}; border-radius: 6px; "
+                f"background-color: {self.colors['background']};"
+            )
+            media_layout.addWidget(info_label, 1)
+
+        # 控制栏
+        controls = QWidget()
+        controls.setStyleSheet(
+            f"background-color: {self.colors['card_background']}; "
+            f"border: 1px solid {self.colors['border']}; border-radius: 6px;"
+        )
+        ctrl_layout = QVBoxLayout()
+        ctrl_layout.setContentsMargins(8, 6, 8, 6)
+        ctrl_layout.setSpacing(4)
+
+        # 进度条
+        self._media_slider = QSlider(Qt.Orientation.Horizontal)
+        self._media_slider.setRange(0, 100)
+        self._media_slider.setStyleSheet(
+            f"QSlider::groove:horizontal {{ height: 4px; background: {self.colors['border']}; "
+            f"border-radius: 2px; }}"
+            f"QSlider::handle:horizontal {{ background: {self.colors['primary']}; "
+            f"width: 14px; height: 14px; margin: -5px 0; border-radius: 7px; }}"
+            f"QSlider::sub-page:horizontal {{ background: {self.colors['primary']}; "
+            f"border-radius: 2px; }}"
+        )
+        self._media_slider.sliderMoved.connect(self._media_seek)
+        ctrl_layout.addWidget(self._media_slider)
+
+        # 按钮行
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+
+        btn_play = QPushButton(tr('viewer.media_play'))
+        btn_play.setStyleSheet(
+            f"QPushButton {{ background-color: {self.colors['primary']}; color: #fff; "
+            f"padding: 6px 16px; font-size: 13px; border-radius: 6px; }}"
+        )
+        btn_play.clicked.connect(self._media_toggle_play)
+        btn_row.addWidget(btn_play)
+
+        self._media_play_btn = btn_play
+
+        # 时间标签
+        self._media_time_label = QLabel("00:00 / 00:00")
+        self._media_time_label.setStyleSheet(
+            f"color: {self.colors['text_secondary']}; font-size: 12px;"
+        )
+        btn_row.addWidget(self._media_time_label)
+
+        # 音量
+        volume_slider = QSlider(Qt.Orientation.Horizontal)
+        volume_slider.setRange(0, 100)
+        volume_slider.setValue(50)
+        volume_slider.setFixedWidth(100)
+        volume_slider.setStyleSheet(
+            f"QSlider::groove:horizontal {{ height: 4px; background: {self.colors['border']}; "
+            f"border-radius: 2px; }}"
+            f"QSlider::handle:horizontal {{ background: {self.colors['primary']}; "
+            f"width: 12px; height: 12px; margin: -4px 0; border-radius: 6px; }}"
+            f"QSlider::sub-page:horizontal {{ background: {self.colors['primary']}; "
+            f"border-radius: 2px; }}"
+        )
+        volume_slider.valueChanged.connect(self._media_set_volume)
+        btn_row.addWidget(volume_slider)
+
+        btn_row.addStretch()
+        ctrl_layout.addLayout(btn_row)
+        controls.setLayout(ctrl_layout)
+        media_layout.addWidget(controls)
+
+        media_widget.setLayout(media_layout)
+
+        # 连接信号
+        self._media_player.positionChanged.connect(self._media_position_changed)
+        self._media_player.durationChanged.connect(self._media_duration_changed)
+        self._media_player.playbackStateChanged.connect(self._media_state_changed)
+
+        # 设置媒体源并播放
+        self._media_player.setSource(QUrl.fromLocalFile(self.file_path))
+        self._media_player.play()
+
+        # 窗口关闭时停止播放
+        self.finished.connect(self._stop_media)
+
+        return media_widget
+
+    # ------------------------------------------------------------------ #
+    #  媒体播放器辅助方法
+    # ------------------------------------------------------------------ #
+    def _media_toggle_play(self):
+        if self._media_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+            self._media_player.pause()
+        else:
+            self._media_player.play()
+
+    def _media_seek(self, position):
+        duration = self._media_player.duration()
+        if duration > 0:
+            self._media_player.setPosition(int(duration * position / 100))
+
+    def _media_set_volume(self, value):
+        self._audio_output.setVolume(value / 100.0)
+
+    def _media_position_changed(self, position):
+        duration = self._media_player.duration()
+        if duration > 0:
+            self._media_slider.blockSignals(True)
+            self._media_slider.setValue(int(position * 100 / duration))
+            self._media_slider.blockSignals(False)
+        self._media_time_label.setText(
+            f"{self._fmt_time(position)} / {self._fmt_time(self._media_player.duration())}"
+        )
+
+    def _media_duration_changed(self, duration):
+        self._media_time_label.setText(
+            f"{self._fmt_time(self._media_player.position())} / {self._fmt_time(duration)}"
+        )
+
+    def _media_state_changed(self, state):
+        if state == QMediaPlayer.PlaybackState.PlayingState:
+            self._media_play_btn.setText(tr('viewer.media_pause'))
+        else:
+            self._media_play_btn.setText(tr('viewer.media_play'))
+
+    def _stop_media(self):
+        self._media_player.stop()
+
+    @staticmethod
+    def _fmt_time(ms):
+        if ms < 0:
+            return "00:00"
+        s = int(ms / 1000)
+        m, s = divmod(s, 60)
+        return f"{m:02d}:{s:02d}"
 
     # ------------------------------------------------------------------ #
     #  XLSX 文件渲染 (openpyxl)
