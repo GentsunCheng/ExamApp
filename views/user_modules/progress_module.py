@@ -1,12 +1,12 @@
 from PySide6.QtCore import Qt
-from PySide6.QtCore import QUrl
-from PySide6.QtGui import QColor, QDesktopServices
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QScrollArea, QTableWidget, QTableWidgetItem, QAbstractItemView, QHBoxLayout, QPushButton, QFileDialog, QDialog, QHeaderView, QLabel, QMessageBox
 
 from icon_manager import IconManager
 from theme_manager import theme_manager
 from language import tr
 from utils import show_info, show_warn
+from file_viewer import open_file_in_viewer
 from models import (
     PROGRESS_STATUS_NOT_STARTED,
     PROGRESS_STATUS_IN_PROGRESS,
@@ -206,7 +206,7 @@ class UserProgressModule(QWidget):
             btn_open = QPushButton('打开')
             btn_open.setStyleSheet("QPushButton { background-color:#409eff; color:#fff; padding:4px 12px; font-size:12px; border-radius:6px; }")
             sha1 = fmeta.get('sha1', '')
-            btn_open.clicked.connect(lambda checked, s=sha1: self.open_file(s))
+            btn_open.clicked.connect(lambda checked, s=sha1, oname=fmeta.get('original_name', ''): self.open_file(s, oname))
 
             btn_del = QPushButton('删除')
             btn_del.setStyleSheet("QPushButton { background-color:#f56c6c; color:#fff; padding:4px 12px; font-size:12px; border-radius:6px; }")
@@ -227,10 +227,10 @@ class UserProgressModule(QWidget):
         dlg.setLayout(layout)
         dlg.exec()
 
-    def open_file(self, sha1):
+    def open_file(self, sha1, original_name=''):
         path = get_file_path(sha1)
         if path and os.path.exists(path):
-            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+            open_file_in_viewer(path, self, original_name=original_name or None)
 
     def delete_file_from_task(self, user_id, task_id, sha1, dialog):
         reply = QMessageBox.question(self, tr('common.confirm'), tr('progress.confirm_delete_file'),

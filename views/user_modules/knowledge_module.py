@@ -10,6 +10,7 @@ from icon_manager import IconManager
 from theme_manager import theme_manager
 from language import tr
 from utils import show_info, show_warn, ask_yes_no
+from file_viewer import open_file_in_viewer
 from models import (
     save_knowledge_file,
     list_knowledge_files,
@@ -214,7 +215,7 @@ class KnowledgeBaseModule(QWidget):
             return
         path = get_knowledge_file_path(sha1)
         if path:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+            open_file_in_viewer(path, self, original_name=it.text())
 
     def _delete_file(self, kb_id):
         reply = ask_yes_no(self, tr('common.confirm'), tr('knowledge.delete_confirm'), default_yes=False)

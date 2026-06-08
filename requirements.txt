@@ -5,3 +5,6 @@ pycryptodome
 openpyxl
 qtawesome
 Pillow
+PyMuPDF
+python-docx
+markdown

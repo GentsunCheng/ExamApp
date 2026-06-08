@@ -7,8 +7,6 @@ from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils import get_column_letter
 
 from PySide6.QtCore import Qt
-from PySide6.QtCore import QUrl
-from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QComboBox, QPushButton, QFileDialog, QScrollArea, QTableWidget, QTableWidgetItem, QCheckBox, QMessageBox, QAbstractItemView, QDialog, QLabel
 
 from icon_manager import IconManager
@@ -16,6 +14,7 @@ from theme_manager import theme_manager
 from utils import show_info, show_warn, ask_yes_no
 from language import tr
 from database import FILES_DIR
+from file_viewer import open_file_in_viewer
 from windows.study_progress_overview_window import ProgressOverviewWindow
 
 from models import (
@@ -433,7 +432,7 @@ class AdminProgressModule(QWidget):
             btn_open = QPushButton('打开')
             btn_open.setStyleSheet("QPushButton { background-color:#409eff; color:#fff; padding:4px 12px; font-size:12px; border-radius:6px; }")
             sha1 = fmeta.get('sha1', '')
-            btn_open.clicked.connect(lambda checked, s=sha1: self.admin_open_file(s))
+            btn_open.clicked.connect(lambda checked, s=sha1, oname=fmeta.get('original_name', ''): self.admin_open_file(s, oname))
 
             row.addWidget(lbl_name)
             row.addWidget(lbl_size)
@@ -449,11 +448,11 @@ class AdminProgressModule(QWidget):
         dlg.setLayout(layout)
         dlg.exec()
 
-    def admin_open_file(self, sha1):
+    def admin_open_file(self, sha1, original_name=''):
         from models import get_file_path
         path = get_file_path(sha1)
         if path and os.path.exists(path):
-            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+            open_file_in_viewer(path, self, original_name=original_name or None)
 
     @staticmethod
     def _format_size(size_bytes):
