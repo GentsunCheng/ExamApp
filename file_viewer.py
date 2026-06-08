@@ -14,6 +14,13 @@
 import os
 import shutil
 import logging
+import html
+
+import fitz
+import markdown as md_lib
+from docx import Document
+from pptx import Presentation
+from openpyxl import load_workbook
 
 from PySide6.QtCore import Qt, QUrl, QTimer
 from PySide6.QtGui import QPixmap, QImage, QFont, QDesktopServices
@@ -22,6 +29,8 @@ from PySide6.QtWidgets import (
     QScrollArea, QPushButton, QTabWidget, QWidget, QSizePolicy,
     QFileDialog, QSlider,
 )
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PySide6.QtMultimediaWidgets import QVideoWidget
 
 from theme_manager import theme_manager
 from language import tr
@@ -185,8 +194,7 @@ class FileViewerDialog(QDialog):
             browser.setHtml(text)
         else:
             # 转义 HTML 特殊字符后以 <pre> 方式渲染，保留格式
-            import html as html_mod
-            escaped = html_mod.escape(text)
+            escaped = html.escape(text)
             html_content = (
                 f"<html><body style='background-color:{bg}; color:{fg};'>"
                 f"<pre style='white-space:pre-wrap; word-wrap:break-word; "
@@ -200,14 +208,6 @@ class FileViewerDialog(QDialog):
     #  Markdown 文件渲染
     # ------------------------------------------------------------------ #
     def _build_md_viewer(self):
-        try:
-            import markdown as md_lib
-        except ImportError:
-            fallback_label = QLabel(tr('viewer.markdown_not_installed'))
-            fallback_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            fallback_label.setStyleSheet(f"color: {self.colors['warning']}; padding: 40px;")
-            return fallback_label
-
         try:
             with open(self.file_path, 'r', encoding='utf-8', errors='replace') as f:
                 md_text = f.read()
@@ -374,14 +374,6 @@ class FileViewerDialog(QDialog):
     #  PDF 文件渲染 (PyMuPDF)
     # ------------------------------------------------------------------ #
     def _build_pdf_viewer(self):
-        try:
-            import fitz  # PyMuPDF
-        except ImportError:
-            fallback_label = QLabel(tr('viewer.pymupdf_not_installed'))
-            fallback_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            fallback_label.setStyleSheet(f"color: {self.colors['warning']}; padding: 40px;")
-            return fallback_label
-
         doc = fitz.open(self.file_path)
         scroll = QScrollArea()
         scroll.setWidgetResizable(False)
@@ -437,14 +429,6 @@ class FileViewerDialog(QDialog):
     #  DOCX 文件渲染 (python-docx)
     # ------------------------------------------------------------------ #
     def _build_docx_viewer(self):
-        try:
-            from docx import Document
-        except ImportError:
-            fallback_label = QLabel(tr('viewer.python_docx_not_installed'))
-            fallback_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            fallback_label.setStyleSheet(f"color: {self.colors['warning']}; padding: 40px;")
-            return fallback_label
-
         doc = Document(self.file_path)
         browser = QTextBrowser()
         bg = self.colors['card_background']
@@ -494,15 +478,6 @@ class FileViewerDialog(QDialog):
     #  PPTX 文件渲染 (python-pptx)
     # ------------------------------------------------------------------ #
     def _build_pptx_viewer(self):
-        try:
-            from pptx import Presentation
-            from pptx.util import Inches, Pt
-        except ImportError:
-            fallback_label = QLabel(tr('viewer.pptx_not_installed'))
-            fallback_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            fallback_label.setStyleSheet(f"color: {self.colors['warning']}; padding: 40px;")
-            return fallback_label
-
         prs = Presentation(self.file_path)
         bg = self.colors['card_background']
         fg = self.colors['text_primary']
@@ -598,15 +573,6 @@ class FileViewerDialog(QDialog):
     #  音视频文件播放 (QMediaPlayer)
     # ------------------------------------------------------------------ #
     def _build_media_viewer(self):
-        try:
-            from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
-            from PySide6.QtMultimediaWidgets import QVideoWidget
-        except ImportError:
-            fallback_label = QLabel(tr('viewer.multimedia_not_installed'))
-            fallback_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            fallback_label.setStyleSheet(f"color: {self.colors['warning']}; padding: 40px;")
-            return fallback_label
-
         is_video = self.ext in {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm'}
 
         media_widget = QWidget()
@@ -775,14 +741,6 @@ class FileViewerDialog(QDialog):
     #  XLSX 文件渲染 (openpyxl)
     # ------------------------------------------------------------------ #
     def _build_xlsx_viewer(self):
-        try:
-            from openpyxl import load_workbook
-        except ImportError:
-            fallback_label = QLabel(tr('viewer.openpyxl_not_installed'))
-            fallback_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            fallback_label.setStyleSheet(f"color: {self.colors['warning']}; padding: 40px;")
-            return fallback_label
-
         wb = load_workbook(self.file_path, data_only=True)
         tabs = QTabWidget()
         tabs.setStyleSheet(
@@ -876,5 +834,4 @@ class FileViewerDialog(QDialog):
 
 def _escape(text):
     """HTML 转义"""
-    import html as html_mod
-    return html_mod.escape(str(text))
+    return html.escape(str(text))
