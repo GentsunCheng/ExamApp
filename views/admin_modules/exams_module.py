@@ -811,7 +811,7 @@ class AdminExamsModule(QWidget):
         self.exams_table.setColumnWidth(5, 480)
         self.exams_table.setColumnWidth(6, 80)
         self.exams_table.setColumnWidth(7, 80)
-        self.exams_table.setColumnWidth(8, 150)
+        self.exams_table.setColumnWidth(8, 210)
         self.exams_table.horizontalHeader().setStretchLastSection(True)
         self.exams_table.setAlternatingRowColors(True)
         self.exams_table.setShowGrid(False)
@@ -953,14 +953,18 @@ class AdminExamsModule(QWidget):
             opw = QWidget()
             hb = QHBoxLayout()
             hb.setContentsMargins(0,0,0,0)
+            btn_export = QPushButton(tr('admin.export.exam'))
+            btn_export.setIcon(self.icon_manager.get_icon('exam_export'))
             btn_clear = QPushButton(tr('common.clear'))
             btn_clear.setIcon(self.icon_manager.get_icon('delete'))
             btn_del = QPushButton(tr('common.delete'))
             btn_del.setIcon(self.icon_manager.get_icon('exam_delete'))
             exam_uuid = e[6] or ''
             exam_id = e[0]
+            btn_export.clicked.connect(lambda _, x=(exam_id, exam_uuid, e[1]): self.export_exam_questions(*x))
             btn_clear.clicked.connect(lambda _, x=exam_uuid: self.clear_exam(x))
             btn_del.clicked.connect(lambda _, x=exam_id: self.delete_exam(x))
+            hb.addWidget(btn_export)
             hb.addWidget(btn_clear)
             hb.addWidget(btn_del)
             hb.addStretch()
@@ -1259,6 +1263,93 @@ class AdminExamsModule(QWidget):
             show_info(self, tr('common.success'), tr('admin.import.success', single=cnt_single, multiple=cnt_multiple, truefalse=cnt_tf, fill=cnt_fill, essay=cnt_essay, mandatory=cnt_mand, random=cnt_rand, extra=extra))
         except Exception as e:
             show_warn(self, tr('common.error'), str(e))
+    def export_exam_questions(self, exam_id, exam_uuid, title=''):
+        """将指定试卷的全部题目导出为与导入模板一致的 Excel 文件"""
+        if not exam_id or not exam_uuid:
+            show_warn(self, tr('common.error'), tr('error.select_exam'))
+            return
+        safe_title = (title or 'exam').strip().replace('/', '_').replace('\\', '_')
+        suggested = os.path.join(str(pathlib.Path.home()), 'Documents', f'{safe_title}_questions')
+        fn, sel = QFileDialog.getSaveFileName(self, tr('admin.export.exam.title'), suggested, 'Excel (*.xlsx)')
+        if not fn:
+            return
+        try:
+            ext = os.path.splitext(fn)[1].lower()
+            out = fn if ext == '.xlsx' or ext == '' else fn + '.xlsx'
+            mand = list_questions_by_pool(exam_uuid, 'mandatory')
+            rand = list_questions_by_pool(exam_uuid, 'random')
+            wb = Workbook()
+            ws_cfg = wb.active
+            ws_cfg.title = '配置选项'
+            ws_cfg.append(['随机抽取数量'])
+            ws_cfg.append([int(get_exam_random_pick_count(exam_uuid) or 0)])
+            self._write_question_sheet(wb.create_sheet('必考题库'), mand)
+            self._write_question_sheet(wb.create_sheet('随机题库'), rand)
+            wb.save(out)
+            show_info(self, tr('common.success'), tr('admin.export.exam.done'))
+        except Exception as e:
+            show_warn(self, tr('common.error'), str(e))
+
+    def _write_question_sheet(self, ws, rows):
+        """按导入模板格式写入一个题库工作表（选项列数按实际题目动态扩展）"""
+        letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        max_opts = max((len(q.get('options') or []) for q in rows), default=0)
+        headers = ['类型', '内容', '正确答案', '分数'] + [f'选项{letters[i]}' for i in range(max_opts)]
+        ws.append(headers)
+        for item in rows:
+            qtype = item.get('type')
+            text = item.get('text') or ''
+            score = item.get('score')
+            correct = item.get('correct') or []
+            if qtype == 'truefalse':
+                row = ['判断', text, 'true' if correct and correct[0] else 'false', score]
+            elif qtype == 'single':
+                row = ['单选', text, ','.join(str(c) for c in correct), score]
+            elif qtype == 'fill':
+                row = ['填空', text, ' / '.join(str(c) for c in correct), score]
+            elif qtype == 'essay':
+                row = ['简答', text, '', score]
+            else:
+                row = ['多选', text, ','.join(str(c) for c in correct), score]
+            row += [o.get('text') if isinstance(o, dict) else o for o in (item.get('options') or [])]
+            ws.append(row)
+        self._style_question_sheet(ws, headers)
+
+    def _style_question_sheet(self, ws, headers):
+        """为题目工作表套用与导入模板一致的样式"""
+        header_fill = PatternFill(start_color='FF409EFF', end_color='FF409EFF', fill_type='solid')
+        header_font = Font(bold=True, color='FFFFFFFF', size=13)
+        data_font = Font(size=12)
+        center = Alignment(horizontal='center', vertical='center')
+        left = Alignment(horizontal='left', vertical='center')
+        thin = Side(style='thin', color='FFDDDDDD')
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+        ncols = len(headers)
+        for c in range(1, ncols + 1):
+            cell = ws.cell(row=1, column=c)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = center
+        ws.row_dimensions[1].height = 26
+        for r in range(2, ws.max_row + 1):
+            for c in range(1, ncols + 1):
+                cell = ws.cell(row=r, column=c)
+                cell.border = border
+                cell.font = data_font
+            for c in range(1, ncols + 1):
+                ws.cell(row=r, column=c).alignment = center if c == 4 else left
+            ws.row_dimensions[r].height = 22
+        widths = [0] * ncols
+        for r in ws.iter_rows(values_only=True):
+            for idx, val in enumerate(r):
+                l = len(str(val)) if val is not None else 0
+                widths[idx] = max(widths[idx], l)
+        for i, w in enumerate(widths, start=1):
+            letter = get_column_letter(i)
+            ws.column_dimensions[letter].width = max(16, min(48, w + 6))
+        ws.freeze_panes = 'A2'
+        ws.auto_filter.ref = f"A1:{get_column_letter(ncols)}{ws.max_row}"
+
     def clear_exam(self, exam_id):
         reply = ask_yes_no(self, tr('common.hint'), tr('admin.exams.clear_confirm'), default_yes=False)
         if reply != QMessageBox.StandardButton.Yes:
