@@ -420,10 +420,39 @@ def get_exam_title(exam_id):
     conn.close()
     return decrypt_text(row[0]) if row else None
 
-def add_question(exam_uuid, qtype, text, options, correct_answers, score):
+def add_question(exam_uuid, qtype, text, options, correct_answers, score, pool='mandatory'):
     conn = get_exam_conn()
     c = conn.cursor()
-    c.execute('INSERT INTO questions (exam_uuid, type, text, options, correct_answers, score) VALUES (?,?,?,?,?,?)', (exam_uuid, qtype, encrypt_text(text), encrypt_json(options or []), encrypt_json(correct_answers), float(score)))
+    c.execute('INSERT INTO questions (exam_uuid, type, text, options, correct_answers, score, pool) VALUES (?,?,?,?,?,?,?)', (exam_uuid, qtype, encrypt_text(text), encrypt_json(options or []), encrypt_json(correct_answers), float(score), pool))
+    conn.commit()
+    new_id = c.lastrowid
+    conn.close()
+    return new_id
+
+
+def update_question(question_id, qtype, text, options, correct_answers, score, pool='mandatory'):
+    conn = get_exam_conn()
+    c = conn.cursor()
+    c.execute('UPDATE questions SET type=?, text=?, options=?, correct_answers=?, score=?, pool=? WHERE id=?', (qtype, encrypt_text(text), encrypt_json(options or []), encrypt_json(correct_answers), float(score), pool, question_id))
+    conn.commit()
+    conn.close()
+
+
+def delete_question(question_id):
+    conn = get_exam_conn()
+    c = conn.cursor()
+    c.execute("SELECT pictures FROM questions WHERE id=?", (question_id,))
+    row = c.fetchone()
+    if row and row[0]:
+        try:
+            pic_list = json.loads(row[0])
+            for p in pic_list:
+                picture_path = os.path.join(RESOURCE_PATH, p)
+                if os.path.exists(picture_path):
+                    os.remove(picture_path)
+        except Exception:
+            pass
+    c.execute('DELETE FROM questions WHERE id=?', (question_id,))
     conn.commit()
     conn.close()
 
@@ -1253,14 +1282,14 @@ def list_questions_by_pool(exam_uuid, pool):
     conn = get_exam_conn()
     c = conn.cursor()
     try:
-        c.execute('SELECT id, type, text, options, correct_answers, score, pictures FROM questions WHERE exam_uuid=? AND (pool=? OR (pool IS NULL AND ?="mandatory")) ORDER BY id', (exam_uuid, pool, pool))
+        c.execute('SELECT id, type, text, options, correct_answers, score, pictures, pool FROM questions WHERE exam_uuid=? AND (pool=? OR (pool IS NULL AND ?="mandatory")) ORDER BY id', (exam_uuid, pool, pool))
     except Exception:
-        c.execute('SELECT id, type, text, options, correct_answers, score, pictures FROM questions WHERE exam_uuid=? ORDER BY id', (exam_uuid,))
+        c.execute('SELECT id, type, text, options, correct_answers, score, pictures, pool FROM questions WHERE exam_uuid=? ORDER BY id', (exam_uuid,))
     rows = c.fetchall()
     conn.close()
     out = []
     for r in rows:
-        out.append({'id': r[0], 'type': r[1], 'text': decrypt_text(r[2]) if r[2] else '', 'options': decrypt_json(r[3]) or [], 'correct': decrypt_json(r[4]) or [], 'score': r[5], 'pictures': r[6]})
+        out.append({'id': r[0], 'type': r[1], 'text': decrypt_text(r[2]) if r[2] else '', 'options': decrypt_json(r[3]) or [], 'correct': decrypt_json(r[4]) or [], 'score': r[5], 'pictures': r[6], 'pool': r[7] or 'mandatory'})
     return out
 
 def get_exam_random_pick_count(exam_uuid):

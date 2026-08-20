@@ -3,23 +3,802 @@ import json
 import pathlib
 from io import BytesIO
 from PySide6.QtCore import Qt, QDateTime
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout, QLineEdit, QTextEdit, QSpinBox, QDateTimeEdit, QPushButton, QFileDialog, QTableWidget, QTableWidgetItem, QAbstractItemView, QCheckBox
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QFormLayout, QLineEdit,
+    QTextEdit, QSpinBox, QDoubleSpinBox, QDateTimeEdit, QPushButton,
+    QFileDialog, QTableWidget, QTableWidgetItem, QAbstractItemView,
+    QCheckBox, QComboBox, QStackedWidget, QListWidget, QListWidgetItem,
+    QScrollArea, QLabel
+)
 from PySide6.QtWidgets import QMessageBox
+from PySide6.QtGui import QPixmap
 from icon_manager import IconManager
 from theme_manager import theme_manager
 from language import tr
 from utils import show_info, show_warn, ask_yes_no
-from models import list_exams, add_exam, import_questions_from_json, get_exam_stats, update_exam_title_desc, save_pic
+from models import (
+    list_exams, add_exam, import_questions_from_json, get_exam_stats,
+    update_exam_title_desc, save_pic, update_question, delete_question,
+    list_questions_by_pool, get_exam_random_pick_count,
+    update_exam_random_pick_count, get_pic,
+)
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils import get_column_letter
+
+
+class QuestionPage(QWidget):
+    """题目管理页：左侧上下两栏（必考题/随机题库），右侧查看与编辑题目"""
+
+    LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+    TYPE_COLORS = {
+        'single': '#409eff',
+        'multiple': '#9254de',
+        'truefalse': '#e6a23c',
+        'fill': '#13c2c2',
+        'essay': '#67c23a',
+    }
+
+    def __init__(self, owner=None, parent=None):
+        super().__init__(parent)
+        self.owner = owner
+        self.icon_manager = IconManager()
+        self.exam_id = None
+        self.exam_uuid = None
+        self.exam_title = ''
+        self.current_qid = None
+        self._editing = False
+        self._loading = False
+        self._option_edits = []
+        self._multi_checks = []
+        self._correct_widget = None
+        self._mandatory_qs = []
+        self._random_qs = []
+        self._build_ui()
+
+    # ---------- UI ----------
+    def _build_ui(self):
+        colors = theme_manager.get_theme_colors()
+        self.setStyleSheet(self._page_qss(colors))
+        main_lay = QVBoxLayout(self)
+        main_lay.setContentsMargins(12, 10, 12, 10)
+        main_lay.setSpacing(10)
+
+        # 顶部栏：返回 + 标题 + 随机抽取数量
+        topbar = QHBoxLayout()
+        topbar.setSpacing(10)
+        self.back_btn = QPushButton(tr('admin.questions.back'))
+        self.back_btn.setObjectName('btn-secondary')
+        self.back_btn.setIcon(self.icon_manager.get_icon('back'))
+        self.back_btn.clicked.connect(self.on_back)
+        topbar.addWidget(self.back_btn)
+        self.title_label = QLabel('')
+        self.title_label.setStyleSheet(f"font-size:17px; font-weight:bold; color:{colors['primary']};")
+        topbar.addWidget(self.title_label)
+        topbar.addStretch()
+        pick_lab = QLabel(tr('admin.questions.random_pick') + ':')
+        pick_lab.setStyleSheet(f"color:{colors['text_secondary']}; font-size:13px; font-weight:600;")
+        topbar.addWidget(pick_lab)
+        self.pick_spin = QSpinBox()
+        self.pick_spin.setRange(0, 999)
+        self.pick_spin.setMinimumWidth(90)
+        self.pick_spin.valueChanged.connect(self.on_pick_changed)
+        topbar.addWidget(self.pick_spin)
+        main_lay.addLayout(topbar)
+
+        body = QHBoxLayout()
+        body.setSpacing(12)
+
+        # 左侧：必考题 / 随机题库
+        left_panel = QWidget()
+        left_panel.setFixedWidth(310)
+        left_lay = QVBoxLayout(left_panel)
+        left_lay.setContentsMargins(0, 0, 0, 0)
+        left_lay.setSpacing(10)
+        self.mand_group = QGroupBox(tr('admin.questions.mandatory_group'))
+        m_lay = QVBoxLayout(self.mand_group)
+        m_lay.setContentsMargins(6, 8, 6, 6)
+        m_lay.setSpacing(0)
+        self.mand_list = QListWidget()
+        self.mand_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.mand_list.itemActivated.connect(self.on_question_activated)
+        self.mand_list.currentRowChanged.connect(self._on_list_row_changed(self.mand_list))
+        m_lay.addWidget(self.mand_list)
+        self.rand_group = QGroupBox(tr('admin.questions.random_group'))
+        r_lay = QVBoxLayout(self.rand_group)
+        r_lay.setContentsMargins(6, 8, 6, 6)
+        r_lay.setSpacing(0)
+        self.rand_list = QListWidget()
+        self.rand_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.rand_list.itemActivated.connect(self.on_question_activated)
+        self.rand_list.currentRowChanged.connect(self._on_list_row_changed(self.rand_list))
+        r_lay.addWidget(self.rand_list)
+        left_lay.addWidget(self.mand_group, 1)
+        left_lay.addWidget(self.rand_group, 1)
+        body.addWidget(left_panel)
+
+        # 右侧：详情 / 编辑
+        right_panel = QWidget()
+        right_lay = QVBoxLayout(right_panel)
+        right_lay.setContentsMargins(0, 0, 0, 0)
+        right_lay.setSpacing(10)
+
+        self.hint_label = QLabel(tr('admin.questions.view_hint'))
+        self.hint_label.setObjectName('hint-chip')
+        right_lay.addWidget(self.hint_label)
+
+        # 元信息徽章：类型 / 分数 / 题库
+        self.meta_bar = QHBoxLayout()
+        self.meta_bar.setSpacing(8)
+        self.meta_type_badge = QLabel('')
+        self.meta_score_badge = QLabel('')
+        self.meta_pool_badge = QLabel('')
+        for lab in (self.meta_type_badge, self.meta_score_badge, self.meta_pool_badge):
+            lab.setVisible(False)
+        self.meta_bar.addWidget(self.meta_type_badge)
+        self.meta_bar.addWidget(self.meta_score_badge)
+        self.meta_bar.addWidget(self.meta_pool_badge)
+        self.meta_bar.addStretch()
+        right_lay.addLayout(self.meta_bar)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setStyleSheet(f"QScrollArea {{ border:1px solid {colors['border']}; border-radius:12px; background-color:transparent; }}")
+        content = QWidget()
+        content.setStyleSheet("background-color: transparent;")
+        form_lay = QVBoxLayout(content)
+        form_lay.setContentsMargins(16, 16, 16, 16)
+        form_lay.setSpacing(8)
+
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setVerticalSpacing(14)
+        form.setHorizontalSpacing(18)
+
+        self.type_combo = QComboBox()
+        for tkey in ('single', 'multiple', 'truefalse', 'fill', 'essay'):
+            self.type_combo.addItem(tr('exam.type.' + tkey), tkey)
+        self.type_combo.currentIndexChanged.connect(self.on_type_changed)
+        self.type_combo.setMinimumWidth(170)
+        form.addRow(tr('admin.questions.type'), self.type_combo)
+
+        self.score_spin = QDoubleSpinBox()
+        self.score_spin.setRange(0, 999)
+        self.score_spin.setDecimals(1)
+        self.score_spin.setSingleStep(1.0)
+        self.score_spin.setValue(1.0)
+        self.score_spin.setMinimumWidth(170)
+        self.score_spin.valueChanged.connect(self.on_score_changed)
+        form.addRow(tr('admin.questions.score'), self.score_spin)
+
+        self.pool_combo = QComboBox()
+        self.pool_combo.addItem(tr('admin.questions.pool.mandatory'), 'mandatory')
+        self.pool_combo.addItem(tr('admin.questions.pool.random'), 'random')
+        self.pool_combo.setMinimumWidth(170)
+        form.addRow(tr('admin.questions.pool'), self.pool_combo)
+
+        self.text_edit = QTextEdit()
+        self.text_edit.setPlaceholderText(tr('admin.questions.content'))
+        self.text_edit.setMinimumHeight(110)
+        form.addRow(tr('admin.questions.content'), self.text_edit)
+
+        # 选项编辑区（单选/多选可见）
+        self.options_container = QWidget()
+        opts_lay = QVBoxLayout(self.options_container)
+        opts_lay.setContentsMargins(0, 0, 0, 0)
+        opts_lay.setSpacing(8)
+        for i in range(4):
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(8)
+            lab = QLabel(self.LETTERS[i] + '.')
+            lab.setFixedWidth(26)
+            lab.setStyleSheet(f"font-size:14px; font-weight:700; color:{colors['primary']};")
+            le = QLineEdit()
+            le.setPlaceholderText(tr('admin.questions.options') + f" {self.LETTERS[i]}")
+            row.addWidget(lab)
+            row.addWidget(le, 1)
+            opts_lay.addLayout(row)
+            self._option_edits.append(le)
+        form.addRow(tr('admin.questions.options'), self.options_container)
+
+        # 正确答案区（按题型动态切换）
+        self.correct_container = QWidget()
+        self.correct_container.setLayout(QVBoxLayout())
+        self.correct_container.layout().setContentsMargins(0, 0, 0, 0)
+        form.addRow(tr('admin.questions.correct'), self.correct_container)
+        self.rebuild_correct_widget()
+
+        # 表单字段标签样式
+        for i in range(form.rowCount()):
+            item = form.itemAt(i, QFormLayout.LabelRole)
+            if item is not None and item.widget() is not None:
+                item.widget().setStyleSheet(
+                    f"font-size:14px; color:{colors['text_secondary']}; font-weight:600;"
+                )
+
+        form_lay.addLayout(form)
+
+        # 图片展示区（仅查看模式）
+        self.picture_widget = QWidget()
+        pic_lay = QVBoxLayout(self.picture_widget)
+        pic_lay.setContentsMargins(0, 8, 0, 0)
+        self.picture_title = QLabel('')
+        self.picture_title.setStyleSheet(f"font-weight:bold; color:{colors['text_secondary']}; font-size:13px;")
+        self.picture_rows = QHBoxLayout()
+        self.picture_rows.setSpacing(10)
+        pic_lay.addWidget(self.picture_title)
+        pic_lay.addLayout(self.picture_rows)
+        self.picture_widget.setVisible(False)
+        form_lay.addWidget(self.picture_widget)
+        form_lay.addStretch()
+
+        scroll.setWidget(content)
+        right_lay.addWidget(scroll, 1)
+
+        # 操作按钮
+        btn_lay = QHBoxLayout()
+        btn_lay.setSpacing(10)
+        self.add_btn = QPushButton(tr('admin.questions.add_btn'))
+        self.add_btn.setObjectName('btn-primary')
+        self.add_btn.setIcon(self.icon_manager.get_icon('exam_add'))
+        self.add_btn.clicked.connect(self.new_question)
+        self.edit_btn = QPushButton(tr('common.edit'))
+        self.edit_btn.setObjectName('btn-secondary')
+        self.edit_btn.clicked.connect(self.edit_current)
+        self.save_btn = QPushButton(tr('admin.questions.save_btn'))
+        self.save_btn.setObjectName('btn-success')
+        self.save_btn.setIcon(self.icon_manager.get_icon('save'))
+        self.save_btn.clicked.connect(self.save_question)
+        self.delete_btn = QPushButton(tr('admin.questions.delete_btn'))
+        self.delete_btn.setObjectName('btn-danger')
+        self.delete_btn.setIcon(self.icon_manager.get_icon('exam_delete'))
+        self.delete_btn.clicked.connect(self.delete_current)
+        btn_lay.addWidget(self.add_btn)
+        btn_lay.addWidget(self.edit_btn)
+        btn_lay.addWidget(self.save_btn)
+        btn_lay.addWidget(self.delete_btn)
+        btn_lay.addStretch()
+        right_lay.addLayout(btn_lay)
+
+        body.addWidget(right_panel, 1)
+        main_lay.addLayout(body, 1)
+        self.set_form_enabled(False)
+        self.edit_btn.setEnabled(False)
+        self.save_btn.setEnabled(False)
+        self.delete_btn.setEnabled(False)
+
+    # ---------- 数据加载 ----------
+    def open_exam(self, exam_id, exam_uuid, title):
+        self.exam_id = exam_id
+        self.exam_uuid = exam_uuid
+        self.exam_title = title or ''
+        self.title_label.setText(f"{tr('admin.questions.title')} - {self.exam_title}")
+        self.reload_lists()
+        self.clear_form()
+        self.set_edit_mode(False)
+
+    def reload_lists(self):
+        if not self.exam_uuid:
+            return
+        self._mandatory_qs = list_questions_by_pool(self.exam_uuid, 'mandatory')
+        self._random_qs = list_questions_by_pool(self.exam_uuid, 'random')
+        self._fill_list(self.mand_list, self._mandatory_qs, self.mand_group,
+                        tr('admin.questions.mandatory_group'))
+        self._fill_list(self.rand_list, self._random_qs, self.rand_group,
+                        tr('admin.questions.random_group'))
+        try:
+            self.pick_spin.blockSignals(True)
+            self.pick_spin.setValue(get_exam_random_pick_count(self.exam_uuid))
+            self.pick_spin.blockSignals(False)
+        except Exception:
+            pass
+
+    def _fill_list(self, lst, questions, group, base_title):
+        lst.blockSignals(True)
+        lst.clear()
+        for i, q in enumerate(questions, start=1):
+            item = QListWidgetItem()
+            item.setData(Qt.ItemDataRole.UserRole, q['id'])
+            item.setToolTip(
+                (q.get('text') or '')
+                + f"\n[{tr('exam.type.' + str(q.get('type')))}] "
+                + f"{tr('admin.questions.score')}: {q.get('score', '')}"
+            )
+            lst.addItem(item)
+            row_w = self._make_question_row(q, i)
+            item.setSizeHint(row_w.sizeHint())
+            lst.setItemWidget(item, row_w)
+        lst.blockSignals(False)
+        group.setTitle(f"{base_title} ({len(questions)})")
+
+    # ---------- 列表行 / 徽章样式 ----------
+    def _page_qss(self, c):
+        return f"""
+        QLabel {{ color: {c['text_primary']}; }}
+        QGroupBox {{
+            border: 1px solid {c['border']}; border-radius: 12px;
+            margin-top: 12px; padding-top: 8px;
+            font-size: 13px; font-weight: 600; color: {c['text_secondary']};
+        }}
+        QGroupBox::title {{ subcontrol-origin: margin; left: 12px; padding: 0 6px; }}
+        QListWidget {{
+            background: {c['card_background']}; color: {c['text_primary']};
+            border: 1px solid {c['border']}; border-radius: 10px; padding: 4px; font-size: 13px;
+        }}
+        QListWidget::item {{ border-radius: 8px; margin: 2px; }}
+        QListWidget::item:hover {{ background: {c['border_light']}; }}
+        QListWidget::item:selected {{ background: {c['primary']}; }}
+        QLineEdit, QTextEdit, QComboBox, QDoubleSpinBox, QSpinBox {{
+            background: {c['input_background']}; color: {c['text_primary']};
+            border: 1px solid {c['input_border']}; border-radius: 8px; padding: 7px 10px;
+            selection-background-color: {c['primary']}; selection-color: {c['text_inverse']};
+            font-size: 14px;
+        }}
+        QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QDoubleSpinBox:focus, QSpinBox:focus {{
+            border: 1px solid {c['primary']};
+        }}
+        QLineEdit:disabled, QTextEdit:disabled, QComboBox:disabled, QDoubleSpinBox:disabled, QSpinBox:disabled {{
+            background: transparent; color: {c['text_primary']}; border: 1px dashed {c['border']};
+        }}
+        QComboBox::drop-down {{ width: 26px; border: none; }}
+        QComboBox QAbstractItemView {{
+            background: {c['card_background']}; color: {c['text_primary']};
+            border: 1px solid {c['border']}; border-radius: 8px; padding: 4px;
+            selection-background-color: {c['primary']}; selection-color: {c['text_inverse']}; outline: 0;
+        }}
+        QDoubleSpinBox::up-button, QDoubleSpinBox::down-button, QSpinBox::up-button, QSpinBox::down-button {{
+            width: 20px; border: none; background: {c['border_light']}; border-radius: 6px; margin: 1px;
+        }}
+        QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover, QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
+            background: {c['button_primary_hover']};
+        }}
+        QCheckBox {{ color: {c['text_primary']}; font-size: 14px; spacing: 6px; }}
+        QCheckBox::indicator {{ width: 18px; height: 18px; border-radius: 5px; border: 1px solid {c['input_border']}; background: {c['input_background']}; }}
+        QCheckBox::indicator:checked {{ background: {c['primary']}; border-color: {c['primary']}; }}
+        QPushButton {{ border: none; border-radius: 8px; padding: 8px 18px; font-size: 14px; font-weight: 600; }}
+        QPushButton#btn-primary {{ background: {c['primary']}; color: {c['text_inverse']}; }}
+        QPushButton#btn-primary:hover {{ background: {c['button_primary_hover']}; }}
+        QPushButton#btn-secondary {{ background: {c['card_background']}; color: {c['text_primary']}; border: 1px solid {c['border']}; }}
+        QPushButton#btn-secondary:hover {{ background: {c['border_light']}; }}
+        QPushButton#btn-success {{ background: {c['success']}; color: {c['text_inverse']}; }}
+        QPushButton#btn-success:hover {{ background: #85ce61; }}
+        QPushButton#btn-danger {{ background: {c['error']}; color: {c['text_inverse']}; }}
+        QPushButton#btn-danger:hover {{ background: #f78989; }}
+        QPushButton:disabled {{ background: {c['border_light']}; color: {c['text_tertiary']}; }}
+        QLabel#hint-chip {{
+            background: {c['info_light']}; color: {c['primary']}; font-size: 13px;
+            border-radius: 8px; padding: 7px 12px;
+        }}
+        """
+
+    def _badge_style(self, accent):
+        colors = theme_manager.get_theme_colors()
+        return (
+            f"background:{colors['card_background']}; color:{accent}; "
+            f"border:1px solid {accent}; font-size:12px; font-weight:600; "
+            f"padding:2px 10px; border-radius:10px;"
+        )
+
+    def _type_badge(self, qtype):
+        colors = theme_manager.get_theme_colors()
+        accent = self.TYPE_COLORS.get(str(qtype), colors['primary'])
+        lab = QLabel(tr('exam.type.' + str(qtype)))
+        lab._qtype = str(qtype)
+        lab.setStyleSheet(self._badge_style(accent))
+        return lab
+
+    def _make_question_row(self, q, idx):
+        colors = theme_manager.get_theme_colors()
+        container = QWidget()
+        container.setObjectName('qrow')
+        container.setMinimumHeight(40)
+        lay = QHBoxLayout(container)
+        lay.setContentsMargins(6, 7, 8, 7)
+        lay.setSpacing(10)
+        num_lab = QLabel(str(idx))
+        num_lab.setFixedWidth(24)
+        num_lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        num_lab.setStyleSheet(f"color:{colors['text_tertiary']}; font-size:13px; font-weight:600;")
+        badge = self._type_badge(q.get('type'))
+        text = (q.get('text') or '').replace('\n', ' ')
+        if len(text) > 34:
+            text = text[:34] + '...'
+        preview = QLabel(text)
+        preview.setStyleSheet(f"color:{colors['text_primary']}; font-size:13px;")
+        lay.addWidget(num_lab)
+        lay.addWidget(badge)
+        lay.addWidget(preview, 1)
+        container._q_labels = [num_lab, preview]
+        container._q_badge = badge
+        return container
+
+    def _style_row_widget(self, w, selected):
+        colors = theme_manager.get_theme_colors()
+        accent = self.TYPE_COLORS.get(w._q_badge._qtype, colors['primary'])
+        if selected:
+            w.setStyleSheet(f"QWidget#qrow {{ background:{colors['primary']}; border-radius:8px; }}")
+            w._q_labels[0].setStyleSheet(f"color:{colors['text_inverse']}; font-size:13px; font-weight:600;")
+            w._q_labels[1].setStyleSheet(f"color:{colors['text_inverse']}; font-size:13px;")
+            w._q_badge.setStyleSheet(
+                f"color:{colors['text_inverse']}; background:transparent; border:none; "
+                f"font-size:12px; font-weight:600; padding:2px 10px;"
+            )
+        else:
+            w.setStyleSheet("QWidget#qrow { background:transparent; border-radius:8px; }")
+            w._q_labels[0].setStyleSheet(f"color:{colors['text_tertiary']}; font-size:12px; font-weight:600;")
+            w._q_labels[1].setStyleSheet(f"color:{colors['text_primary']}; font-size:13px;")
+            w._q_badge.setStyleSheet(self._badge_style(accent))
+
+    def _on_list_row_changed(self, lst):
+        def handler(current, previous):
+            for row in (current, previous):
+                item = lst.item(row)
+                if item is None:
+                    continue
+                w = lst.itemWidget(item)
+                if w is not None:
+                    self._style_row_widget(w, row == current)
+        return handler
+
+    def _update_meta_badges(self, q):
+        colors = theme_manager.get_theme_colors()
+        qtype = str(q.get('type'))
+        self.meta_type_badge.setText(tr('exam.type.' + qtype))
+        self.meta_type_badge.setStyleSheet(self._badge_style(self.TYPE_COLORS.get(qtype, colors['primary'])))
+        self.meta_type_badge.setVisible(True)
+        self.meta_score_badge.setText(f"{tr('admin.questions.score')}: {q.get('score', 0)}")
+        self.meta_score_badge.setStyleSheet(self._badge_style(colors['info']))
+        self.meta_score_badge.setVisible(True)
+        pool = q.get('pool') or 'mandatory'
+        self.meta_pool_badge.setText(tr('admin.questions.pool.' + pool))
+        self.meta_pool_badge.setStyleSheet(
+            self._badge_style(colors['success'] if pool == 'mandatory' else colors['warning'])
+        )
+        self.meta_pool_badge.setVisible(True)
+
+    def _clear_meta_badges(self):
+        for lab in (self.meta_type_badge, self.meta_score_badge, self.meta_pool_badge):
+            lab.setText('')
+            lab.setStyleSheet('')
+            lab.setVisible(False)
+
+    # ---------- 查看 / 编辑 ----------
+    def on_question_activated(self, item):
+        qid = item.data(Qt.ItemDataRole.UserRole)
+        if qid is not None:
+            self.load_question(qid)
+
+    def _find_question(self, qid):
+        for q in self._mandatory_qs:
+            if q['id'] == qid:
+                return q, self.mand_list
+        for q in self._random_qs:
+            if q['id'] == qid:
+                return q, self.rand_list
+        return None, None
+
+    def load_question(self, qid):
+        q, lst = self._find_question(qid)
+        if q is None:
+            return
+        self._loading = True
+        try:
+            self.current_qid = qid
+            idx = self.type_combo.findData(q.get('type'))
+            self.type_combo.setCurrentIndex(max(0, idx))
+            self.score_spin.setValue(float(q.get('score') or 0))
+            pool = q.get('pool') or 'mandatory'
+            pidx = self.pool_combo.findData(pool)
+            self.pool_combo.setCurrentIndex(max(0, pidx))
+            self.text_edit.setPlainText(q.get('text') or '')
+            opts = q.get('options') or []
+            for i, le in enumerate(self._option_edits):
+                if i < len(opts):
+                    le.setText(str(opts[i].get('text') or '') if isinstance(opts[i], dict) else str(opts[i]))
+                else:
+                    le.clear()
+            self.rebuild_correct_widget()
+            self.fill_correct(q.get('correct') or [])
+            self._show_pictures(q.get('pictures') or '')
+            self._update_meta_badges(q)
+            # 高亮左侧对应题目
+            if lst is not None:
+                for i in range(lst.count()):
+                    it = lst.item(i)
+                    if it and it.data(Qt.ItemDataRole.UserRole) == qid:
+                        lst.setCurrentRow(i)
+                        break
+            self.set_edit_mode(False)
+        finally:
+            self._loading = False
+
+    def _show_pictures(self, pictures):
+        while self.picture_rows.count():
+            item = self.picture_rows.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+        try:
+            hashes = json.loads(pictures) if pictures else []
+        except Exception:
+            hashes = []
+        if not hashes:
+            self.picture_widget.setVisible(False)
+            return
+        colors = theme_manager.get_theme_colors()
+        self.picture_title.setText(tr('admin.questions.pictures') + ':')
+        for h in hashes:
+            img = get_pic(h)
+            if img:
+                lab = QLabel()
+                lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                pm = QPixmap.fromImage(img)
+                if pm.width() > 400:
+                    pm = pm.scaledToWidth(400, Qt.TransformationMode.SmoothTransformation)
+                lab.setPixmap(pm)
+                self.picture_rows.addWidget(lab)
+        self.picture_widget.setVisible(True)
+
+    def clear_form(self):
+        self._loading = True
+        try:
+            self.current_qid = None
+            self.type_combo.setCurrentIndex(0)
+            self.score_spin.setValue(1.0)
+            self.text_edit.clear()
+            for le in self._option_edits:
+                le.clear()
+            self.pool_combo.setCurrentIndex(0)
+            self.rebuild_correct_widget()
+            self.picture_widget.setVisible(False)
+            self._clear_meta_badges()
+        finally:
+            self._loading = False
+
+    def new_question(self):
+        self.clear_form()
+        self.set_edit_mode(True)
+
+    def edit_current(self):
+        if self.current_qid is None:
+            show_warn(self, tr('common.error'), tr('admin.questions.select_first'))
+            return
+        self.set_edit_mode(True)
+
+    def set_edit_mode(self, editing):
+        self._editing = editing
+        self.set_form_enabled(editing)
+        if editing:
+            self.hint_label.setText(tr('admin.questions.new_question') if self.current_qid is None else tr('admin.questions.view_hint'))
+            self.edit_btn.setEnabled(False)
+            self.save_btn.setEnabled(True)
+            self.delete_btn.setEnabled(self.current_qid is not None)
+        else:
+            self.hint_label.setText(tr('admin.questions.view_hint'))
+            self.edit_btn.setEnabled(self.current_qid is not None)
+            self.save_btn.setEnabled(False)
+            self.delete_btn.setEnabled(self.current_qid is not None)
+
+    def set_form_enabled(self, enabled):
+        for w in (self.type_combo, self.pool_combo, self.text_edit):
+            w.setEnabled(enabled)
+        for le in self._option_edits:
+            le.setEnabled(enabled)
+        if self._correct_widget is not None:
+            self._correct_widget.setEnabled(enabled)
+        # 分数始终可编辑（查看模式下修改后自动保存）
+        self.score_spin.setEnabled(True)
+
+    def on_score_changed(self, value):
+        if self._loading or self.current_qid is None or self._editing:
+            return
+        q, _lst = self._find_question(self.current_qid)
+        if q is None:
+            return
+        try:
+            update_question(
+                self.current_qid,
+                q.get('type'), q.get('text') or '',
+                q.get('options') or [], q.get('correct') or [],
+                float(value), q.get('pool') or 'mandatory',
+            )
+            q['score'] = float(value)
+        except Exception as e:
+            show_warn(self, tr('common.error'), str(e))
+            return
+        self._update_meta_badges(q)
+
+    # ---------- 正确答案控件 ----------
+    def rebuild_correct_widget(self):
+        if self._correct_widget is not None:
+            self._correct_widget.setParent(None)
+            self._correct_widget.deleteLater()
+            self._correct_widget = None
+        self._multi_checks = []
+        lay = self.correct_container.layout()
+        while lay.count():
+            item = lay.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+        qtype = self.type_combo.currentData()
+        colors = theme_manager.get_theme_colors()
+        if qtype == 'single':
+            w = QComboBox()
+            for i in range(4):
+                text = self._option_edits[i].text().strip()
+                if text:
+                    w.addItem(self.LETTERS[i], self.LETTERS[i])
+        elif qtype == 'multiple':
+            w = QWidget()
+            wl = QHBoxLayout(w)
+            wl.setContentsMargins(0, 0, 0, 0)
+            wl.setSpacing(14)
+            for i in range(4):
+                if not self._option_edits[i].text().strip():
+                    continue
+                cb = QCheckBox(self.LETTERS[i])
+                self._multi_checks.append(cb)
+                wl.addWidget(cb)
+            wl.addStretch()
+        elif qtype == 'truefalse':
+            w = QComboBox()
+            w.addItem(tr('exam.true'), True)
+            w.addItem(tr('exam.false'), False)
+        elif qtype == 'fill':
+            w = QLineEdit()
+            w.setPlaceholderText(tr('admin.questions.fill_hint'))
+        else:  # essay
+            w = QLineEdit()
+            w.setPlaceholderText(tr('admin.questions.correct_none'))
+            w.setReadOnly(True)
+        self._correct_widget = w
+        w.setEnabled(self._editing)
+        lay.addWidget(w)
+
+    def fill_correct(self, correct):
+        qtype = self.type_combo.currentData()
+        w = self._correct_widget
+        if w is None:
+            return
+        if qtype == 'single':
+            idx = w.findData(correct[0]) if correct else -1
+            w.setCurrentIndex(max(0, idx))
+        elif qtype == 'multiple':
+            sset = set(str(c) for c in correct)
+            for cb in self._multi_checks:
+                cb.setChecked(cb.text() in sset)
+        elif qtype == 'truefalse':
+            idx = w.findData(bool(correct[0])) if correct else 0
+            w.setCurrentIndex(max(0, idx))
+        elif qtype == 'fill':
+            w.setText(' / '.join(str(c) for c in correct))
+
+    def collect_correct(self):
+        qtype = self.type_combo.currentData()
+        w = self._correct_widget
+        if qtype == 'single':
+            return [str(w.currentData())] if w and w.currentData() is not None else []
+        if qtype == 'multiple':
+            return [cb.text() for cb in self._multi_checks if cb.isChecked()]
+        if qtype == 'truefalse':
+            return [bool(w.currentData())] if w and w.currentData() is not None else []
+        if qtype == 'fill':
+            parts = [p.strip() for p in w.text().replace('，', '/').replace(';', '/').split('/') if p.strip()] if w else []
+            return parts
+        return []
+
+    def collect_options(self):
+        qtype = self.type_combo.currentData()
+        if qtype not in ('single', 'multiple'):
+            return []
+        opts = []
+        for i, le in enumerate(self._option_edits):
+            text = le.text().strip()
+            if text:
+                opts.append({'key': self.LETTERS[i], 'text': text})
+        return opts
+
+    def on_type_changed(self, _idx):
+        # 非选项类题型隐藏选项编辑区
+        qtype = self.type_combo.currentData()
+        self.options_container.setVisible(qtype in ('single', 'multiple'))
+        self.rebuild_correct_widget()
+
+    def on_pick_changed(self, value):
+        if self.exam_id is not None:
+            update_exam_random_pick_count(self.exam_id, value)
+
+    # ---------- 操作 ----------
+    def save_question(self):
+        text = self.text_edit.toPlainText().strip()
+        if not text:
+            show_warn(self, tr('common.error'), tr('admin.questions.text_required'))
+            return
+        qtype = self.type_combo.currentData()
+        score = self.score_spin.value()
+        pool = self.pool_combo.currentData()
+        options = self.collect_options()
+        correct = self.collect_correct()
+        if qtype in ('single', 'multiple'):
+            if not options:
+                show_warn(self, tr('common.error'), tr('admin.questions.no_options'))
+                return
+            keys = {o['key'] for o in options}
+            if not correct or not set(correct).issubset(keys):
+                show_warn(self, tr('common.error'), tr('admin.questions.invalid_correct'))
+                return
+            if qtype == 'single' and len(correct) != 1:
+                show_warn(self, tr('common.error'), tr('admin.questions.invalid_correct'))
+                return
+        elif qtype == 'fill':
+            if not correct:
+                show_warn(self, tr('common.error'), tr('admin.questions.invalid_correct'))
+                return
+        try:
+            if self.current_qid is None:
+                new_id = add_question(self.exam_uuid, qtype, text, options, correct, score, pool)
+                qid = new_id
+            else:
+                update_question(self.current_qid, qtype, text, options, correct, score, pool)
+                qid = self.current_qid
+        except Exception as e:
+            show_warn(self, tr('common.error'), str(e))
+            return
+        self.reload_lists()
+        self._select_by_id(qid, pool)
+        self.load_question(qid)
+        self.set_edit_mode(False)
+        show_info(self, tr('common.success'), tr('admin.questions.saved'))
+
+    def _select_by_id(self, qid, pool):
+        lst = self.mand_list if pool == 'mandatory' else self.rand_list
+        for i in range(lst.count()):
+            it = lst.item(i)
+            if it and it.data(Qt.ItemDataRole.UserRole) == qid:
+                lst.setCurrentRow(i)
+                break
+
+    def delete_current(self):
+        if self.current_qid is None:
+            show_warn(self, tr('common.error'), tr('admin.questions.select_first'))
+            return
+        reply = ask_yes_no(self, tr('common.hint'), tr('admin.questions.delete_confirm'), default_yes=False)
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            delete_question(self.current_qid)
+        except Exception as e:
+            show_warn(self, tr('common.error'), str(e))
+            return
+        self.reload_lists()
+        self.clear_form()
+        self.set_edit_mode(False)
+        show_info(self, tr('common.success'), tr('admin.questions.deleted'))
+
+    def on_back(self):
+        if self.owner is not None:
+            self.owner.back_to_exams()
 
 
 class AdminExamsModule(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.icon_manager = IconManager()
-        lay = QVBoxLayout()
+        self.stack = QStackedWidget()
+        self.exam_list_page = self._build_exam_list_page()
+        self.question_page = QuestionPage(owner=self)
+        self.stack.addWidget(self.exam_list_page)
+        self.stack.addWidget(self.question_page)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self.stack)
+
+    def _build_exam_list_page(self):
+        page = QWidget()
+        lay = QVBoxLayout(page)
+        lay.setContentsMargins(0, 0, 0, 0)
         gb1 = QGroupBox(tr('admin.exams_group'))
         vb1 = QVBoxLayout()
         self.exams_table = QTableWidget(0, 9)
@@ -38,9 +817,14 @@ class AdminExamsModule(QWidget):
         self.exams_table.setShowGrid(False)
         self.exams_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.exams_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.exams_table.itemChanged.connect(self.on_exam_item_changed)
+        self.exams_table.cellDoubleClicked.connect(self.on_exam_double_clicked)
         self.refresh_exams()
         vb1.addWidget(self.exams_table)
-        self.exams_table.itemChanged.connect(self.on_exam_item_changed)
+        colors = theme_manager.get_theme_colors()
+        hint = QLabel(tr('admin.questions.open_hint'))
+        hint.setStyleSheet(f"color:{colors['text_secondary']}; font-size:12px; padding:2px 0;")
+        vb1.addWidget(hint)
         gb1.setLayout(vb1)
         gb2 = QGroupBox(tr('admin.new_exam_group'))
         vb2 = QVBoxLayout()
@@ -131,7 +915,8 @@ class AdminExamsModule(QWidget):
         gb2.setLayout(vb2)
         lay.addWidget(gb1, 3)
         lay.addWidget(gb2, 1)
-        self.setLayout(lay)
+        return page
+
     def refresh_exams(self):
         tbl = getattr(self, 'exams_table', None)
         if tbl is None:
@@ -239,6 +1024,29 @@ class AdminExamsModule(QWidget):
             return None
         it = tbl.item(r, 0)
         return it.data(Qt.ItemDataRole.UserRole) if it else None
+    def on_exam_double_clicked(self, row, col):
+        tbl = getattr(self, 'exams_table', None)
+        if tbl is None:
+            return
+        it = tbl.item(row, 0)
+        if it is None:
+            return
+        try:
+            exam_id = int(it.text())
+        except Exception:
+            return
+        exam_uuid = it.data(Qt.ItemDataRole.UserRole)
+        if not exam_uuid:
+            return
+        title_it = tbl.item(row, 1)
+        title = title_it.text() if title_it else ''
+        self.open_question_page(exam_id, exam_uuid, title)
+    def open_question_page(self, exam_id, exam_uuid, title):
+        self.question_page.open_exam(exam_id, exam_uuid, title)
+        self.stack.setCurrentWidget(self.question_page)
+    def back_to_exams(self):
+        self.stack.setCurrentWidget(self.exam_list_page)
+        self.refresh_exams()
     def import_questions(self):
         exam_id = self.get_selected_exam_id()
         exam_uuid = self.get_selected_exam_uuid()
