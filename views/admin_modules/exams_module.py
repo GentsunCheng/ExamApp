@@ -25,6 +25,7 @@ from models import (
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill, Alignment, Font, Border, Side
 from openpyxl.utils import get_column_letter
+from windows.ai_generate_window import AIGenerateWindow
 
 
 class QuestionPage(QWidget):
@@ -897,6 +898,9 @@ class AdminExamsModule(QWidget):
         form.addRow(tr('admin.exams.form.time_limit'), self.ex_time)
         form.addRow(tr('admin.exams.form.end_date'), self.ex_end)
         form.addRow('', self.ex_permanent)
+        ai_btn = QPushButton(tr('admin.exams.ai_btn'))
+        ai_btn.setIcon(self.icon_manager.get_icon('question'))
+        ai_btn.clicked.connect(self.open_ai_generate)
         add_btn = QPushButton(tr('admin.exams.add_btn'))
         add_btn.setIcon(self.icon_manager.get_icon('exam_add'))
         add_btn.clicked.connect(self.add_exam)
@@ -908,6 +912,7 @@ class AdminExamsModule(QWidget):
         export_btn.clicked.connect(self.export_sample)
         vb2.addLayout(form)
         hb = QHBoxLayout()
+        hb.addWidget(ai_btn)
         hb.addWidget(add_btn)
         hb.addWidget(import_btn)
         hb.addWidget(export_btn)
@@ -1028,6 +1033,18 @@ class AdminExamsModule(QWidget):
             return None
         it = tbl.item(r, 0)
         return it.data(Qt.ItemDataRole.UserRole) if it else None
+    def open_ai_generate(self):
+        exam_id = self.get_selected_exam_id()
+        exam_uuid = self.get_selected_exam_uuid()
+        if not exam_id or not exam_uuid:
+            show_warn(self, tr('common.error'), tr('error.select_exam'))
+            return
+        tbl = self.exams_table
+        r = tbl.currentRow()
+        title_it = tbl.item(r, 1)
+        title = title_it.text() if title_it else ''
+        win = AIGenerateWindow(exam_id, exam_uuid, title, self)
+        win.exec()
     def on_exam_double_clicked(self, row, col):
         tbl = getattr(self, 'exams_table', None)
         if tbl is None:
